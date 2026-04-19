@@ -828,8 +828,30 @@ function InfoBox({ children }) {
 }
 
 // ---------- main ----------
+const STORAGE_KEY = "fatfire_inputs_v1";
+
+function loadSaved() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw);
+    // Merge with defaults so new fields added in future versions always have a value
+    return { ...defaults, ...parsed };
+  } catch {
+    return defaults;
+  }
+}
+
+function saveToStorage(state) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // localStorage unavailable (e.g. private browsing) — fail silently
+  }
+}
+
 export default function FatFireCalculator() {
-  const [s, setS] = useState(defaults);
+  const [s, setS] = useState(loadSaved);
 
   const inputs   = useMemo(() => buildInputs(s), [s]);
   const solved    = useMemo(() => solveEarliestAge(inputs), [inputs]);
@@ -855,9 +877,20 @@ export default function FatFireCalculator() {
   }
 
   // Clear MC results whenever inputs change (they're stale)
-  useMemo(() => { setMc(null); setMcReverse(null); }, [inputs]); // eslint-disable-line
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useMemo(() => { setMc(null); setMcReverse(null); }, [inputs]);
+
+  // Autosave whenever s changes
+  useEffect(() => { saveToStorage(s); }, [s]);
 
   const update = (k) => (v) => setS((prev) => ({ ...prev, [k]: v }));
+
+  function resetToDefaults() {
+    if (window.confirm("Reset all inputs to defaults? This cannot be undone.")) {
+      localStorage.removeItem(STORAGE_KEY);
+      setS(defaults);
+    }
+  }
 
   // Always show in today's dollars (real)
   const displayRows = useMemo(() => {
@@ -929,10 +962,23 @@ export default function FatFireCalculator() {
     <div className="min-h-screen bg-slate-50 p-4 text-slate-900" style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <div className="max-w-7xl mx-auto">
         <div className="mb-4">
-          <h1 className="text-2xl font-bold">FAT FIRE Calculator</h1>
-          <p className="text-sm text-slate-600">
-            Canadian tax-optimized · RRSP meltdown strategy · All figures in today's dollars
-          </p>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold">FAT FIRE Calculator</h1>
+              <p className="text-sm text-slate-600">
+                Canadian tax-optimized · RRSP meltdown strategy · All figures in today's dollars
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <span>Auto-saved</span>
+              <button
+                onClick={resetToDefaults}
+                className="px-2 py-1 rounded border border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+              >
+                Reset to defaults
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-12 gap-4">
