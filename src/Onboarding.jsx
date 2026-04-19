@@ -84,18 +84,12 @@ function classifyFire(retirementAge, lifestyleSpend, workLevel) {
   return                                       { label: "Traditional Retirement",emoji: "🏡", desc: "A well-funded retirement at a traditional age." };
 }
 
-// ---------- shared styles ----------
-const inputCls = "w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white transition-colors";
-const labelCls = "block text-xs font-medium text-slate-500 mb-1";
-const primaryBtn = "w-full py-2.5 rounded-lg text-sm font-semibold transition-colors bg-slate-900 text-white hover:bg-slate-700";
-const secondaryBtn = "w-full py-2.5 rounded-lg text-sm font-semibold transition-colors border border-slate-300 text-slate-600 hover:bg-slate-50";
-
 function Field({ label, children, hint }) {
   return (
-    <div>
-      {label && <label className={labelCls}>{label}</label>}
+    <div className="ob-field">
+      {label && <label className="label-xs">{label}</label>}
       {children}
-      {hint && <p className="text-xs text-slate-400 mt-1">{hint}</p>}
+      {hint && <p className="ob-hint">{hint}</p>}
     </div>
   );
 }
@@ -107,13 +101,13 @@ function DollarInput({ value, onChange, placeholder = "0" }) {
       setRaw(value ? String(value) : "");
   }, [value]);
   return (
-    <div className="relative">
-      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+    <div className="input-group">
+      <span className="adornment --left">$</span>
       <input
         data-dollar="true"
         type="text"
         inputMode="numeric"
-        className={inputCls + " pl-7"}
+        className="input mono"
         placeholder={placeholder}
         value={raw}
         onChange={(e) => {
@@ -135,11 +129,11 @@ function DollarInput({ value, onChange, placeholder = "0" }) {
 function PctInput({ value, onChange, placeholder = "0" }) {
   const pctVal = value ? Math.round(value * 100) : "";
   return (
-    <div className="relative">
+    <div className="input-group">
       <input
         type="text"
         inputMode="numeric"
-        className={inputCls + " pr-7"}
+        className="input mono --suffix"
         placeholder={placeholder}
         value={pctVal === 0 ? "" : pctVal}
         onChange={(e) => {
@@ -149,52 +143,33 @@ function PctInput({ value, onChange, placeholder = "0" }) {
           else if (cleaned === "") onChange(0);
         }}
       />
-      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
-    </div>
-  );
-}
-
-// Progress bar — no numbers, just the bar
-function ProgressBar({ step, total }) {
-  const pct = Math.round((step / total) * 100);
-  return (
-    <div className="w-full mb-6">
-      <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-slate-800 rounded-full transition-all duration-500"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+      <span className="adornment --right">%</span>
     </div>
   );
 }
 
 // Card shell
 function Card({ children, step, totalSteps, onSkip, canExit, onExit, onBack }) {
+  const pct = Math.round((step / totalSteps) * 100);
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-lg">
-        {/* Top nav row: back on left, skip/exit on right */}
-        <div className="flex justify-between items-center mb-3 h-5">
+    <div className="ob-scene">
+      <div className="ob-card" style={{ maxWidth: 480 }}>
+        <div className="ob-card__topnav">
           {onBack ? (
-            <button onClick={onBack} className="text-xs text-slate-400 hover:text-slate-600 transition-colors">
-              ← Back
-            </button>
+            <button onClick={onBack} className="btn btn--ghost btn--sm">← Back</button>
           ) : (
             <span />
           )}
           {canExit ? (
-            <button onClick={onExit} className="text-xs text-slate-400 hover:text-slate-600 transition-colors">
-              Skip to the dashboard →
-            </button>
+            <button onClick={onExit} className="btn btn--ghost btn--sm">Skip to the dashboard →</button>
           ) : (
-            <button onClick={onSkip} className="text-xs text-slate-400 hover:text-slate-600 transition-colors">
-              Skip for now →
-            </button>
+            <button onClick={onSkip} className="btn btn--ghost btn--sm">Skip for now →</button>
           )}
         </div>
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-100 p-8">
-          <ProgressBar step={step} total={totalSteps} />
+        <div className="ob-card__body">
+          <div className="progress">
+            <div style={{ width: `${pct}%` }} />
+          </div>
           {children}
         </div>
       </div>
@@ -205,16 +180,38 @@ function Card({ children, step, totalSteps, onSkip, canExit, onExit, onBack }) {
 // ---------- Card: Welcome ----------
 function CardWelcome({ onNext, onSignIn }) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-lg border border-slate-100 p-10 text-center">
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">Let's get you to financial independence 🔥</h1>
-        <p className="text-slate-500 text-sm mb-8 leading-relaxed">
-          A Canadian optimized financial independence calculator. We'll build your
-          financial picture in a few quick steps and figure out how quickly you can retire.
-        </p>
-        <div className="space-y-3">
-          <button onClick={onNext} className={primaryBtn}>Let's go →</button>
-          <button onClick={onSignIn} className={secondaryBtn}>I already have an account</button>
+    <div className="ob-scene">
+      <div className="ob-card">
+        <div className="ob-card__body" style={{ textAlign: "center", padding: "56px 48px" }}>
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            padding: "6px 12px", borderRadius: 999,
+            background: "var(--accent-soft)", color: "var(--accent-ink)",
+            fontSize: 12, fontWeight: 500, marginBottom: 28
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: 3, background: "var(--accent)" }} />
+            Canadian-optimized
+          </div>
+          <h1 style={{
+            fontFamily: "var(--font-display)", fontWeight: 600,
+            fontSize: 42, lineHeight: 1.05, letterSpacing: "-0.03em"
+          }}>
+            Let's find the day<br />you can stop working.
+          </h1>
+          <p style={{
+            color: "var(--ink-2)", fontSize: 15, lineHeight: 1.55,
+            marginTop: 20, maxWidth: 360, marginLeft: "auto", marginRight: "auto"
+          }}>
+            Ten quick questions. We'll handle the Canadian tax math — RRSP, TFSA, OAS, CPP,
+            provincial brackets — and show you the exact age when the numbers work.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 32, maxWidth: 320, marginLeft: "auto", marginRight: "auto" }}>
+            <button onClick={onNext} className="btn btn--accent btn--lg" style={{ width: "100%" }}>Let's go →</button>
+            <button onClick={onSignIn} className="btn btn--ghost" style={{ width: "100%" }}>I already have an account</button>
+          </div>
+          <div style={{ marginTop: 24, fontSize: 11, color: "var(--ink-3)" }}>
+            Nothing is shared or stored without your say-so.
+          </div>
         </div>
       </div>
     </div>
@@ -227,48 +224,46 @@ function CardAboutYou({ data, onChange, onNext, onSkip, onBack }) {
   const canExit = !!name;
   return (
     <Card step={1} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-slate-900">
-          {name ? `Nice to meet you, ${name}!` : "Let's start with you."}
-        </h2>
-        <p className="text-sm text-slate-500 mt-1">Just a few basics to get started.</p>
-      </div>
-      <div className="space-y-4">
-        <Field label="Your name">
-          <input
-            type="text"
-            className={inputCls}
-            placeholder="e.g. Alex"
-            value={data.yourName || ""}
-            onChange={(e) => onChange("yourName", e.target.value)}
-          />
-        </Field>
-        <Field label={name ? `How old are you, ${name}?` : "Your current age"}>
-          <input
-            type="number"
-            className={inputCls}
-            placeholder="e.g. 35"
-            min={18} max={80}
-            value={data.currentAge || ""}
-            onChange={(e) => onChange("currentAge", parseInt(e.target.value) || 0)}
-          />
-        </Field>
-        <Field label="Province">
-          <select
-            className={inputCls}
-            value={data.province || "ON"}
-            onChange={(e) => onChange("province", e.target.value)}
-          >
-            {PROVINCES.map((p) => (
-              <option key={p.code} value={p.code}>{p.name}</option>
-            ))}
-          </select>
-        </Field>
-      </div>
-      <div className="mt-6">
-        <button onClick={onNext} className={primaryBtn}>Continue</button>
-      </div>
+      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
+        {name ? `Nice to meet you, ${name}.` : "Let's start with you."}
+      </h2>
+      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 28 }}>Three basics to anchor the plan.</p>
+      <Field label="Your name">
+        <input className="input" type="text" placeholder="e.g. Alex"
+          value={data.yourName || ""}
+          onChange={(e) => onChange("yourName", e.target.value)} />
+      </Field>
+      <Field label={name ? `How old are you, ${name}?` : "Your current age"}>
+        <input className="input mono" type="number" placeholder="e.g. 35"
+          min={18} max={80} style={{ maxWidth: 140 }}
+          value={data.currentAge || ""}
+          onChange={(e) => onChange("currentAge", parseInt(e.target.value) || 0)} />
+      </Field>
+      <Field label="Province" hint="We'll use this for tax brackets, health premiums, and provincial credits.">
+        <select className="input" value={data.province || "ON"}
+          onChange={(e) => onChange("province", e.target.value)}>
+          {PROVINCES.map((p) => (
+            <option key={p.code} value={p.code}>{p.name}</option>
+          ))}
+        </select>
+      </Field>
+      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 10 }}>Continue</button>
     </Card>
+  );
+}
+
+// ---------- Shared: two-up button pair ----------
+function BtnPair({ options, value, onChange }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+      {options.map(({ label, sub, val }) => (
+        <button key={label} onClick={() => onChange(val)}
+          className={`option-tile ${value === val ? "is-active" : ""}`}>
+          <div style={{ fontWeight: 500, fontSize: 14 }}>{label}</div>
+          {sub && <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>{sub}</div>}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -279,123 +274,73 @@ function CardHousehold({ data, onChange, onNext, onSkip, onBack }) {
   const partnered = data.partnered === true;
   const hasKids = data.hasKids === true;
   const spouseName = data.spouseName?.trim();
-  // partnerFillsOwn: true = they'll fill it out themselves, false/null = fill together now
   const partnerFillsOwn = data.partnerFillsOwn === true;
 
   return (
     <Card step={2} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-slate-900">Who are we planning for?</h2>
-        <p className="text-sm text-slate-500 mt-1">
-          {partnered
-            ? `We'll make sure the plan fits both of your pictures.`
-            : `We'll make sure the plan fits ${name}'s full picture.`}
-        </p>
-      </div>
-      <div className="space-y-4">
+      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
+        Who are we planning for?
+      </h2>
+      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
+        {partnered ? "We'll fit the plan around both of you." : `We'll tailor it to ${name}'s full picture.`}
+      </p>
 
-        {/* Single vs partnered */}
-        <Field label="Relationship status">
-          <div className="grid grid-cols-2 gap-2">
-            {[{ label: "Just me", value: false }, { label: "Me & a partner", value: true }].map(({ label, value }) => (
-              <button
-                key={label}
-                onClick={() => onChange("partnered", value)}
-                className={
-                  "py-2.5 rounded-lg border text-sm font-medium transition-colors " +
-                  (partnered === value
-                    ? "border-slate-800 bg-slate-900 text-white"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50")
-                }
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </Field>
+      <Field label="Relationship">
+        <BtnPair
+          value={data.partnered}
+          onChange={(v) => onChange("partnered", v)}
+          options={[
+            { label: "Just me", sub: "Solo plan", val: false },
+            { label: "Me & a partner", sub: "Shared household", val: true },
+          ]}
+        />
+      </Field>
 
-        {/* Partner details */}
-        {partnered && (
-          <>
-            <Field label="Their name">
-              <input
-                type="text"
-                className={inputCls}
-                placeholder="e.g. Jamie"
-                value={data.spouseName || ""}
-                onChange={(e) => onChange("spouseName", e.target.value)}
-              />
-            </Field>
-            <Field label={`${spouseName ? spouseName + "'s" : "Their"} current age`}>
-              <input
-                type="number"
-                className={inputCls}
-                placeholder="e.g. 33"
-                min={18} max={80}
-                value={data.spouseCurrentAge || ""}
-                onChange={(e) => onChange("spouseCurrentAge", parseInt(e.target.value) || 0)}
-              />
-            </Field>
+      {partnered && (
+        <>
+          <Field label="Your partner's name">
+            <input className="input" type="text" placeholder="e.g. Jamie"
+              value={data.spouseName || ""}
+              onChange={(e) => onChange("spouseName", e.target.value)} />
+          </Field>
+          <Field label={`${spouseName ? spouseName + "'s" : "Their"} current age`}>
+            <input className="input mono" type="number" placeholder="e.g. 33"
+              min={18} max={80} style={{ maxWidth: 140 }}
+              value={data.spouseCurrentAge || ""}
+              onChange={(e) => onChange("spouseCurrentAge", parseInt(e.target.value) || 0)} />
+          </Field>
+          <Field label={`Will ${spouseName || "your partner"} fill in their own details?`}>
+            <p className="ob-hint" style={{ marginBottom: 8 }}>Their income, savings, and pension — you can fill it in for them, or send them a link to do it themselves after you sign in.</p>
+            <BtnPair
+              value={data.partnerFillsOwn}
+              onChange={(v) => onChange("partnerFillsOwn", v)}
+              options={[
+                { label: "I'll fill it in", val: false },
+                { label: "They'll do it", val: true },
+              ]}
+            />
+          </Field>
+          {partnerFillsOwn && (
+            <div className="ob-notice">
+              <strong>Got it.</strong> Once you sign in, you'll get a link to share with{" "}
+              {spouseName || "your partner"} — they can join your household and add their details.
+            </div>
+          )}
+        </>
+      )}
 
-            {/* Who fills in their details? */}
-            <Field
-              label={`Will ${spouseName || "your partner"} fill in their own financial details?`}
-            >
-              <p className="text-xs text-slate-400 mb-2">Their income, savings, and pension — you can fill it in for them, or send them a link to do it themselves after you sign in.</p>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: "I'll fill it in", value: false },
-                  { label: "They'll do it", value: true },
-                ].map(({ label, value }) => (
-                  <button
-                    key={label}
-                    onClick={() => onChange("partnerFillsOwn", value)}
-                    className={
-                      "py-2.5 rounded-lg border text-sm font-medium transition-colors " +
-                      (partnerFillsOwn === value
-                        ? "border-slate-800 bg-slate-900 text-white"
-                        : "border-slate-200 text-slate-600 hover:bg-slate-50")
-                    }
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </Field>
+      <Field label="Kids at home (or on the way)">
+        <BtnPair
+          value={data.hasKids}
+          onChange={(v) => onChange("hasKids", v)}
+          options={[
+            { label: "Yes", val: true },
+            { label: "No", val: false },
+          ]}
+        />
+      </Field>
 
-            {/* If partner fills own — reassurance note */}
-            {partnerFillsOwn && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-                <span className="font-semibold">Got it.</span> Once you sign in, you'll get a link to share with{" "}
-                {spouseName || "your partner"} — they'll be able to join your household and add their details.
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Kids */}
-        <Field label="Do you have children under 18?">
-          <div className="grid grid-cols-2 gap-2">
-            {[{ label: "Yes", value: true }, { label: "No", value: false }].map(({ label, value }) => (
-              <button
-                key={label}
-                onClick={() => onChange("hasKids", value)}
-                className={
-                  "py-2.5 rounded-lg border text-sm font-medium transition-colors " +
-                  (hasKids === value
-                    ? "border-slate-800 bg-slate-900 text-white"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50")
-                }
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </Field>
-      </div>
-      <div className="mt-6">
-        <button onClick={onNext} className={primaryBtn}>Continue</button>
-      </div>
+      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 8 }}>Continue</button>
     </Card>
   );
 }
@@ -414,163 +359,98 @@ function CardVision({ data, onChange, onNext, onSkip, onBack }) {
   const spend = lifestyleSliderToSpend(lifestyleVal);
   const fire  = classifyFire(retAge, spend, workLevel);
 
-  // Who this plan is for — shown prominently
-  const planFor = partnered && spouseName
-    ? `${name} & ${spouseName}`
-    : partnered
-      ? `${name} & your partner`
-      : name;
-
-  function setField(key, val) { onChange(key, val); }
+  const planFor = partnered && spouseName ? `${name} & ${spouseName}` : partnered ? `${name} & your partner` : name;
 
   return (
     <Card step={3} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
-      <div className="mb-6">
-        {/* Who this is for */}
-        <div className="flex items-center gap-2 mb-3">
-          <div className="flex -space-x-1.5">
-            {(partnered ? [name, spouseName || "?"] : [name]).map((n, i) => (
-              <div
-                key={i}
-                className="w-7 h-7 rounded-full bg-slate-800 text-white text-xs font-bold flex items-center justify-center ring-2 ring-white"
-              >
-                {(n || "?")[0].toUpperCase()}
-              </div>
-            ))}
-          </div>
-          <span className="text-sm font-medium text-slate-600">{planFor}</span>
-        </div>
-        <h2 className="text-xl font-bold text-slate-900">
-          What does retirement look like?
-        </h2>
-        <p className="text-sm text-slate-500 mt-1">
-          Drag the sliders — we'll tailor the plan to your vision.
-        </p>
-      </div>
+      <div className="chip chip--accent" style={{ marginBottom: 16 }}>Planning for {planFor}</div>
+      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
+        What does the horizon look like?
+      </h2>
+      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>Move the sliders until it feels right.</p>
 
-      <div className="space-y-7">
-        {/* Slider 1: Retirement age */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+        {/* Retirement age */}
         <div>
-          <div className="flex justify-between items-baseline mb-2">
-            <span className="text-sm font-medium text-slate-700">When do you want to retire?</span>
-            <span className="text-lg font-bold text-slate-900">Age {retAge}</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+            <span className="label-xs">Retire at</span>
+            <span className="mono" style={{ fontSize: 14, color: "var(--ink-2)" }}>age {retAge}</span>
           </div>
-          <input
-            type="range" min={40} max={70} step={1}
-            value={retAge}
-            onChange={(e) => setField("visionRetirementAge", parseInt(e.target.value))}
-            className="w-full accent-slate-800"
-          />
-          <div className="flex justify-between text-xs text-slate-400 mt-1">
-            <span>As soon as possible</span>
-            <span>Traditional (65+)</span>
+          <input className="slider" type="range" min={40} max={70} step={1}
+            value={retAge} onChange={(e) => onChange("visionRetirementAge", parseInt(e.target.value))} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--ink-3)", marginTop: 6 }}>
+            <span>As soon as possible</span><span>Traditional (65+)</span>
           </div>
         </div>
 
-        {/* Slider 2: Lifestyle — continuous */}
+        {/* Lifestyle */}
         <div>
-          <div className="flex justify-between items-baseline mb-1">
-            <span className="text-sm font-medium text-slate-700">What lifestyle do you want?</span>
-            <span className="text-sm font-semibold text-slate-900">{lifestyleLabel(spend)}</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+            <span className="label-xs">Lifestyle</span>
+            <span className="mono" style={{ fontSize: 14, color: "var(--ink-2)" }}>{fmtSpend(spend)}/yr</span>
           </div>
-          {/* Spend amount with explanation */}
-          <p className="text-xs text-slate-500 mb-2">
-            <span className="font-semibold text-slate-700">{fmtSpend(spend)}/yr</span>
-            {" "}in today's dollars — what you'd spend each year in retirement
-          </p>
-          <input
-            type="range" min={0} max={100} step={1}
-            value={lifestyleVal}
-            onChange={(e) => setField("visionLifestyleVal", parseInt(e.target.value))}
-            className="w-full accent-slate-800"
-          />
-          <div className="flex justify-between text-xs text-slate-400 mt-1">
-            <span>Lean & simple</span>
-            <span>Luxurious</span>
+          <input className="slider" type="range" min={0} max={100} step={1}
+            value={lifestyleVal} onChange={(e) => onChange("visionLifestyleVal", parseInt(e.target.value))} />
+          <div style={{ marginTop: 10, fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 24, color: "var(--accent-deep)", letterSpacing: "-0.02em" }}>
+            {lifestyleLabel(spend)}
           </div>
         </div>
 
-        {/* Slider 3: Work */}
+        {/* Work level */}
         <div>
-          <div className="flex justify-between items-baseline mb-2">
-            <span className="text-sm font-medium text-slate-700">Will you work in retirement?</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+            <span className="label-xs">Work after retirement</span>
+            <span className="mono" style={{ fontSize: 14, color: "var(--ink-2)" }}>{WORK_HINTS[workLevel - 1]}</span>
           </div>
-          <input
-            type="range" min={1} max={3} step={1}
-            value={workLevel}
-            onChange={(e) => setField("visionWorkLevel", parseInt(e.target.value))}
-            className="w-full accent-slate-800"
-          />
-          <div className="flex justify-between text-xs text-slate-400 mt-1">
-            <span>Fully retired</span>
-            <span>Semi-retired</span>
+          <input className="slider" type="range" min={1} max={3} step={1}
+            value={workLevel} onChange={(e) => onChange("visionWorkLevel", parseInt(e.target.value))} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--ink-3)", marginTop: 6 }}>
+            <span>Fully retired</span><span>Part-time</span><span>Semi-retired</span>
           </div>
-          <p className="text-xs text-slate-500 mt-1.5">
-            <span className="font-medium text-slate-700">{WORK_LABELS[workLevel - 1]}.</span>{" "}
-            {WORK_HINTS[workLevel - 1]}
-          </p>
+          <div style={{ marginTop: 10, fontWeight: 500, fontSize: 16 }}>{WORK_LABELS[workLevel - 1]}</div>
         </div>
       </div>
 
       {/* FIRE type reveal */}
-      <div className="mt-6 bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-start gap-3">
-        <div className="text-2xl">{fire.emoji}</div>
+      <div style={{ marginTop: 24, display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", background: "var(--paper-2)", borderRadius: 12, border: "1px solid var(--line)" }}>
+        <div style={{ fontSize: 28 }}>{fire.emoji}</div>
         <div>
-          <div className="text-xs text-slate-500 mb-0.5">Looks like you're aiming for</div>
-          <div className="text-base font-bold text-slate-900">{fire.label}</div>
-          <div className="text-xs text-slate-500 mt-0.5">{fire.desc}</div>
+          <div className="label-xs" style={{ marginBottom: 2 }}>Looks like you're aiming for</div>
+          <div style={{ fontWeight: 600, fontSize: 16 }}>{fire.label}</div>
+          <div style={{ fontSize: 13, color: "var(--ink-3)", marginTop: 2 }}>{fire.desc}</div>
         </div>
       </div>
 
-      <div className="mt-4">
-        <button onClick={onNext} className={primaryBtn}>This feels right →</button>
-      </div>
+      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>This feels right →</button>
     </Card>
   );
 }
 
 // ---------- Card 4: Income ----------
-// Small toggle for switching between % and $ input modes
 function ModeToggle({ mode, onChange }) {
   return (
-    <div className="flex rounded-md overflow-hidden border border-slate-200 w-fit">
+    <div className="mode-toggle">
       {["%", "$"].map((m) => (
-        <button
-          key={m}
-          onClick={() => onChange(m)}
-          className={"px-2.5 py-1 text-xs font-medium transition-colors " +
-            (mode === m ? "bg-slate-800 text-white" : "bg-white text-slate-500 hover:bg-slate-50")}
-        >
-          {m}
-        </button>
+        <button key={m} onClick={() => onChange(m)} className={mode === m ? "is-active" : ""}>{m}</button>
       ))}
     </div>
   );
 }
 
-// A comp row: yes/no toggle, then amount with % / $ switcher
 function CompRow({ label, hint, hasKey, modeKey, pctKey, dollarKey, data, onChange, vestDateKey, vestDateLabel }) {
-  const has     = data[hasKey]  === true;
-  const mode    = data[modeKey] || "%";
-  const pctVal  = data[pctKey]  || 0;
+  const has      = data[hasKey]    === true;
+  const mode     = data[modeKey]   || "%";
+  const pctVal   = data[pctKey]    || 0;
   const dollarVal = data[dollarKey] || 0;
-
   return (
-    <div className="space-y-1.5">
-      <p className="text-xs text-slate-500">{label}</p>
-      <div className="grid grid-cols-2 gap-2">
-        {[{ label: "Yes", value: true }, { label: "No", value: false }].map(({ label: l, value }) => (
-          <button key={l} onClick={() => onChange(hasKey, value)}
-            className={"py-2 rounded-lg border text-xs font-medium transition-colors " +
-              (has === value ? "border-slate-800 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:bg-slate-50")}>
-            {l}
-          </button>
-        ))}
-      </div>
+    <div style={{ marginBottom: 16 }}>
+      <p className="label-xs" style={{ marginBottom: 8 }}>{label}</p>
+      <BtnPair value={has} onChange={(v) => onChange(hasKey, v)}
+        options={[{ label: "Yes", val: true }, { label: "No", val: false }]} />
       {has && (
-        <div className="pt-1 space-y-2">
-          <div className="flex items-center justify-between">
-            <label className={labelCls + " mb-0"}>{hint}</label>
+        <div style={{ marginTop: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <label className="label-xs">{hint}</label>
             <ModeToggle mode={mode} onChange={(m) => onChange(modeKey, m)} />
           </div>
           {mode === "%" ? (
@@ -580,7 +460,7 @@ function CompRow({ label, hint, hasKey, modeKey, pctKey, dollarKey, data, onChan
           )}
           {vestDateKey && (
             <Field label={vestDateLabel || "Vesting date / cliff"} hint="Optional — helps model timing">
-              <input type="text" className={inputCls} placeholder="e.g. Jun 2026"
+              <input className="input" type="text" placeholder="e.g. Jun 2026"
                 value={data[vestDateKey] || ""}
                 onChange={(e) => onChange(vestDateKey, e.target.value)} />
             </Field>
@@ -602,101 +482,71 @@ function CardIncome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false
 
   function PersonIncome({ prefix, personName }) {
     return (
-      <div className="space-y-4">
+      <div>
         <Field label="Annual base salary">
           <DollarInput value={data[`${prefix}Base`]} onChange={(v) => onChange(`${prefix}Base`, v)} />
         </Field>
-
-        <CompRow
-          label={`Does ${personName} get a performance bonus?`}
-          hint="Typical annual bonus"
+        <CompRow label={`Does ${personName} get a performance bonus?`} hint="Typical annual bonus"
           hasKey={`${prefix}HasBonus`} modeKey={`${prefix}BonusMode`}
           pctKey={`${prefix}BonusPct`} dollarKey={`${prefix}BonusDollar`}
-          data={data} onChange={onChange}
-        />
-
-        <CompRow
-          label="Any stock options or equity grants?"
-          hint="Annual equity value vesting"
+          data={data} onChange={onChange} />
+        <CompRow label="Any stock options or equity grants?" hint="Annual equity value vesting"
           hasKey={`${prefix}HasEquity`} modeKey={`${prefix}EquityMode`}
           pctKey={`${prefix}EquityPct`} dollarKey={`${prefix}EquityDollar`}
           data={data} onChange={onChange}
-          vestDateKey={`${prefix}EquityVestDate`} vestDateLabel="Vesting date / cliff"
-        />
-
-        <CompRow
-          label="What about RSUs?"
-          hint="Annual RSU value vesting"
+          vestDateKey={`${prefix}EquityVestDate`} vestDateLabel="Vesting date / cliff" />
+        <CompRow label="What about RSUs?" hint="Annual RSU value vesting"
           hasKey={`${prefix}HasRsu`} modeKey={`${prefix}RsuMode`}
           pctKey={`${prefix}RsuPct`} dollarKey={`${prefix}RsuAnnual`}
           data={data} onChange={onChange}
-          vestDateKey={`${prefix}RsuVestDate`} vestDateLabel="Next vesting date / cliff"
-        />
-
-        <CompRow
-          label="Commission or variable pay?"
-          hint="Typical annual commission"
+          vestDateKey={`${prefix}RsuVestDate`} vestDateLabel="Next vesting date / cliff" />
+        <CompRow label="Commission or variable pay?" hint="Typical annual commission"
           hasKey={`${prefix}HasCommission`} modeKey={`${prefix}CommissionMode`}
           pctKey={`${prefix}CommissionPct`} dollarKey={`${prefix}CommissionDollar`}
-          data={data} onChange={onChange}
-        />
-
-        <CompRow
-          label="Profit sharing or DPSP?"
-          hint="Annual profit sharing amount"
+          data={data} onChange={onChange} />
+        <CompRow label="Profit sharing or DPSP?" hint="Annual profit sharing amount"
           hasKey={`${prefix}HasProfitShare`} modeKey={`${prefix}ProfitShareMode`}
           pctKey={`${prefix}ProfitSharePct`} dollarKey={`${prefix}ProfitShareDollar`}
-          data={data} onChange={onChange}
-        />
+          data={data} onChange={onChange} />
       </div>
     );
   }
 
   return (
     <Card step={4} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-slate-900">
-          {showSpouse ? `${name} & ${spouseName}'s income` : `${name}'s income`}
-        </h2>
-        <p className="text-sm text-slate-500 mt-1">Start with base salary — we'll layer in the rest.</p>
-      </div>
+      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
+        {showSpouse ? `${name} & ${spouseName}'s income` : `${name}'s income`}
+      </h2>
+      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>Start with base salary — we'll layer in the rest.</p>
 
-      <div className="space-y-5">
-        <div>
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">{name}</div>
-          <PersonIncome prefix="your" personName="you" />
+      <div className="ob-person-label">{name}</div>
+      <PersonIncome prefix="your" personName="you" />
+
+      {showSpouse && (
+        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 20, marginTop: 8 }}>
+          <div className="ob-person-label">{spouseName}</div>
+          <PersonIncome prefix="spouse" personName={spouseName} />
         </div>
-
-        {showSpouse && (
-          <div className="border-t border-slate-100 pt-5">
-            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">{spouseName}</div>
-            <PersonIncome prefix="spouse" personName={spouseName} />
+      )}
+      {partnered && hideSpouse && (
+        <div className="ob-notice" style={{ marginTop: 12 }}>
+          {spouseName}'s income will be added when they join via the invite link.
+        </div>
+      )}
+      {combined > 0 && (
+        <div className="ob-summary">
+          <div className="ob-summary-row">
+            <span className="label-xs">Est. blended tax rate</span>
+            <span className="mono" style={{ fontSize: 14 }}>~{Math.round(estimatedRate * 100)}%</span>
           </div>
-        )}
-        {partnered && hideSpouse && (
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-500">
-            {spouseName}'s income will be added when they join via the invite link.
-          </div>
-        )}
-
-        {combined > 0 && (
-          <div className="bg-slate-50 rounded-lg p-3 flex items-center justify-between">
-            <span className="text-xs text-slate-500">Estimated blended tax rate</span>
-            <span className="text-xs font-semibold text-slate-700 bg-slate-200 px-2 py-0.5 rounded-full">
-              ~{Math.round(estimatedRate * 100)}% <span className="font-normal text-slate-400">(auto)</span>
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-6">
-        <button onClick={onNext} className={primaryBtn}>Continue</button>
-      </div>
+        </div>
+      )}
+      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Continue</button>
     </Card>
   );
 }
 
-// ---------- Card 5: Retirement contributions (monthly + annual) ----------
+// ---------- Card 5: Retirement contributions ----------
 function CardContributions({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }) {
   const name = data.yourName?.trim() || "You";
   const spouseName = data.spouseName?.trim() || "Spouse";
@@ -705,36 +555,30 @@ function CardContributions({ data, onChange, onNext, onSkip, onBack, hideSpouse 
   const showSpouse = partnered && !hideSpouse;
   const hasKids = data.hasKids === true;
 
-  function PersonContributions({ prefix, monthlyRrspKey, monthlyTfsaKey, monthlyNrKey, annualRrspKey, annualTfsaKey, annualNrKey }) {
+  function PersonContributions({ monthlyRrspKey, monthlyTfsaKey, monthlyNrKey, annualRrspKey, annualTfsaKey, annualNrKey }) {
     return (
-      <div className="space-y-4">
-        <div>
-          <div className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Monthly</div>
-          <div className="space-y-2">
-            <Field label="RRSP">
-              <DollarInput value={data[monthlyRrspKey]} onChange={(v) => onChange(monthlyRrspKey, v)} placeholder="e.g. 2,000" />
-            </Field>
-            <Field label="TFSA">
-              <DollarInput value={data[monthlyTfsaKey]} onChange={(v) => onChange(monthlyTfsaKey, v)} placeholder="e.g. 500" />
-            </Field>
-            <Field label="Non-registered" hint="Taxable brokerage, ETFs, etc.">
-              <DollarInput value={data[monthlyNrKey]} onChange={(v) => onChange(monthlyNrKey, v)} placeholder="0" />
-            </Field>
-          </div>
-        </div>
-        <div className="border-t border-slate-100 pt-3">
-          <div className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Annual lump-sum top-ups</div>
-          <div className="space-y-2">
-            <Field label="RRSP" hint="e.g. year-end bonus contribution">
-              <DollarInput value={data[annualRrspKey]} onChange={(v) => onChange(annualRrspKey, v)} placeholder="0" />
-            </Field>
-            <Field label="TFSA">
-              <DollarInput value={data[annualTfsaKey]} onChange={(v) => onChange(annualTfsaKey, v)} placeholder="0" />
-            </Field>
-            <Field label="Non-registered">
-              <DollarInput value={data[annualNrKey]} onChange={(v) => onChange(annualNrKey, v)} placeholder="0" />
-            </Field>
-          </div>
+      <div>
+        <div className="label-xs" style={{ marginBottom: 10 }}>Monthly</div>
+        <Field label="RRSP">
+          <DollarInput value={data[monthlyRrspKey]} onChange={(v) => onChange(monthlyRrspKey, v)} placeholder="e.g. 2,000" />
+        </Field>
+        <Field label="TFSA">
+          <DollarInput value={data[monthlyTfsaKey]} onChange={(v) => onChange(monthlyTfsaKey, v)} placeholder="e.g. 500" />
+        </Field>
+        <Field label="Non-registered" hint="Taxable brokerage, ETFs, etc.">
+          <DollarInput value={data[monthlyNrKey]} onChange={(v) => onChange(monthlyNrKey, v)} placeholder="0" />
+        </Field>
+        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 4 }}>
+          <div className="label-xs" style={{ marginBottom: 10 }}>Annual lump-sum top-ups</div>
+          <Field label="RRSP" hint="e.g. year-end bonus contribution">
+            <DollarInput value={data[annualRrspKey]} onChange={(v) => onChange(annualRrspKey, v)} placeholder="0" />
+          </Field>
+          <Field label="TFSA">
+            <DollarInput value={data[annualTfsaKey]} onChange={(v) => onChange(annualTfsaKey, v)} placeholder="0" />
+          </Field>
+          <Field label="Non-registered">
+            <DollarInput value={data[annualNrKey]} onChange={(v) => onChange(annualNrKey, v)} placeholder="0" />
+          </Field>
         </div>
       </div>
     );
@@ -742,55 +586,45 @@ function CardContributions({ data, onChange, onNext, onSkip, onBack, hideSpouse 
 
   return (
     <Card step={5} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-slate-900">Retirement saving</h2>
-        <p className="text-sm text-slate-500 mt-1">
-          {showSpouse
-            ? `How much are ${name} and ${spouseName} putting toward retirement — both monthly and as lump sums?`
-            : `How much are you putting toward retirement — both monthly and as annual lump sums?`}
-        </p>
-      </div>
+      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
+        Retirement saving
+      </h2>
+      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
+        {showSpouse
+          ? `How much are ${name} and ${spouseName} putting toward retirement — monthly and as lump sums?`
+          : "How much are you putting toward retirement — monthly and as annual lump sums?"}
+      </p>
 
-      <div className="space-y-5">
-        <div>
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">{name}</div>
+      <div className="ob-person-label">{name}</div>
+      <PersonContributions
+        monthlyRrspKey="startingMonthly" monthlyTfsaKey="yourTfsaMonthly" monthlyNrKey="yourNrMonthly"
+        annualRrspKey="rrspTopUp" annualTfsaKey="tfsaTopUp" annualNrKey="nrTopUp"
+      />
+
+      {showSpouse && (
+        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 20, marginTop: 8 }}>
+          <div className="ob-person-label">{spouseName}</div>
           <PersonContributions
-            prefix="your"
-            monthlyRrspKey="startingMonthly" monthlyTfsaKey="yourTfsaMonthly" monthlyNrKey="yourNrMonthly"
-            annualRrspKey="rrspTopUp" annualTfsaKey="tfsaTopUp" annualNrKey="nrTopUp"
+            monthlyRrspKey="spouseMonthly" monthlyTfsaKey="spouseTfsaMonthly" monthlyNrKey="spouseNrMonthly"
+            annualRrspKey="spouseRrspTopUp" annualTfsaKey="spouseTfsaTopUp" annualNrKey="spouseNrTopUp"
           />
         </div>
+      )}
 
-        {showSpouse && (
-          <div className="border-t border-slate-100 pt-5">
-            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">{spouseName}</div>
-            <PersonContributions
-              prefix="spouse"
-              monthlyRrspKey="spouseMonthly" monthlyTfsaKey="spouseTfsaMonthly" monthlyNrKey="spouseNrMonthly"
-              annualRrspKey="spouseRrspTopUp" annualTfsaKey="spouseTfsaTopUp" annualNrKey="spouseNrTopUp"
-            />
-          </div>
-        )}
-
-        {hasKids && (
-          <div className="border-t border-slate-100 pt-4">
-            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Children</div>
-            <Field label="Annual RESP contributions" hint="Per year, across all children">
-              <DollarInput value={data.resp} onChange={(v) => onChange("resp", v)} placeholder="e.g. 2,500" />
-            </Field>
-          </div>
-        )}
-
-        {partnered && hideSpouse && (
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-500">
-            {spouseName}'s contributions will be added when they join via the invite link.
-          </div>
-        )}
-      </div>
-
-      <div className="mt-6">
-        <button onClick={onNext} className={primaryBtn}>Continue</button>
-      </div>
+      {hasKids && (
+        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 16, marginTop: 8 }}>
+          <div className="ob-person-label">Children</div>
+          <Field label="Annual RESP contributions" hint="Per year, across all children">
+            <DollarInput value={data.resp} onChange={(v) => onChange("resp", v)} placeholder="e.g. 2,500" />
+          </Field>
+        </div>
+      )}
+      {partnered && hideSpouse && (
+        <div className="ob-notice" style={{ marginTop: 12 }}>
+          {spouseName}'s contributions will be added when they join via the invite link.
+        </div>
+      )}
+      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Continue</button>
     </Card>
   );
 }
@@ -805,54 +639,46 @@ function CardSavings({ data, onChange, onNext, onSkip, onBack, hideSpouse = fals
 
   return (
     <Card step={6} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-slate-900">What's already saved?</h2>
-        <p className="text-sm text-slate-500 mt-1">
-          {showSpouse
-            ? `Current balances across ${name} and ${spouseName}'s registered and non-registered accounts.`
-            : `Current balances across ${name}'s registered and non-registered accounts.`}
-        </p>
-      </div>
-      <div className="space-y-5">
-        <div>
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">{name}</div>
-          <div className="space-y-3">
-            <Field label="RRSP balance">
-              <DollarInput value={data.yourRrspStart} onChange={(v) => onChange("yourRrspStart", v)} />
-            </Field>
-            <Field label="TFSA balance">
-              <DollarInput value={data.yourTfsaStart} onChange={(v) => onChange("yourTfsaStart", v)} />
-            </Field>
-            <Field label="Non-registered investments">
-              <DollarInput value={data.yourNrStart} onChange={(v) => onChange("yourNrStart", v)} placeholder="0" />
-            </Field>
-          </div>
+      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
+        What's already saved?
+      </h2>
+      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
+        {showSpouse
+          ? `Current balances across ${name} and ${spouseName}'s accounts. A round number is fine — you can refine later.`
+          : `Current balances across your accounts. A round number is fine — you can refine later.`}
+      </p>
+
+      <div className="ob-person-label">{name}</div>
+      <Field label="RRSP balance">
+        <DollarInput value={data.yourRrspStart} onChange={(v) => onChange("yourRrspStart", v)} />
+      </Field>
+      <Field label="TFSA balance">
+        <DollarInput value={data.yourTfsaStart} onChange={(v) => onChange("yourTfsaStart", v)} />
+      </Field>
+      <Field label="Non-registered investments">
+        <DollarInput value={data.yourNrStart} onChange={(v) => onChange("yourNrStart", v)} placeholder="0" />
+      </Field>
+
+      {showSpouse && (
+        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 20, marginTop: 8 }}>
+          <div className="ob-person-label">{spouseName}</div>
+          <Field label="RRSP balance">
+            <DollarInput value={data.spouseRrspStart} onChange={(v) => onChange("spouseRrspStart", v)} />
+          </Field>
+          <Field label="TFSA balance">
+            <DollarInput value={data.spouseTfsaStart} onChange={(v) => onChange("spouseTfsaStart", v)} />
+          </Field>
+          <Field label="Non-registered investments">
+            <DollarInput value={data.spouseNrStart} onChange={(v) => onChange("spouseNrStart", v)} placeholder="0" />
+          </Field>
         </div>
-        {showSpouse && (
-          <div className="border-t border-slate-100 pt-4">
-            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">{spouseName}</div>
-            <div className="space-y-3">
-              <Field label="RRSP balance">
-                <DollarInput value={data.spouseRrspStart} onChange={(v) => onChange("spouseRrspStart", v)} />
-              </Field>
-              <Field label="TFSA balance">
-                <DollarInput value={data.spouseTfsaStart} onChange={(v) => onChange("spouseTfsaStart", v)} />
-              </Field>
-              <Field label="Non-registered investments">
-                <DollarInput value={data.spouseNrStart} onChange={(v) => onChange("spouseNrStart", v)} placeholder="0" />
-              </Field>
-            </div>
-          </div>
-        )}
-        {partnered && hideSpouse && (
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-500">
-            {spouseName}'s savings will be added when they join via the invite link.
-          </div>
-        )}
-      </div>
-      <div className="mt-6">
-        <button onClick={onNext} className={primaryBtn}>Continue</button>
-      </div>
+      )}
+      {partnered && hideSpouse && (
+        <div className="ob-notice" style={{ marginTop: 12 }}>
+          {spouseName}'s savings will be added when they join via the invite link.
+        </div>
+      )}
+      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Continue</button>
     </Card>
   );
 }
@@ -864,93 +690,68 @@ function CardPension({ data, onChange, onNext, onSkip, onBack, hideSpouse = fals
   const canExit = !!(data.yourName?.trim());
   const partnered = data.partnered === true;
   const showSpouse = partnered && !hideSpouse;
-  const yourHasPension    = data.yourHasPension    === true;
-  const spouseHasPension  = data.spouseHasPension  === true;
+  const yourHasPension   = data.yourHasPension   === true;
+  const spouseHasPension = data.spouseHasPension === true;
 
   return (
     <Card step={7} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-slate-900">Any defined-benefit pensions?</h2>
-        <p className="text-sm text-slate-500 mt-1">
-          A DB pension pays a guaranteed monthly amount in retirement — think government, teachers, or union plans.
-        </p>
-      </div>
+      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
+        Any defined-benefit pensions?
+      </h2>
+      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
+        A DB pension pays a guaranteed monthly amount in retirement — government, teachers, or union plans.
+      </p>
 
-      <div className="space-y-5">
-        {/* Your pension */}
-        <div>
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">{name}</div>
-          <div>
-            <p className="text-xs text-slate-500 mb-1.5">Do you have a defined-benefit pension?</p>
-            <div className="grid grid-cols-2 gap-2">
-              {[{ label: "Yes", value: true }, { label: "No", value: false }].map(({ label, value }) => (
-                <button key={label} onClick={() => onChange("yourHasPension", value)}
-                  className={"py-2.5 rounded-lg border text-sm font-medium transition-colors " +
-                    (yourHasPension === value ? "border-slate-800 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:bg-slate-50")}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-          {yourHasPension && (
-            <div className="mt-3 space-y-3">
-              <Field label="Expected monthly pension at retirement">
-                <DollarInput value={data.pensionMonthly} onChange={(v) => onChange("pensionMonthly", v)} placeholder="e.g. 3,000" />
+      <div className="ob-person-label">{name}</div>
+      <Field label="Do you have a defined-benefit pension?">
+        <BtnPair value={data.yourHasPension} onChange={(v) => onChange("yourHasPension", v)}
+          options={[{ label: "Yes", val: true }, { label: "No", val: false }]} />
+      </Field>
+      {yourHasPension && (
+        <>
+          <Field label="Expected monthly pension at retirement">
+            <DollarInput value={data.pensionMonthly} onChange={(v) => onChange("pensionMonthly", v)} placeholder="e.g. 3,000" />
+          </Field>
+          <Field label="Pension start age" hint="Usually 60–65">
+            <input className="input mono" type="number" placeholder="65" min={50} max={75} style={{ maxWidth: 140 }}
+              value={data.pensionStartAge || ""}
+              onChange={(e) => onChange("pensionStartAge", parseInt(e.target.value) || 0)} />
+          </Field>
+        </>
+      )}
+
+      {showSpouse && (
+        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 20, marginTop: 8 }}>
+          <div className="ob-person-label">{spouseName}</div>
+          <Field label={`Does ${spouseName} have a defined-benefit pension?`}>
+            <BtnPair value={data.spouseHasPension} onChange={(v) => onChange("spouseHasPension", v)}
+              options={[{ label: "Yes", val: true }, { label: "No", val: false }]} />
+          </Field>
+          {spouseHasPension && (
+            <>
+              <Field label={`${spouseName}'s expected monthly pension`}>
+                <DollarInput value={data.spousePensionMonthly} onChange={(v) => onChange("spousePensionMonthly", v)} placeholder="e.g. 3,000" />
               </Field>
               <Field label="Pension start age" hint="Usually 60–65">
-                <input type="number" className={inputCls} placeholder="65" min={50} max={75}
-                  value={data.pensionStartAge || ""}
-                  onChange={(e) => onChange("pensionStartAge", parseInt(e.target.value) || 0)} />
+                <input className="input mono" type="number" placeholder="65" min={50} max={75} style={{ maxWidth: 140 }}
+                  value={data.spousePensionStartAge || ""}
+                  onChange={(e) => onChange("spousePensionStartAge", parseInt(e.target.value) || 0)} />
               </Field>
-            </div>
+            </>
           )}
         </div>
-
-        {/* Spouse pension */}
-        {showSpouse && (
-          <div className="border-t border-slate-100 pt-4">
-            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">{spouseName}</div>
-            <div>
-              <p className="text-xs text-slate-500 mb-1.5">Does {spouseName} have a defined-benefit pension?</p>
-              <div className="grid grid-cols-2 gap-2">
-                {[{ label: "Yes", value: true }, { label: "No", value: false }].map(({ label, value }) => (
-                  <button key={label} onClick={() => onChange("spouseHasPension", value)}
-                    className={"py-2.5 rounded-lg border text-sm font-medium transition-colors " +
-                      (spouseHasPension === value ? "border-slate-800 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:bg-slate-50")}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {spouseHasPension && (
-              <div className="mt-3 space-y-3">
-                <Field label={`${spouseName}'s expected monthly pension`}>
-                  <DollarInput value={data.spousePensionMonthly} onChange={(v) => onChange("spousePensionMonthly", v)} placeholder="e.g. 3,000" />
-                </Field>
-                <Field label="Pension start age" hint="Usually 60–65">
-                  <input type="number" className={inputCls} placeholder="65" min={50} max={75}
-                    value={data.spousePensionStartAge || ""}
-                    onChange={(e) => onChange("spousePensionStartAge", parseInt(e.target.value) || 0)} />
-                </Field>
-              </div>
-            )}
-          </div>
-        )}
-        {partnered && hideSpouse && (
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-500">
-            {spouseName}'s pension will be added when they join via the invite link.
-          </div>
-        )}
-      </div>
-
-      <div className="mt-6">
-        <button onClick={onNext} className={primaryBtn}>Continue</button>
-      </div>
+      )}
+      {partnered && hideSpouse && (
+        <div className="ob-notice" style={{ marginTop: 12 }}>
+          {spouseName}'s pension will be added when they join via the invite link.
+        </div>
+      )}
+      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Continue</button>
     </Card>
   );
 }
 
-// ---------- Card 8: Home & housing costs ----------
+// ---------- Card 8: Housing ----------
 function CardHome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }) {
   const name = data.yourName?.trim() || "You";
   const spouseName = data.spouseName?.trim() || "Spouse";
@@ -962,80 +763,67 @@ function CardHome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }
 
   return (
     <Card step={8} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-slate-900">Housing</h2>
-        <p className="text-sm text-slate-500 mt-1">
-          {showSpouse
-            ? `Let's capture ${name} and ${spouseName}'s housing picture — mortgage, rent, and running costs.`
-            : `Let's capture your housing picture — mortgage, rent, and running costs.`}
-        </p>
-      </div>
+      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
+        Housing
+      </h2>
+      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
+        {showSpouse
+          ? `${name} and ${spouseName}'s housing picture — mortgage, rent, and running costs.`
+          : "Your housing picture — mortgage, rent, and running costs."}
+      </p>
 
-      <div className="space-y-4">
-        {/* Own vs rent */}
-        <Field label="Do you own or rent?">
-          <div className="grid grid-cols-2 gap-2 mt-1">
-            {[{ label: partnered ? "We own" : "I own", value: true }, { label: partnered ? "We rent" : "I rent", value: false }].map(({ label, value }) => (
-              <button key={label} onClick={() => onChange("ownsHome", value)}
-                className={"py-2.5 rounded-lg border text-sm font-medium transition-colors " +
-                  (data.ownsHome === value ? "border-slate-800 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:bg-slate-50")}>
-                {label}
-              </button>
-            ))}
-          </div>
-        </Field>
+      <Field label="Do you own or rent?">
+        <BtnPair value={data.ownsHome} onChange={(v) => onChange("ownsHome", v)}
+          options={[
+            { label: partnered ? "We own" : "I own", val: true },
+            { label: partnered ? "We rent" : "I rent", val: false },
+          ]} />
+      </Field>
 
-        {/* Owner fields */}
-        {ownsHome && (
-          <div className="space-y-3 pt-1">
-            <Field label="Mortgage balance remaining">
-              <DollarInput value={data.mortgagePrincipal} onChange={(v) => onChange("mortgagePrincipal", v)} />
+      {ownsHome && (
+        <>
+          <Field label="Mortgage balance remaining">
+            <DollarInput value={data.mortgagePrincipal} onChange={(v) => onChange("mortgagePrincipal", v)} />
+          </Field>
+          <Field label="Monthly mortgage payment">
+            <DollarInput value={data.mortgage} onChange={(v) => onChange("mortgage", v)} />
+          </Field>
+          <Field label="Interest rate" hint="e.g. 3.85 for 3.85%">
+            <PctInput value={data.mortgageRate} onChange={(v) => onChange("mortgageRate", v)} />
+          </Field>
+          <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 4 }}>
+            <div className="label-xs" style={{ marginBottom: 10 }}>Monthly housing costs (separate from mortgage)</div>
+            <Field label="Property tax" hint="Per month">
+              <DollarInput value={data.propertyTax} onChange={(v) => onChange("propertyTax", v)} placeholder="e.g. 500" />
             </Field>
-            <Field label="Monthly mortgage payment">
-              <DollarInput value={data.mortgage} onChange={(v) => onChange("mortgage", v)} />
+            <Field label="Home insurance" hint="Per month">
+              <DollarInput value={data.homeInsurance} onChange={(v) => onChange("homeInsurance", v)} placeholder="e.g. 150" />
             </Field>
-            <Field label="Interest rate" hint="e.g. 3.85 for 3.85%">
-              <PctInput value={data.mortgageRate} onChange={(v) => onChange("mortgageRate", v)} />
+            <Field label="Maintenance & repairs" hint="Per month — typically 1% of home value/yr">
+              <DollarInput value={data.maintenance} onChange={(v) => onChange("maintenance", v)} placeholder="e.g. 400" />
             </Field>
-            <div className="pt-1 border-t border-slate-100">
-              <p className="text-xs text-slate-400 mb-2 mt-2">Monthly housing costs (separate from mortgage)</p>
-              <div className="space-y-2">
-                <Field label="Property tax" hint="Per month">
-                  <DollarInput value={data.propertyTax} onChange={(v) => onChange("propertyTax", v)} placeholder="e.g. 500" />
-                </Field>
-                <Field label="Home insurance" hint="Per month">
-                  <DollarInput value={data.homeInsurance} onChange={(v) => onChange("homeInsurance", v)} placeholder="e.g. 150" />
-                </Field>
-                <Field label="Maintenance & repairs" hint="Per month — typically 1% of home value per year">
-                  <DollarInput value={data.maintenance} onChange={(v) => onChange("maintenance", v)} placeholder="e.g. 400" />
-                </Field>
-                <Field label="Utilities (hydro, gas, water)" hint="Per month">
-                  <DollarInput value={data.utilities} onChange={(v) => onChange("utilities", v)} placeholder="e.g. 300" />
-                </Field>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Renter fields */}
-        {rents && (
-          <div className="space-y-3 pt-1">
-            <Field label="Monthly rent">
-              <DollarInput value={data.rent} onChange={(v) => onChange("rent", v)} placeholder="e.g. 3,000" />
-            </Field>
-            <Field label="Utilities (hydro, gas, internet)" hint="Per month">
-              <DollarInput value={data.utilities} onChange={(v) => onChange("utilities", v)} placeholder="e.g. 200" />
-            </Field>
-            <Field label="Tenant insurance" hint="Per month">
-              <DollarInput value={data.homeInsurance} onChange={(v) => onChange("homeInsurance", v)} placeholder="e.g. 30" />
+            <Field label="Utilities (hydro, gas, water)" hint="Per month">
+              <DollarInput value={data.utilities} onChange={(v) => onChange("utilities", v)} placeholder="e.g. 300" />
             </Field>
           </div>
-        )}
-      </div>
+        </>
+      )}
 
-      <div className="mt-6">
-        <button onClick={onNext} className={primaryBtn}>Continue</button>
-      </div>
+      {rents && (
+        <>
+          <Field label="Monthly rent">
+            <DollarInput value={data.rent} onChange={(v) => onChange("rent", v)} placeholder="e.g. 3,000" />
+          </Field>
+          <Field label="Utilities (hydro, gas, internet)" hint="Per month">
+            <DollarInput value={data.utilities} onChange={(v) => onChange("utilities", v)} placeholder="e.g. 200" />
+          </Field>
+          <Field label="Tenant insurance" hint="Per month">
+            <DollarInput value={data.homeInsurance} onChange={(v) => onChange("homeInsurance", v)} placeholder="e.g. 30" />
+          </Field>
+        </>
+      )}
+
+      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Continue</button>
     </Card>
   );
 }
@@ -1049,7 +837,6 @@ function CardSpending({ data, onChange, onNext, onSkip, onBack, hideSpouse = fal
   const showSpouse = partnered && !hideSpouse;
   const hasKids = data.hasKids === true;
 
-  // Non-discretionary monthly (excluding housing which was card 8)
   const nonDiscMonthly = [
     { key: "groceries",    label: "Groceries" },
     { key: "transport",    label: "Transport & transit" },
@@ -1057,80 +844,65 @@ function CardSpending({ data, onChange, onNext, onSkip, onBack, hideSpouse = fal
     { key: "personalCare", label: "Personal care & health" },
   ].filter((c) => !c.kidsOnly || hasKids);
 
-  // Discretionary monthly
   const discMonthly = [
-    { key: "dining",         label: "Dining & takeout" },
-    { key: "clothing",       label: "Clothing & shopping" },
-    { key: "subscriptions",  label: "Subscriptions & tech" },
-    { key: "entertainment",  label: "Entertainment & hobbies" },
+    { key: "dining",        label: "Dining & takeout" },
+    { key: "clothing",      label: "Clothing & shopping" },
+    { key: "subscriptions", label: "Subscriptions & tech" },
+    { key: "entertainment", label: "Entertainment & hobbies" },
   ];
 
   const totalMonthly = [...nonDiscMonthly, ...discMonthly].reduce((s, c) => s + (data[c.key] || 0), 0);
 
   return (
     <Card step={9} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-slate-900">
-          {showSpouse ? `How do ${name} & ${spouseName} spend today?` : `How does ${name} spend today?`}
-        </h2>
-        <p className="text-sm text-slate-500 mt-1">Monthly figures in today's dollars — housing excluded (already captured).</p>
+      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
+        {showSpouse ? `How do ${name} & ${spouseName} spend today?` : `How does ${name} spend today?`}
+      </h2>
+      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
+        Monthly figures in today's dollars — housing excluded (already captured).
+      </p>
+
+      <div className="label-xs" style={{ marginBottom: 10 }}>Essentials (monthly)</div>
+      {nonDiscMonthly.map((c) => (
+        <Field key={c.key} label={c.label}>
+          <DollarInput value={data[c.key]} onChange={(v) => onChange(c.key, v)} placeholder="0" />
+        </Field>
+      ))}
+
+      <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 4 }}>
+        <div className="label-xs" style={{ marginBottom: 10 }}>Lifestyle (monthly)</div>
+        {discMonthly.map((c) => (
+          <Field key={c.key} label={c.label}>
+            <DollarInput value={data[c.key]} onChange={(v) => onChange(c.key, v)} placeholder="0" />
+          </Field>
+        ))}
       </div>
 
-      <div className="space-y-5">
-        {/* Non-discretionary */}
-        <div>
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Essentials (monthly)</div>
-          <div className="space-y-3">
-            {nonDiscMonthly.map((c) => (
-              <Field key={c.key} label={c.label}>
-                <DollarInput value={data[c.key]} onChange={(v) => onChange(c.key, v)} placeholder="0" />
-              </Field>
-            ))}
+      {totalMonthly > 0 && (
+        <div className="ob-summary">
+          <div className="ob-summary-row">
+            <span className="label-xs">Monthly total (ex. housing)</span>
+            <span className="mono" style={{ fontSize: 14 }}>${totalMonthly.toLocaleString()}/mo</span>
           </div>
         </div>
+      )}
 
-        {/* Discretionary */}
-        <div className="border-t border-slate-100 pt-4">
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Lifestyle (monthly)</div>
-          <div className="space-y-3">
-            {discMonthly.map((c) => (
-              <Field key={c.key} label={c.label}>
-                <DollarInput value={data[c.key]} onChange={(v) => onChange(c.key, v)} placeholder="0" />
-              </Field>
-            ))}
-          </div>
-        </div>
-
-        {/* Running total */}
-        {totalMonthly > 0 && (
-          <div className="bg-slate-50 rounded-lg p-3 flex items-center justify-between">
-            <span className="text-xs text-slate-500">Monthly total (ex. housing)</span>
-            <span className="text-xs font-semibold text-slate-700">${totalMonthly.toLocaleString()}/mo</span>
-          </div>
-        )}
-
-        {/* Annual */}
-        <div className="border-t border-slate-100 pt-4">
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Annual commitments</div>
-          <div className="space-y-3">
-            <Field label="Travel & holidays" hint="Annual budget">
-              <DollarInput value={data.travel} onChange={(v) => onChange("travel", v)} placeholder="e.g. 10,000" />
-            </Field>
-            <Field label="Other annual expenses" hint="Insurance premiums, gifts, subscriptions billed annually, etc.">
-              <DollarInput value={data.otherAnnual} onChange={(v) => onChange("otherAnnual", v)} placeholder="0" />
-            </Field>
-          </div>
-        </div>
+      <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: totalMonthly > 0 ? 0 : 4 }}>
+        <div className="label-xs" style={{ marginBottom: 10 }}>Annual commitments</div>
+        <Field label="Travel & holidays" hint="Annual budget">
+          <DollarInput value={data.travel} onChange={(v) => onChange("travel", v)} placeholder="e.g. 10,000" />
+        </Field>
+        <Field label="Other annual expenses" hint="Insurance premiums, gifts, subscriptions billed annually, etc.">
+          <DollarInput value={data.otherAnnual} onChange={(v) => onChange("otherAnnual", v)} placeholder="0" />
+        </Field>
       </div>
 
-      <div className="mt-6">
-        <button onClick={onNext} className={primaryBtn}>Continue</button>
-      </div>
+      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Continue</button>
     </Card>
   );
 }
 
-// ---------- Card 10: Retirement income ----------
+// ---------- Card 10: CPP / Retirement income ----------
 function CardRetirement({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }) {
   const name = data.yourName?.trim() || "You";
   const spouseName = data.spouseName?.trim() || "Spouse";
@@ -1140,32 +912,28 @@ function CardRetirement({ data, onChange, onNext, onSkip, onBack, hideSpouse = f
 
   return (
     <Card step={10} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-slate-900">Almost there!</h2>
-        <p className="text-sm text-slate-500 mt-1">
-          {showSpouse
-            ? `Last thing — ${name} and ${spouseName}'s CPP estimates. We've pre-filled the Canadian average.`
-            : `Last thing — ${name}'s CPP estimate. We've pre-filled the Canadian average.`}
-        </p>
-      </div>
-      <div className="space-y-4">
-        <Field label={`${name}'s estimated CPP (annual)`} hint="Adjust if you have a My Service Canada estimate">
-          <DollarInput value={data.cppAmountToday ?? 9300} onChange={(v) => onChange("cppAmountToday", v)} placeholder="9300" />
+      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
+        Almost there!
+      </h2>
+      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
+        {showSpouse
+          ? `Last thing — ${name} and ${spouseName}'s CPP estimates. We've pre-filled the Canadian average.`
+          : `Last thing — ${name}'s CPP estimate. We've pre-filled the Canadian average.`}
+      </p>
+      <Field label={`${name}'s estimated CPP (annual)`} hint="Adjust if you have a My Service Canada estimate">
+        <DollarInput value={data.cppAmountToday ?? 9300} onChange={(v) => onChange("cppAmountToday", v)} placeholder="9300" />
+      </Field>
+      {showSpouse && (
+        <Field label={`${spouseName}'s estimated CPP (annual)`}>
+          <DollarInput value={data.spouseCppAmountToday ?? 9300} onChange={(v) => onChange("spouseCppAmountToday", v)} placeholder="9300" />
         </Field>
-        {showSpouse && (
-          <Field label={`${spouseName}'s estimated CPP (annual)`}>
-            <DollarInput value={data.spouseCppAmountToday ?? 9300} onChange={(v) => onChange("spouseCppAmountToday", v)} placeholder="9300" />
-          </Field>
-        )}
-        {partnered && !showSpouse && (
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-500">
-            {spouseName}'s CPP will be added when they join via the invite link.
-          </div>
-        )}
-      </div>
-      <div className="mt-6">
-        <button onClick={onNext} className={primaryBtn}>Build my plan →</button>
-      </div>
+      )}
+      {partnered && !showSpouse && (
+        <div className="ob-notice" style={{ marginTop: 12 }}>
+          {spouseName}'s CPP will be added when they join via the invite link.
+        </div>
+      )}
+      <button onClick={onNext} className="btn btn--accent btn--lg" style={{ width: "100%", marginTop: 20 }}>Build my plan →</button>
     </Card>
   );
 }
