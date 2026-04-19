@@ -471,6 +471,38 @@ function CompRow({ label, hint, hasKey, modeKey, pctKey, dollarKey, data, onChan
   );
 }
 
+function PersonIncome({ prefix, personName, data, onChange }) {
+  return (
+    <div>
+      <Field label="Annual base salary">
+        <DollarInput value={data[`${prefix}Base`]} onChange={(v) => onChange(`${prefix}Base`, v)} />
+      </Field>
+      <CompRow label={`Does ${personName} get a performance bonus?`} hint="Typical annual bonus"
+        hasKey={`${prefix}HasBonus`} modeKey={`${prefix}BonusMode`}
+        pctKey={`${prefix}BonusPct`} dollarKey={`${prefix}BonusDollar`}
+        data={data} onChange={onChange} />
+      <CompRow label="Any stock options or equity grants?" hint="Annual equity value vesting"
+        hasKey={`${prefix}HasEquity`} modeKey={`${prefix}EquityMode`}
+        pctKey={`${prefix}EquityPct`} dollarKey={`${prefix}EquityDollar`}
+        data={data} onChange={onChange}
+        vestDateKey={`${prefix}EquityVestDate`} vestDateLabel="Vesting date / cliff" />
+      <CompRow label="What about RSUs?" hint="Annual RSU value vesting"
+        hasKey={`${prefix}HasRsu`} modeKey={`${prefix}RsuMode`}
+        pctKey={`${prefix}RsuPct`} dollarKey={`${prefix}RsuAnnual`}
+        data={data} onChange={onChange}
+        vestDateKey={`${prefix}RsuVestDate`} vestDateLabel="Next vesting date / cliff" />
+      <CompRow label="Commission or variable pay?" hint="Typical annual commission"
+        hasKey={`${prefix}HasCommission`} modeKey={`${prefix}CommissionMode`}
+        pctKey={`${prefix}CommissionPct`} dollarKey={`${prefix}CommissionDollar`}
+        data={data} onChange={onChange} />
+      <CompRow label="Profit sharing or DPSP?" hint="Annual profit sharing amount"
+        hasKey={`${prefix}HasProfitShare`} modeKey={`${prefix}ProfitShareMode`}
+        pctKey={`${prefix}ProfitSharePct`} dollarKey={`${prefix}ProfitShareDollar`}
+        data={data} onChange={onChange} />
+    </div>
+  );
+}
+
 function CardIncome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }) {
   const name = data.yourName?.trim() || "You";
   const spouseName = data.spouseName?.trim() || "Spouse";
@@ -480,38 +512,6 @@ function CardIncome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false
   const combined = (data.yourBase || 0) + (showSpouse ? (data.spouseBase || 0) : 0);
   const estimatedRate = estimateBlendedTax(combined);
 
-  function PersonIncome({ prefix, personName }) {
-    return (
-      <div>
-        <Field label="Annual base salary">
-          <DollarInput value={data[`${prefix}Base`]} onChange={(v) => onChange(`${prefix}Base`, v)} />
-        </Field>
-        <CompRow label={`Does ${personName} get a performance bonus?`} hint="Typical annual bonus"
-          hasKey={`${prefix}HasBonus`} modeKey={`${prefix}BonusMode`}
-          pctKey={`${prefix}BonusPct`} dollarKey={`${prefix}BonusDollar`}
-          data={data} onChange={onChange} />
-        <CompRow label="Any stock options or equity grants?" hint="Annual equity value vesting"
-          hasKey={`${prefix}HasEquity`} modeKey={`${prefix}EquityMode`}
-          pctKey={`${prefix}EquityPct`} dollarKey={`${prefix}EquityDollar`}
-          data={data} onChange={onChange}
-          vestDateKey={`${prefix}EquityVestDate`} vestDateLabel="Vesting date / cliff" />
-        <CompRow label="What about RSUs?" hint="Annual RSU value vesting"
-          hasKey={`${prefix}HasRsu`} modeKey={`${prefix}RsuMode`}
-          pctKey={`${prefix}RsuPct`} dollarKey={`${prefix}RsuAnnual`}
-          data={data} onChange={onChange}
-          vestDateKey={`${prefix}RsuVestDate`} vestDateLabel="Next vesting date / cliff" />
-        <CompRow label="Commission or variable pay?" hint="Typical annual commission"
-          hasKey={`${prefix}HasCommission`} modeKey={`${prefix}CommissionMode`}
-          pctKey={`${prefix}CommissionPct`} dollarKey={`${prefix}CommissionDollar`}
-          data={data} onChange={onChange} />
-        <CompRow label="Profit sharing or DPSP?" hint="Annual profit sharing amount"
-          hasKey={`${prefix}HasProfitShare`} modeKey={`${prefix}ProfitShareMode`}
-          pctKey={`${prefix}ProfitSharePct`} dollarKey={`${prefix}ProfitShareDollar`}
-          data={data} onChange={onChange} />
-      </div>
-    );
-  }
-
   return (
     <Card step={4} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
       <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
@@ -520,12 +520,12 @@ function CardIncome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false
       <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>Start with base salary — we'll layer in the rest.</p>
 
       <div className="ob-person-label">{name}</div>
-      <PersonIncome prefix="your" personName="you" />
+      <PersonIncome prefix="your" personName="you" data={data} onChange={onChange} />
 
       {showSpouse && (
         <div style={{ borderTop: "1px solid var(--line)", paddingTop: 20, marginTop: 8 }}>
           <div className="ob-person-label">{spouseName}</div>
-          <PersonIncome prefix="spouse" personName={spouseName} />
+          <PersonIncome prefix="spouse" personName={spouseName} data={data} onChange={onChange} />
         </div>
       )}
       {partnered && hideSpouse && (
@@ -546,6 +546,35 @@ function CardIncome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false
   );
 }
 
+function PersonContributions({ monthlyRrspKey, monthlyTfsaKey, monthlyNrKey, annualRrspKey, annualTfsaKey, annualNrKey, data, onChange }) {
+  return (
+    <div>
+      <div className="label-xs" style={{ marginBottom: 10 }}>Monthly</div>
+      <Field label="RRSP">
+        <DollarInput value={data[monthlyRrspKey]} onChange={(v) => onChange(monthlyRrspKey, v)} placeholder="e.g. 2,000" />
+      </Field>
+      <Field label="TFSA">
+        <DollarInput value={data[monthlyTfsaKey]} onChange={(v) => onChange(monthlyTfsaKey, v)} placeholder="e.g. 500" />
+      </Field>
+      <Field label="Non-registered" hint="Taxable brokerage, ETFs, etc.">
+        <DollarInput value={data[monthlyNrKey]} onChange={(v) => onChange(monthlyNrKey, v)} placeholder="0" />
+      </Field>
+      <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 4 }}>
+        <div className="label-xs" style={{ marginBottom: 10 }}>Annual lump-sum top-ups</div>
+        <Field label="RRSP" hint="e.g. year-end bonus contribution">
+          <DollarInput value={data[annualRrspKey]} onChange={(v) => onChange(annualRrspKey, v)} placeholder="0" />
+        </Field>
+        <Field label="TFSA">
+          <DollarInput value={data[annualTfsaKey]} onChange={(v) => onChange(annualTfsaKey, v)} placeholder="0" />
+        </Field>
+        <Field label="Non-registered">
+          <DollarInput value={data[annualNrKey]} onChange={(v) => onChange(annualNrKey, v)} placeholder="0" />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
 // ---------- Card 5: Retirement contributions ----------
 function CardContributions({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }) {
   const name = data.yourName?.trim() || "You";
@@ -554,35 +583,6 @@ function CardContributions({ data, onChange, onNext, onSkip, onBack, hideSpouse 
   const partnered = data.partnered === true;
   const showSpouse = partnered && !hideSpouse;
   const hasKids = data.hasKids === true;
-
-  function PersonContributions({ monthlyRrspKey, monthlyTfsaKey, monthlyNrKey, annualRrspKey, annualTfsaKey, annualNrKey }) {
-    return (
-      <div>
-        <div className="label-xs" style={{ marginBottom: 10 }}>Monthly</div>
-        <Field label="RRSP">
-          <DollarInput value={data[monthlyRrspKey]} onChange={(v) => onChange(monthlyRrspKey, v)} placeholder="e.g. 2,000" />
-        </Field>
-        <Field label="TFSA">
-          <DollarInput value={data[monthlyTfsaKey]} onChange={(v) => onChange(monthlyTfsaKey, v)} placeholder="e.g. 500" />
-        </Field>
-        <Field label="Non-registered" hint="Taxable brokerage, ETFs, etc.">
-          <DollarInput value={data[monthlyNrKey]} onChange={(v) => onChange(monthlyNrKey, v)} placeholder="0" />
-        </Field>
-        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 4 }}>
-          <div className="label-xs" style={{ marginBottom: 10 }}>Annual lump-sum top-ups</div>
-          <Field label="RRSP" hint="e.g. year-end bonus contribution">
-            <DollarInput value={data[annualRrspKey]} onChange={(v) => onChange(annualRrspKey, v)} placeholder="0" />
-          </Field>
-          <Field label="TFSA">
-            <DollarInput value={data[annualTfsaKey]} onChange={(v) => onChange(annualTfsaKey, v)} placeholder="0" />
-          </Field>
-          <Field label="Non-registered">
-            <DollarInput value={data[annualNrKey]} onChange={(v) => onChange(annualNrKey, v)} placeholder="0" />
-          </Field>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <Card step={5} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
@@ -599,6 +599,7 @@ function CardContributions({ data, onChange, onNext, onSkip, onBack, hideSpouse 
       <PersonContributions
         monthlyRrspKey="startingMonthly" monthlyTfsaKey="yourTfsaMonthly" monthlyNrKey="yourNrMonthly"
         annualRrspKey="rrspTopUp" annualTfsaKey="tfsaTopUp" annualNrKey="nrTopUp"
+        data={data} onChange={onChange}
       />
 
       {showSpouse && (
@@ -607,6 +608,7 @@ function CardContributions({ data, onChange, onNext, onSkip, onBack, hideSpouse 
           <PersonContributions
             monthlyRrspKey="spouseMonthly" monthlyTfsaKey="spouseTfsaMonthly" monthlyNrKey="spouseNrMonthly"
             annualRrspKey="spouseRrspTopUp" annualTfsaKey="spouseTfsaTopUp" annualNrKey="spouseNrTopUp"
+            data={data} onChange={onChange}
           />
         </div>
       )}
