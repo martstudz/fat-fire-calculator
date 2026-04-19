@@ -949,6 +949,23 @@ function saveToStorage(state) {
   }
 }
 
+// Returns the raw browser-saved inputs if they contain any real (non-zero) data,
+// otherwise null. Used to detect whether an unauthenticated user made real edits.
+function getBrowserInputsIfReal() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Check if any numeric field is non-zero (i.e. user actually typed something)
+    const hasAnyValue = Object.values(parsed).some(
+      v => typeof v === "number" && v !== 0
+    );
+    return hasAnyValue ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function FatFireCalculator() {
   const [s, setS] = useState(loadSaved);
   const [user, setUser] = useState(null);
@@ -969,6 +986,11 @@ export default function FatFireCalculator() {
   const [activePlan, setActivePlan] = useState(null);
   const [personalPlanId, setPersonalPlanId] = useState(null);
   const [showPlanPicker, setShowPlanPicker] = useState(false);
+
+  // ── Merge conflict: browser inputs vs cloud ───────────────────────────────
+  // When both exist, we pause and ask the user which to keep.
+  // { cloudInputs, planType: "personal"|"household" }
+  const [mergeConflict, setMergeConflict] = useState(null);
 
   // ── Check URL for ?join=CODE on load ──────────────────────────────────────
   const pendingJoinCode = useMemo(() => {
@@ -995,6 +1017,25 @@ export default function FatFireCalculator() {
   // Returns true if a plan inputs object has meaningful saved data
   function hasRealData(inputs) {
     return inputs && Object.keys(inputs).length > 0;
+  }
+
+  // Load cloud inputs — but if the browser also has real data, pause and ask.
+  // planType tells the conflict UI which plan this is ("personal" or "household").
+  function loadCloudInputs(cloudInputs, planType) {
+    const browserInputs = getBrowserInputsIfReal();
+    const cloudHasData = hasRealData(cloudInputs);
+
+    if (browserInputs && cloudHasData) {
+      // Both have data — ask the user
+      setMergeConflict({ cloudInputs, planType });
+    } else if (browserInputs && !cloudHasData) {
+      // Cloud is empty, browser has data — silently keep browser inputs
+      // (they'll get saved to cloud on next autosave)
+    } else {
+      // Browser empty or cloud wins — load cloud
+      setS({ ...publicDefaults, ...(cloudInputs || {}) });
+      localStorage.removeItem(STORAGE_KEY);
+    }
   }
 
   async function initPlans(userId) {
@@ -1052,19 +1093,26 @@ export default function FatFireCalculator() {
       if (existingPersonal) {
         setPersonalPlanId(existingPersonal.id);
         if (hasRealData(existingPersonal.inputs)) {
-          setS({ ...publicDefaults, ...existingPersonal.inputs });
-        } else {
-          setS(defaults);
+          loadCloudInputs(existingPersonal.inputs, "personal");
         }
+        // If cloud is empty, browser inputs (already in state from loadSaved) win silently
       } else {
-        // Brand new user — create personal plan seeded with defaults
+        // Brand new user — create personal plan
+        // If browser has real data, use that as the seed; otherwise use defaults
+        const browserInputs = getBrowserInputsIfReal();
+        const seed = browserInputs ? { ...defaults, ...browserInputs } : defaults;
         const { data: newPlan } = await supabase
           .from("personal_plans")
-          .insert({ user_id: userId, inputs: defaults })
+          .insert({ user_id: userId, inputs: seed })
           .select("id")
           .single();
         if (newPlan) setPersonalPlanId(newPlan.id);
-        setS(defaults);
+        if (browserInputs) {
+          setS({ ...publicDefaults, ...seed });
+        } else {
+          setS(defaults);
+        }
+        localStorage.removeItem(STORAGE_KEY);
       }
       setActivePlan("personal");
     }
@@ -1085,9 +1133,10 @@ export default function FatFireCalculator() {
     return null;
   }
 
-  // Internal: load the data for a plan without touching picker state
-  // Takes an optional householdOverride for cases where household state isn't set yet
-  async function switchPlanData(plan, householdOverride) {
+  // Internal: load the data for a plan without touching picker state.
+  // checkConflict=true on initial sign-in load; false when user manually switches tabs.
+  // Takes an optional householdOverride for cases where household state isn't set yet.
+  async function switchPlanData(plan, householdOverride, checkConflict = true) {
     setActivePlan(plan);
     const hh = householdOverride || household;
     if (plan === "household" && hh) {
@@ -1096,10 +1145,11 @@ export default function FatFireCalculator() {
         .select("inputs")
         .eq("id", hh.id)
         .single();
-      if (data?.inputs && Object.keys(data.inputs).length > 0) {
-        setS({ ...publicDefaults, ...data.inputs });
+      const cloudInputs = data?.inputs || {};
+      if (checkConflict) {
+        loadCloudInputs(cloudInputs, "household");
       } else {
-        setS(defaults);
+        setS(hasRealData(cloudInputs) ? { ...publicDefaults, ...cloudInputs } : defaults);
       }
     } else if (plan === "personal" && personalPlanId) {
       const { data } = await supabase
@@ -1107,18 +1157,19 @@ export default function FatFireCalculator() {
         .select("inputs")
         .eq("id", personalPlanId)
         .single();
-      if (data?.inputs && Object.keys(data.inputs).length > 0) {
-        setS({ ...publicDefaults, ...data.inputs });
+      const cloudInputs = data?.inputs || {};
+      if (checkConflict) {
+        loadCloudInputs(cloudInputs, "personal");
       } else {
-        setS(defaults);
+        setS(hasRealData(cloudInputs) ? { ...publicDefaults, ...cloudInputs } : defaults);
       }
     }
   }
 
-  // User-facing: called from tab toggle or plan picker
+  // User-facing: called from tab toggle or plan picker (no conflict check — always load cloud)
   async function switchPlan(plan) {
     setShowPlanPicker(false);
-    await switchPlanData(plan);
+    await switchPlanData(plan, null, false);
   }
 
   async function fetchMembers(householdId) {
@@ -1210,17 +1261,12 @@ export default function FatFireCalculator() {
     setShowJoinBox(false);
 
     // If the joining user already has a personal plan with real data, let them choose
-    // Otherwise go straight to the household plan
+    // Otherwise go straight to the household plan (still checking for browser conflict)
     if (existingPersonal && hasRealData(existingPersonal.inputs)) {
       setShowPlanPicker(true);
     } else {
-      // Load the household inputs and switch directly
-      if (hh.inputs && Object.keys(hh.inputs).length > 0) {
-        setS({ ...publicDefaults, ...hh.inputs });
-      } else {
-        setS(defaults);
-      }
       setActivePlan("household");
+      loadCloudInputs(hh.inputs || {}, "household");
     }
     return true;
   }
@@ -1619,6 +1665,48 @@ export default function FatFireCalculator() {
             )}
           </div>
         </div>
+
+        {/* ── Merge conflict ── browser inputs vs cloud */}
+        {mergeConflict && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-slate-900 mb-1">You have unsaved inputs</h2>
+              <p className="text-sm text-slate-500 mb-6">
+                Your browser has inputs from before you signed in. Your {mergeConflict.planType === "household" ? "household" : "saved"} plan also has data. Which would you like to keep?
+              </p>
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    // Keep browser inputs — they'll auto-save to cloud
+                    setMergeConflict(null);
+                  }}
+                  className="w-full flex items-start gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-slate-800 hover:bg-slate-50 transition-all text-left"
+                >
+                  <div className="text-2xl mt-0.5">💻</div>
+                  <div>
+                    <div className="font-semibold text-slate-800">Keep browser inputs</div>
+                    <div className="text-xs text-slate-500 mt-0.5">Use what you just entered — this will overwrite your saved plan</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => {
+                    const { cloudInputs } = mergeConflict;
+                    setS({ ...publicDefaults, ...cloudInputs });
+                    localStorage.removeItem(STORAGE_KEY);
+                    setMergeConflict(null);
+                  }}
+                  className="w-full flex items-start gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-slate-800 hover:bg-slate-50 transition-all text-left"
+                >
+                  <div className="text-2xl mt-0.5">☁️</div>
+                  <div>
+                    <div className="font-semibold text-slate-800">Load saved plan</div>
+                    <div className="text-xs text-slate-500 mt-0.5">Restore your previously saved {mergeConflict.planType === "household" ? "household" : "personal"} plan — browser inputs will be discarded</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Plan picker ── shown when user has both plans */}
         {showPlanPicker && (
