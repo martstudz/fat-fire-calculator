@@ -1,12 +1,18 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, createContext, useContext } from "react";
+
+// ---------- privacy context ----------
+const PrivacyContext = createContext(false);
+const MASK = "••••••";
 
 // ---------- helpers ----------
-const fmt$ = (n) => {
+const fmt$ = (n, hidden) => {
+  if (hidden) return MASK;
   if (n === null || n === undefined || !isFinite(n)) return "—";
   const sign = n < 0 ? "-" : "";
   const abs = Math.abs(Math.round(n));
   return sign + "$" + abs.toLocaleString();
 };
+
 
 // Months remaining on a mortgage given principal, monthly payment, annual rate.
 function monthsToPayoff(principal, monthlyPayment, annualRate) {
@@ -662,6 +668,7 @@ function formatWithCommas(num) {
 }
 
 function NumInput({ label, value, onChange, step = 1, prefix, suffix, small, hint }) {
+  const hidden = useContext(PrivacyContext);
   const [focused, setFocused] = useState(false);
   const [raw, setRaw] = useState(String(value));
   const inputRef = useRef(null);
@@ -671,7 +678,7 @@ function NumInput({ label, value, onChange, step = 1, prefix, suffix, small, hin
     if (!focused) setRaw(String(value));
   }, [value, focused]);
 
-  const displayValue = focused ? raw : formatWithCommas(value);
+  const displayValue = hidden && !focused ? MASK : focused ? raw : formatWithCommas(value);
 
   function handleFocus() {
     setRaw(value === 0 ? "" : String(value));
@@ -680,7 +687,7 @@ function NumInput({ label, value, onChange, step = 1, prefix, suffix, small, hin
 
   function handleChange(e) {
     // Allow digits, minus, dot only
-    const cleaned = e.target.value.replace(/[^0-9.-]/g, "");
+    const cleaned = e.target.value.replace(/[^0-9.\-]/g, "");
     setRaw(cleaned);
     const parsed = parseFloat(cleaned);
     if (!isNaN(parsed)) onChange(parsed);
@@ -752,6 +759,7 @@ function PctInput({ label, value, onChange, hint }) {
 }
 
 function ExpenseRow({ label, value, onChange, freq, step = 50 }) {
+  const hidden = useContext(PrivacyContext);
   const annualized = freq === "monthly" ? value * 12 : value;
   const [focused, setFocused] = useState(false);
   const [raw, setRaw] = useState(String(value));
@@ -760,11 +768,11 @@ function ExpenseRow({ label, value, onChange, freq, step = 50 }) {
     if (!focused) setRaw(String(value));
   }, [value, focused]);
 
-  const displayValue = focused ? raw : formatWithCommas(value);
+  const displayValue = hidden && !focused ? MASK : focused ? raw : formatWithCommas(value);
 
   function handleFocus() { setRaw(value === 0 ? "" : String(value)); setFocused(true); }
   function handleChange(e) {
-    const cleaned = e.target.value.replace(/[^0-9.-]/g, "");
+    const cleaned = e.target.value.replace(/[^0-9.\-]/g, "");
     setRaw(cleaned);
     const parsed = parseFloat(cleaned);
     if (!isNaN(parsed)) onChange(parsed);
@@ -799,7 +807,7 @@ function ExpenseRow({ label, value, onChange, freq, step = 50 }) {
           <span className="text-slate-400 text-xs w-7">{freq === "monthly" ? "/mo" : "/yr"}</span>
         </div>
         <span className="text-slate-500 text-xs w-20 text-right font-mono">
-          {freq === "monthly" ? "= " + fmt$(annualized) + "/yr" : ""}
+          {freq === "monthly" ? "= " + (hidden ? MASK : fmtMoney(annualized)) + "/yr" : ""}
         </span>
       </div>
     </div>
@@ -858,10 +866,12 @@ export default function FatFireCalculator() {
   const scenarios = useMemo(() => solveScenarios(inputs), [inputs]);
   const yourWindfallAdvice   = useMemo(() => solveWindfall(inputs, s.yourWindfallAmount,   s.yourWindfallAge),   [inputs, s.yourWindfallAmount, s.yourWindfallAge]);
   const spouseWindfallAdvice = useMemo(() => solveWindfall(inputs, s.spouseWindfallAmount, s.spouseWindfallAge), [inputs, s.spouseWindfallAmount, s.spouseWindfallAge]);
+  const [hidden, setHidden] = useState(false);
+  const fmtMoney = (n) => fmt$(n, hidden);
   const [mc, setMc] = useState(null);
   const [mcRunning, setMcRunning] = useState(false);
   const [mcTargetRate, setMcTargetRate] = useState(80); // percent
-  const [, setMcReverse] = useState(null);
+  const [mcReverse, setMcReverse] = useState(null);
 
   function runMC() {
     setMcRunning(true);
@@ -920,6 +930,7 @@ export default function FatFireCalculator() {
   // Base mortgage payoff (no extra payment) for comparison
   const baseMortgageMonths = monthsToPayoff(s.mortgagePrincipal, s.mortgage, s.mortgageRate);
   const baseMortgagePayoffAge = payoffAgeFromMonths(s.currentAge, baseMortgageMonths);
+  const extraMortgageMonths = s.extraMortgagePayment > 0 ? solved.mortgagePayoffMonths : null;
   const yearsSaved = s.extraMortgagePayment > 0 && isFinite(baseMortgagePayoffAge) && isFinite(mortgagePayoff)
     ? baseMortgagePayoffAge - mortgagePayoff
     : 0;
@@ -958,6 +969,7 @@ export default function FatFireCalculator() {
   const householdGross = s.yourBase + s.spouseBase + yourBonusAmt + spouseBonusAmt + yourEquityAmt + spouseEquityAmt;
 
   return (
+    <PrivacyContext.Provider value={hidden}>
     <div className="min-h-screen bg-slate-50 p-4 text-slate-900" style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <div className="max-w-7xl mx-auto">
         <div className="mb-4">
@@ -970,6 +982,12 @@ export default function FatFireCalculator() {
             </div>
             <div className="flex items-center gap-2 text-xs text-slate-400">
               <span>Auto-saved</span>
+              <button
+                onClick={() => setHidden(h => !h)}
+                className={"px-2 py-1 rounded border transition-colors font-medium " + (hidden ? "border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100" : "border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-700")}
+              >
+                {hidden ? "🙈 Hidden" : "👁 Hide"}
+              </button>
               <button
                 onClick={resetToDefaults}
                 className="px-2 py-1 rounded border border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
@@ -1008,15 +1026,15 @@ export default function FatFireCalculator() {
               <div className="pt-2 mt-1 border-t border-slate-200 space-y-0.5 text-xs">
                 <div className="flex justify-between text-slate-600">
                   <span>Your total comp (base + bonus + equity)</span>
-                  <span className="font-mono">{fmt$(s.yourBase + yourBonusAmt + yourEquityAmt)}</span>
+                  <span className="font-mono">{fmtMoney(s.yourBase + yourBonusAmt + yourEquityAmt)}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
                   <span>Spouse total comp</span>
-                  <span className="font-mono">{fmt$(s.spouseBase + spouseBonusAmt + spouseEquityAmt)}</span>
+                  <span className="font-mono">{fmtMoney(s.spouseBase + spouseBonusAmt + spouseEquityAmt)}</span>
                 </div>
                 <div className="flex justify-between font-semibold text-slate-800 pt-1 border-t border-slate-100">
                   <span>Household gross</span>
-                  <span className="font-mono">{fmt$(householdGross)}</span>
+                  <span className="font-mono">{fmtMoney(householdGross)}</span>
                 </div>
               </div>
             </Section>
@@ -1054,19 +1072,19 @@ export default function FatFireCalculator() {
               <div className="pt-2 mt-1 border-t border-slate-200 space-y-0.5 text-xs">
                 <div className="flex justify-between text-slate-600">
                   <span>Monthly (×12)</span>
-                  <span className="font-mono">{fmt$(inputs.monthlyExpensesTotal * 12)}</span>
+                  <span className="font-mono">{fmtMoney(inputs.monthlyExpensesTotal * 12)}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
                   <span>One-time annual</span>
-                  <span className="font-mono">{fmt$(inputs.oneTimeAnnualTotal)}</span>
+                  <span className="font-mono">{fmtMoney(inputs.oneTimeAnnualTotal)}</span>
                 </div>
                 <div className="flex justify-between font-semibold text-slate-800 pt-1 border-t border-slate-100">
                   <span>Grand total / yr</span>
-                  <span className="font-mono">{fmt$(grandAnnual)}</span>
+                  <span className="font-mono">{fmtMoney(grandAnnual)}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
                   <span>After mortgage payoff</span>
-                  <span className="font-mono">{fmt$(postMortgageAnnual)}</span>
+                  <span className="font-mono">{fmtMoney(postMortgageAnnual)}</span>
                 </div>
               </div>
             </Section>
@@ -1077,7 +1095,7 @@ export default function FatFireCalculator() {
               <NumInput label="Non-registered" value={s.nrStart} onChange={update("nrStart")} prefix="$" step={10000} />
               <div className="pt-1 mt-1 border-t border-slate-200 text-xs text-slate-600 flex justify-between">
                 <span className="font-semibold text-slate-800">Total starting portfolio</span>
-                <span className="font-mono font-semibold text-slate-800">{fmt$(s.rrspStart + s.tfsaStart + s.nrStart)}</span>
+                <span className="font-mono font-semibold text-slate-800">{fmtMoney(s.rrspStart + s.tfsaStart + s.nrStart)}</span>
               </div>
             </Section>
 
@@ -1091,13 +1109,13 @@ export default function FatFireCalculator() {
                   <span>
                     Bonus / yr <span className="text-slate-400">(after-tax, from yr 1)</span>
                   </span>
-                  <span className="font-mono">{fmt$(bonusAfterTax)}</span>
+                  <span className="font-mono">{fmtMoney(bonusAfterTax)}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
                   <span>
                     Equity / yr <span className="text-slate-400">(after-tax, from yr 4)</span>
                   </span>
-                  <span className="font-mono">{equityAfterTax > 0 ? fmt$(equityAfterTax) : "—"}</span>
+                  <span className="font-mono">{equityAfterTax > 0 ? fmtMoney(equityAfterTax) : "—"}</span>
                 </div>
                 <div className="text-slate-400 text-xs">Both grow with income growth rate. Set % in Income section.</div>
               </div>
@@ -1106,17 +1124,17 @@ export default function FatFireCalculator() {
                 {s.extraMortgagePayment > 0 && (
                   <div className="flex justify-between text-rose-600">
                     <span>Extra mortgage payment / yr</span>
-                    <span className="font-mono">−{fmt$(s.extraMortgagePayment * 12)}</span>
+                    <span className="font-mono">−{fmtMoney(s.extraMortgagePayment * 12)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-slate-700">
                   <span>Net annual contribution (yrs 1–3)</span>
-                  <span className="font-mono font-semibold">{fmt$(Math.max(0, startingAnnualContrib - s.extraMortgagePayment * 12))}</span>
+                  <span className="font-mono font-semibold">{fmtMoney(Math.max(0, startingAnnualContrib - s.extraMortgagePayment * 12))}</span>
                 </div>
                 {equityAfterTax > 0 && (
                   <div className="flex justify-between font-semibold text-slate-800">
                     <span>Net annual contribution (yr 4+)</span>
-                    <span className="font-mono">{fmt$(Math.max(0, fullAnnualContrib - s.extraMortgagePayment * 12))}</span>
+                    <span className="font-mono">{fmtMoney(Math.max(0, fullAnnualContrib - s.extraMortgagePayment * 12))}</span>
                   </div>
                 )}
                 <div className="text-slate-500 mt-1">Waterfall: TFSA room → RRSP room → Non-reg overflow.</div>
@@ -1143,19 +1161,19 @@ export default function FatFireCalculator() {
               <div className="pt-2 mt-2 border-t border-slate-100 space-y-0.5 text-xs">
                 <div className="flex justify-between text-slate-600">
                   <span>Total existing RRSP room</span>
-                  <span className="font-mono">{fmt$(s.yourRrspRoomExisting + s.spouseRrspRoomExisting)}</span>
+                  <span className="font-mono">{fmtMoney(s.yourRrspRoomExisting + s.spouseRrspRoomExisting)}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
                   <span>Total existing TFSA room</span>
-                  <span className="font-mono">{fmt$(s.yourTfsaRoomExisting + s.spouseTfsaRoomExisting)}</span>
+                  <span className="font-mono">{fmtMoney(s.yourTfsaRoomExisting + s.spouseTfsaRoomExisting)}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
                   <span>Total new RRSP room / yr</span>
-                  <span className="font-mono">{fmt$(s.yourRrspRoomAnnual + s.spouseRrspRoomAnnual)}</span>
+                  <span className="font-mono">{fmtMoney(s.yourRrspRoomAnnual + s.spouseRrspRoomAnnual)}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
                   <span>Total new TFSA room / yr</span>
-                  <span className="font-mono">{fmt$(s.yourTfsaRoomAnnual + s.spouseTfsaRoomAnnual)}</span>
+                  <span className="font-mono">{fmtMoney(s.yourTfsaRoomAnnual + s.spouseTfsaRoomAnnual)}</span>
                 </div>
               </div>
               <div className="pt-1 mt-1 text-xs text-slate-500">
@@ -1195,7 +1213,7 @@ export default function FatFireCalculator() {
               {s.pensionMonthly > 0 && (
                 <div className="text-xs text-slate-600 flex justify-between pt-0.5">
                   <span>Annual pension (today's $)</span>
-                  <span className="font-mono font-semibold">{fmt$(s.pensionMonthly * 12)}</span>
+                  <span className="font-mono font-semibold">{fmtMoney(s.pensionMonthly * 12)}</span>
                 </div>
               )}
             </Section>
@@ -1220,11 +1238,11 @@ export default function FatFireCalculator() {
                 return (
                   <div>
                     <div className="text-xs font-semibold text-slate-700 mb-1">
-                      {label} — {fmt$(amount)} at age {age}
+                      {label} — {fmtMoney(amount)} at age {age}
                     </div>
                     <div className="text-xs text-slate-500 mb-2">
                       Base (no windfall): retire age <span className="font-semibold">{base.age ?? "—"}</span>,
-                      portfolio <span className="font-semibold">{fmt$(base.portfolioAtRetirement)}</span>
+                      portfolio <span className="font-semibold">{fmtMoney(base.portfolioAtRetirement)}</span>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">
@@ -1258,11 +1276,11 @@ export default function FatFireCalculator() {
                                       </span>
                                   }
                                 </td>
-                                <td className="px-2 py-1.5 text-right font-mono">{fmt$(a.portfolioAtRetirement)}</td>
+                                <td className="px-2 py-1.5 text-right font-mono">{fmtMoney(a.portfolioAtRetirement)}</td>
                                 <td className="px-2 py-1.5 text-right font-mono">
                                   {a.portDiff === null ? "—" : (
                                     <span className={a.portDiff >= 0 ? "text-emerald-600" : "text-red-500"}>
-                                      {a.portDiff >= 0 ? "+" : ""}{fmt$(a.portDiff)}
+                                      {a.portDiff >= 0 ? "+" : ""}{fmtMoney(a.portDiff)}
                                     </span>
                                   )}
                                 </td>
@@ -1325,8 +1343,8 @@ export default function FatFireCalculator() {
                           <div>{solved.age - s.currentAge} year{solved.age - s.currentAge === 1 ? "" : "s"} away.</div>
                           <div className="text-slate-600">
                             Portfolio reaches{" "}
-                            <span className="font-semibold">{fmt$(solved.terminalBal / Math.pow(1 + s.inflation, s.deathAge - s.currentAge))}</span>{" "}
-                            at age {s.deathAge} (today's $). Target: {fmt$(s.terminalTargetToday)}.
+                            <span className="font-semibold">{fmtMoney(solved.terminalBal / Math.pow(1 + s.inflation, s.deathAge - s.currentAge))}</span>{" "}
+                            at age {s.deathAge} (today's $). Target: {fmtMoney(s.terminalTargetToday)}.
                           </div>
                         </div>
                       </div>
@@ -1334,7 +1352,7 @@ export default function FatFireCalculator() {
                         <div className="mt-3 pt-3 border-t border-slate-100 flex items-baseline gap-3">
                           <div>
                             <div className="text-xs uppercase tracking-wide text-slate-500 mb-0.5">Portfolio at retirement</div>
-                            <div className="text-2xl font-bold text-slate-700">{fmt$(portfolioAtRetirement)}</div>
+                            <div className="text-2xl font-bold text-slate-700">{fmtMoney(portfolioAtRetirement)}</div>
                           </div>
                           <div className="text-xs text-slate-500">(today's $, end of age {solved.age})</div>
                         </div>
@@ -1344,7 +1362,7 @@ export default function FatFireCalculator() {
                 })() : (
                   <div>
                     <div className="text-3xl font-bold text-red-600">Not reachable</div>
-                    <div className="text-sm text-slate-600">No retirement age draws the portfolio down to {fmt$(s.terminalTargetToday)} (today's $) by age {s.deathAge} while covering all spending.</div>
+                    <div className="text-sm text-slate-600">No retirement age draws the portfolio down to {fmtMoney(s.terminalTargetToday)} (today's $) by age {s.deathAge} while covering all spending.</div>
                   </div>
                 )}
               </div>
@@ -1358,8 +1376,8 @@ export default function FatFireCalculator() {
                     </div>
                     <div className="text-xs text-slate-600 mt-0.5">
                       Spend drops from{" "}
-                      <span className="font-mono">{fmt$(grandAnnual)}</span> →{" "}
-                      <span className="font-mono">{fmt$(postMortgageAnnual)}</span>/yr.
+                      <span className="font-mono">{fmtMoney(grandAnnual)}</span> →{" "}
+                      <span className="font-mono">{fmtMoney(postMortgageAnnual)}</span>/yr.
                     </div>
                     {yearsSaved > 0 && (
                       <div className="text-xs text-emerald-700 mt-1 font-semibold">
@@ -1402,8 +1420,8 @@ export default function FatFireCalculator() {
               {s.pensionMonthly > 0 && (
                 <div className="mt-2 pt-2 border-t border-slate-100 text-xs text-slate-700">
                   <span className="font-semibold text-emerald-700">DB Pension:</span>{" "}
-                  {fmt$(s.pensionMonthly)}/mo starting at age {s.pensionStartAge} reduces portfolio withdrawal pressure.
-                  Pension + CPP combined = {fmt$((s.pensionMonthly * 12 + s.cppAmountToday))} /yr (today's $) from age {Math.max(s.pensionStartAge, s.cppStartAge)}.
+                  {fmtMoney(s.pensionMonthly)}/mo starting at age {s.pensionStartAge} reduces portfolio withdrawal pressure.
+                  Pension + CPP combined = {fmtMoney((s.pensionMonthly * 12 + s.cppAmountToday))} /yr (today's $) from age {Math.max(s.pensionStartAge, s.cppStartAge)}.
                 </div>
               )}
             </div>
@@ -1444,10 +1462,10 @@ export default function FatFireCalculator() {
                             <div className="text-xs text-slate-500">Portfolio at retirement</div>
                             {sc.portfolioAtRetirement !== null ? (
                               <div className="flex items-baseline gap-1.5 flex-wrap">
-                                <span className="text-sm font-semibold text-slate-700">{fmt$(sc.portfolioAtRetirement)}</span>
+                                <span className="text-sm font-semibold text-slate-700">{fmtMoney(sc.portfolioAtRetirement)}</span>
                                 {!isBase && portDiff !== null && (
                                   <span className={"text-xs font-semibold " + (portDiff < 0 ? "text-red-500" : "text-emerald-600")}>
-                                    {portDiff > 0 ? "+" : ""}{fmt$(portDiff)}
+                                    {portDiff > 0 ? "+" : ""}{fmtMoney(portDiff)}
                                   </span>
                                 )}
                               </div>
@@ -1502,7 +1520,7 @@ export default function FatFireCalculator() {
                                 ${row.extra.toLocaleString()}
                               </td>
                               <td className="px-3 py-2 font-mono text-rose-600">
-                                {row.extra > 0 ? `−${fmt$(row.extra * 12)}` : "—"}
+                                {row.extra > 0 ? `−${fmtMoney(row.extra * 12)}` : "—"}
                               </td>
                               <td className="px-3 py-2 font-mono">
                                 {isFinite(row.payoffAge) ? `age ${row.payoffAge}` : "never"}
@@ -1520,14 +1538,14 @@ export default function FatFireCalculator() {
                                 ) : "—"}
                               </td>
                               <td className="px-3 py-2 text-right font-mono">
-                                {row.portfolioAtRetirement !== null ? fmt$(row.portfolioAtRetirement) : "—"}
+                                {row.portfolioAtRetirement !== null ? fmtMoney(row.portfolioAtRetirement) : "—"}
                               </td>
                               <td className="px-3 py-2 text-right font-mono">
                                 {i === 0 ? (
                                   <span className="text-slate-400">baseline</span>
                                 ) : portDiff !== null ? (
                                   <span className={portDiff >= 0 ? "text-emerald-600" : "text-red-500"}>
-                                    {portDiff >= 0 ? "+" : ""}{fmt$(portDiff)}
+                                    {portDiff >= 0 ? "+" : ""}{fmtMoney(portDiff)}
                                   </span>
                                 ) : "—"}
                               </td>
@@ -1596,7 +1614,7 @@ export default function FatFireCalculator() {
                       <div className="flex items-baseline gap-2 mb-1">
                         <span className={"text-4xl font-bold " + labelColor}>{pct}%</span>
                         <span className="text-sm text-slate-600">of paths succeed</span>
-                        <span className="text-xs text-slate-400">(portfolio ≥ {fmt$(inputs.terminalTargetToday)} at age {s.deathAge})</span>
+                        <span className="text-xs text-slate-400">(portfolio ≥ {fmtMoney(inputs.terminalTargetToday)} at age {s.deathAge})</span>
                       </div>
                       <div className="w-full bg-slate-100 rounded-full h-3">
                         <div className={"h-3 rounded-full transition-all " + barColor} style={{ width: pct + "%" }} />
@@ -1622,7 +1640,7 @@ export default function FatFireCalculator() {
                         ].map(({ label, val, color }) => (
                           <div key={label} className={"rounded border px-1.5 py-2 " + color}>
                             <div className="text-xs font-medium mb-1 leading-tight">{label}</div>
-                            <div className="text-sm font-bold font-mono leading-tight">{fmt$(val)}</div>
+                            <div className="text-sm font-bold font-mono leading-tight">{fmtMoney(val)}</div>
                           </div>
                         ))}
                       </div>
@@ -1670,9 +1688,9 @@ export default function FatFireCalculator() {
                         : "";
                       const combinedIncome = r.cppDisp + r.pensionDisp + (r.oasDisp || 0);
                       const incomeTooltip = [
-                        r.cppDisp > 0    ? `CPP: ${fmt$(r.cppDisp)}` : null,
-                        r.pensionDisp > 0 ? `Pension: ${fmt$(r.pensionDisp)}` : null,
-                        r.oasDisp > 0    ? `OAS: ${fmt$(r.oasDisp)}${r.oasClawbackDisp > 0 ? ` (clawback: −${fmt$(r.oasClawbackDisp)})` : ""}` : null,
+                        r.cppDisp > 0    ? `CPP: ${fmtMoney(r.cppDisp)}` : null,
+                        r.pensionDisp > 0 ? `Pension: ${fmtMoney(r.pensionDisp)}` : null,
+                        r.oasDisp > 0    ? `OAS: ${fmtMoney(r.oasDisp)}${r.oasClawbackDisp > 0 ? ` (clawback: −${fmtMoney(r.oasClawbackDisp)})` : ""}` : null,
                       ].filter(Boolean).join(" · ");
                       return (
                         <tr key={r.t} className={"border-t border-slate-100 " + rowClass}>
@@ -1685,22 +1703,22 @@ export default function FatFireCalculator() {
                               </span>
                             ) : "—"}
                           </td>
-                          <td className="px-2 py-1 text-right font-mono">{fmt$(r.rrspDisp)}</td>
-                          <td className="px-2 py-1 text-right font-mono">{fmt$(r.tfsaDisp)}</td>
-                          <td className="px-2 py-1 text-right font-mono">{fmt$(r.nrDisp)}</td>
+                          <td className="px-2 py-1 text-right font-mono">{fmtMoney(r.rrspDisp)}</td>
+                          <td className="px-2 py-1 text-right font-mono">{fmtMoney(r.tfsaDisp)}</td>
+                          <td className="px-2 py-1 text-right font-mono">{fmtMoney(r.nrDisp)}</td>
                           <td className={"px-2 py-1 text-right font-mono font-semibold " + (r.endTotal <= 0 ? "text-red-600" : "text-slate-800")}>
-                            {fmt$(r.endDisp)}
+                            {fmtMoney(r.endDisp)}
                           </td>
                           <td className="px-2 py-1 text-right font-mono text-emerald-700">
-                            {r.totalContrib > 0 ? fmt$(r.contribDisp) : "—"}
+                            {r.totalContrib > 0 ? fmtMoney(r.contribDisp) : "—"}
                           </td>
                           <td className="px-2 py-1 text-right font-mono text-rose-700">
-                            {r.totalWd > 0 ? fmt$(r.wdDisp) : "—"}
+                            {r.totalWd > 0 ? fmtMoney(r.wdDisp) : "—"}
                           </td>
-                          <td className="px-2 py-1 text-right font-mono">{fmt$(r.spendDisp)}</td>
+                          <td className="px-2 py-1 text-right font-mono">{fmtMoney(r.spendDisp)}</td>
                           <td className="px-2 py-1 text-right font-mono">
                             {combinedIncome > 0
-                              ? <span title={incomeTooltip} className="cursor-help border-b border-dotted border-slate-400">{fmt$(combinedIncome)}</span>
+                              ? <span title={incomeTooltip} className="cursor-help border-b border-dotted border-slate-400">{fmtMoney(combinedIncome)}</span>
                               : "—"}
                           </td>
                         </tr>
@@ -1723,13 +1741,13 @@ export default function FatFireCalculator() {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-slate-700">
               <div className="font-semibold text-slate-800 mb-1">Model notes</div>
               <div className="space-y-0.5">
-                <div>• Retirement target = {fmt$(grandAnnual)}/yr today, stepping down by {fmt$(s.mortgage * 12)}/yr after mortgage payoff (age {isFinite(mortgagePayoff) ? mortgagePayoff : "N/A"}).</div>
-                <div>• Bonus ({fmt$(bonusAfterTax)}/yr after-tax) contributes from year 1. Equity ({fmt$(equityAfterTax)}/yr after-tax) contributes from year 4. Both grow with the income growth rate.</div>
+                <div>• Retirement target = {fmtMoney(grandAnnual)}/yr today, stepping down by {fmtMoney(s.mortgage * 12)}/yr after mortgage payoff (age {isFinite(mortgagePayoff) ? mortgagePayoff : "N/A"}).</div>
+                <div>• Bonus ({fmtMoney(bonusAfterTax)}/yr after-tax) contributes from year 1. Equity ({fmtMoney(equityAfterTax)}/yr after-tax) contributes from year 4. Both grow with the income growth rate.</div>
                 <div>• Contribution waterfall: TFSA → RRSP → Non-reg. Room inflates annually.</div>
                 <div>• Drawdown: Phase 1 (pre-65) RRSP → NR → TFSA. Phase 2 (65+) RRSP/RRIF → NR → TFSA.</div>
-                {s.pensionMonthly > 0 && <div>• DB Pension: {fmt$(s.pensionMonthly)}/mo ({fmt$(s.pensionMonthly * 12)}/yr today's $) from age {s.pensionStartAge}, inflation-indexed.</div>}
+                {s.pensionMonthly > 0 && <div>• DB Pension: {fmtMoney(s.pensionMonthly)}/mo ({fmtMoney(s.pensionMonthly * 12)}/yr today's $) from age {s.pensionStartAge}, inflation-indexed.</div>}
                 <div>• CPP start age {s.cppStartAge}. Delaying to 70 maximizes the guaranteed inflation-protected income stream.</div>
-                <div>• CPP ({fmt$(s.cppAmountToday)}/yr), OAS ({fmt$(s.oasAmountToday * 2)}/yr combined, from age {s.oasStartAge}), and DB pension ({fmt$(s.pensionMonthly * 12)}/yr) are all taxed at {Math.round(s.retirementIncomeTaxRate * 100)}%. OAS subject to 15% clawback above {fmt$(s.oasClawbackThreshold)}/person. Net after-tax combined at peak: {fmt$((s.cppAmountToday + s.oasAmountToday * 2 + s.pensionMonthly * 12) * (1 - s.retirementIncomeTaxRate))}/yr.</div>
+                <div>• CPP ({fmtMoney(s.cppAmountToday)}/yr), OAS ({fmtMoney(s.oasAmountToday * 2)}/yr combined, from age {s.oasStartAge}), and DB pension ({fmtMoney(s.pensionMonthly * 12)}/yr) are all taxed at {Math.round(s.retirementIncomeTaxRate * 100)}%. OAS subject to 15% clawback above {fmtMoney(s.oasClawbackThreshold)}/person. Net after-tax combined at peak: {fmtMoney((s.cppAmountToday + s.oasAmountToday * 2 + s.pensionMonthly * 12) * (1 - s.retirementIncomeTaxRate))}/yr.</div>
                 <div>• RRSP tax refunds (at {Math.round(s.taxRate * 100)}% marginal rate) are recycled into TFSA (if room available) then non-reg each accumulation year.</div>
                 <div>• Single deterministic return path, no full CRA marginal brackets.</div>
               </div>
@@ -1738,5 +1756,6 @@ export default function FatFireCalculator() {
         </div>
       </div>
     </div>
+    </PrivacyContext.Provider>
   );
 }
