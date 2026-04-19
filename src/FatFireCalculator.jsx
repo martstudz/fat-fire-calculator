@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, createContext, useContext, useCallback } from "react";
+import Onboarding, { onboardingToState } from "./Onboarding";
 
 // Supabase client — falls back to a no-op stub if not configured (e.g. running as artifact)
 let supabase;
@@ -621,6 +622,8 @@ function solveWindfall(inputs, windfallAmount, windfallAge) {
 // ---------- defaults ----------
 // publicDefaults: blank slate for guests — no personal numbers
 const publicDefaults = {
+  // Household flags (set by onboarding)
+  partnered: true, hasKids: false, province: "ON", onboardingComplete: false,
   // Names
   yourName: "You", spouseName: "Spouse",
   // Personal
@@ -673,6 +676,8 @@ const publicDefaults = {
 
 // defaults: your personal numbers — only loaded from Supabase when signed in
 const defaults = {
+  // Household flags
+  partnered: true, hasKids: false, province: "ON", onboardingComplete: true,
   // Names
   yourName: "Martin", spouseName: "Jessica",
   // Personal
@@ -928,6 +933,7 @@ function InfoBox({ children }) {
 
 // ---------- main ----------
 const STORAGE_KEY = "fatfire_inputs_v2";
+const ONBOARDING_KEY = "fatfire_onboarding_done";
 
 function loadSaved() {
   try {
@@ -991,6 +997,14 @@ export default function FatFireCalculator() {
   // When both exist, we pause and ask the user which to keep.
   // { cloudInputs, planType: "personal"|"household" }
   const [mergeConflict, setMergeConflict] = useState(null);
+
+  // ── Onboarding ────────────────────────────────────────────────────────────
+  // Show onboarding if:
+  //   - not signed in AND localStorage has no onboarding flag
+  //   - OR signed in but plan has onboardingComplete !== true
+  const [showOnboarding, setShowOnboarding] = useState(
+    () => !localStorage.getItem(ONBOARDING_KEY)
+  );
 
   // ── Check URL for ?join=CODE on load ──────────────────────────────────────
   const pendingJoinCode = useMemo(() => {
@@ -1311,6 +1325,19 @@ export default function FatFireCalculator() {
     setSaveStatus(error ? "error" : "saved");
   }, []);
 
+  function handleOnboardingComplete(computedState) {
+    setS(computedState);
+    localStorage.setItem(ONBOARDING_KEY, "1");
+    setShowOnboarding(false);
+  }
+
+  function handleOnboardingSignIn() {
+    // Skip onboarding, go straight to sign-in
+    localStorage.setItem(ONBOARDING_KEY, "1");
+    setShowOnboarding(false);
+    signInWithGoogle();
+  }
+
   async function signInWithGoogle() {
     // Preserve join code through the OAuth redirect
     const redirectTo = pendingJoinCode
@@ -1462,6 +1489,17 @@ export default function FatFireCalculator() {
   const yourBonusAmt = s.yourBase * s.yourBonusPct;
   const spouseBonusAmt = s.spouseBase * s.spouseBonusPct;
   const householdGross = s.yourBase + s.spouseBase + yourBonusAmt + spouseBonusAmt + yourEquityAmt + spouseEquityAmt;
+
+  // ── Show onboarding instead of calculator ────────────────────────────────
+  if (showOnboarding) {
+    return (
+      <Onboarding
+        onComplete={handleOnboardingComplete}
+        onSignIn={handleOnboardingSignIn}
+        publicDefaults={publicDefaults}
+      />
+    );
+  }
 
   return (
     <PrivacyContext.Provider value={hidden}>
@@ -1754,17 +1792,21 @@ export default function FatFireCalculator() {
                   className="border border-slate-300 rounded px-2 py-1 text-sm w-28 text-right"
                 />
               </label>
-              <label className="flex items-center justify-between gap-2 text-sm py-0.5">
-                <span className="text-slate-700">Spouse's name</span>
-                <input
-                  type="text"
-                  value={s.spouseName}
-                  onChange={(e) => update("spouseName")(e.target.value)}
-                  className="border border-slate-300 rounded px-2 py-1 text-sm w-28 text-right"
-                />
-              </label>
+              {s.partnered !== false && (
+                <label className="flex items-center justify-between gap-2 text-sm py-0.5">
+                  <span className="text-slate-700">Spouse's name</span>
+                  <input
+                    type="text"
+                    value={s.spouseName}
+                    onChange={(e) => update("spouseName")(e.target.value)}
+                    className="border border-slate-300 rounded px-2 py-1 text-sm w-28 text-right"
+                  />
+                </label>
+              )}
               <NumInput label={`${s.yourName}'s current age`} value={s.currentAge} onChange={update("currentAge")} small />
-              <NumInput label={`${s.spouseName}'s current age`} value={s.spouseCurrentAge} onChange={update("spouseCurrentAge")} small />
+              {s.partnered !== false && (
+                <NumInput label={`${s.spouseName}'s current age`} value={s.spouseCurrentAge} onChange={update("spouseCurrentAge")} small />
+              )}
               <NumInput label="End-of-plan age" value={s.deathAge} onChange={update("deathAge")} small />
             </Section>
 
@@ -1774,10 +1816,14 @@ export default function FatFireCalculator() {
               <PctInput label="Bonus (% of base)" value={s.yourBonusPct} onChange={update("yourBonusPct")} />
               <PctInput label="Equity vesting (% of base)" value={s.yourEquityPct} onChange={update("yourEquityPct")} hint="invested as vested" />
 
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">{s.spouseName}</div>
-              <NumInput label="Base pay" value={s.spouseBase} onChange={update("spouseBase")} prefix="$" step={1000} />
-              <PctInput label="Bonus (% of base)" value={s.spouseBonusPct} onChange={update("spouseBonusPct")} />
-              <PctInput label="Equity vesting (% of base)" value={s.spouseEquityPct} onChange={update("spouseEquityPct")} hint="invested as vested" />
+              {s.partnered !== false && (
+                <>
+                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">{s.spouseName}</div>
+                  <NumInput label="Base pay" value={s.spouseBase} onChange={update("spouseBase")} prefix="$" step={1000} />
+                  <PctInput label="Bonus (% of base)" value={s.spouseBonusPct} onChange={update("spouseBonusPct")} />
+                  <PctInput label="Equity vesting (% of base)" value={s.spouseEquityPct} onChange={update("spouseEquityPct")} hint="invested as vested" />
+                </>
+              )}
 
               <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">Tax</div>
               <PctInput label="Blended tax rate" value={s.taxRate} onChange={update("taxRate")} />
@@ -1788,12 +1834,14 @@ export default function FatFireCalculator() {
                   <span>{s.yourName}'s total comp (base + bonus + equity)</span>
                   <span className="font-mono">{fmtMoney(s.yourBase + yourBonusAmt + yourEquityAmt)}</span>
                 </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>{s.spouseName}'s total comp</span>
-                  <span className="font-mono">{fmtMoney(s.spouseBase + spouseBonusAmt + spouseEquityAmt)}</span>
-                </div>
+                {s.partnered !== false && (
+                  <div className="flex justify-between text-slate-600">
+                    <span>{s.spouseName}'s total comp</span>
+                    <span className="font-mono">{fmtMoney(s.spouseBase + spouseBonusAmt + spouseEquityAmt)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between font-semibold text-slate-800 pt-1 border-t border-slate-100">
-                  <span>Household gross</span>
+                  <span>{s.partnered !== false ? "Household" : "Total"} gross</span>
                   <span className="font-mono">{fmtMoney(householdGross)}</span>
                 </div>
               </div>
@@ -1827,11 +1875,15 @@ export default function FatFireCalculator() {
               <ExpenseRow label="Groceries" value={s.groceries} onChange={update("groceries")} freq="monthly" />
               <ExpenseRow label="Dining / entertainment" value={s.dining} onChange={update("dining")} freq="monthly" />
               <ExpenseRow label="Clothing / misc" value={s.clothing} onChange={update("clothing")} freq="monthly" />
-              <ExpenseRow label="Childcare / kids' activities" value={s.childcare} onChange={update("childcare")} freq="monthly" step={100} />
+              {s.hasKids !== false && (
+                <ExpenseRow label="Childcare / kids' activities" value={s.childcare} onChange={update("childcare")} freq="monthly" step={100} />
+              )}
               <ExpenseRow label="Subscriptions / tech / phones" value={s.subscriptions} onChange={update("subscriptions")} freq="monthly" step={50} />
               <ExpenseRow label="Personal care / gym" value={s.personalCare} onChange={update("personalCare")} freq="monthly" step={50} />
               <ExpenseRow label="Travel" value={s.travel} onChange={update("travel")} freq="annual" step={1000} />
-              <ExpenseRow label="RESP contributions" value={s.resp} onChange={update("resp")} freq="annual" step={500} />
+              {s.hasKids !== false && (
+                <ExpenseRow label="RESP contributions" value={s.resp} onChange={update("resp")} freq="annual" step={500} />
+              )}
               <ExpenseRow label="Gifts / misc (annual)" value={s.oneTimeMisc} onChange={update("oneTimeMisc")} freq="annual" step={1000} />
               <div className="pt-2 mt-1 border-t border-slate-200 space-y-0.5 text-xs">
                 <div className="flex justify-between text-slate-600">
@@ -1888,18 +1940,22 @@ export default function FatFireCalculator() {
                 <span className="font-mono">{fmtMoney((s.yourRrspStart||0) + (s.yourTfsaStart||0) + (s.yourNrStart||0))}</span>
               </div>
 
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5 border-t border-slate-100 mt-1">{s.spouseName}</div>
-              <NumInput label="RRSP" value={s.spouseRrspStart} onChange={update("spouseRrspStart")} prefix="$" step={10000} />
-              <NumInput label="TFSA" value={s.spouseTfsaStart} onChange={update("spouseTfsaStart")} prefix="$" step={10000} />
-              <NumInput label="Non-registered" value={s.spouseNrStart} onChange={update("spouseNrStart")} prefix="$" step={10000} />
-              <div className="text-xs text-slate-500 flex justify-between pb-1">
-                <span>{s.spouseName}'s subtotal</span>
-                <span className="font-mono">{fmtMoney((s.spouseRrspStart||0) + (s.spouseTfsaStart||0) + (s.spouseNrStart||0))}</span>
-              </div>
+              {s.partnered !== false && (
+                <>
+                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5 border-t border-slate-100 mt-1">{s.spouseName}</div>
+                  <NumInput label="RRSP" value={s.spouseRrspStart} onChange={update("spouseRrspStart")} prefix="$" step={10000} />
+                  <NumInput label="TFSA" value={s.spouseTfsaStart} onChange={update("spouseTfsaStart")} prefix="$" step={10000} />
+                  <NumInput label="Non-registered" value={s.spouseNrStart} onChange={update("spouseNrStart")} prefix="$" step={10000} />
+                  <div className="text-xs text-slate-500 flex justify-between pb-1">
+                    <span>{s.spouseName}'s subtotal</span>
+                    <span className="font-mono">{fmtMoney((s.spouseRrspStart||0) + (s.spouseTfsaStart||0) + (s.spouseNrStart||0))}</span>
+                  </div>
+                </>
+              )}
 
               <div className="pt-1 mt-1 border-t border-slate-200 text-xs text-slate-600 flex justify-between">
-                <span className="font-semibold text-slate-800">Household total</span>
-                <span className="font-mono font-semibold text-slate-800">{fmtMoney((s.yourRrspStart||0)+(s.yourTfsaStart||0)+(s.yourNrStart||0)+(s.spouseRrspStart||0)+(s.spouseTfsaStart||0)+(s.spouseNrStart||0))}</span>
+                <span className="font-semibold text-slate-800">{s.partnered !== false ? "Household total" : "Total"}</span>
+                <span className="font-mono font-semibold text-slate-800">{fmtMoney((s.yourRrspStart||0)+(s.yourTfsaStart||0)+(s.yourNrStart||0)+(s.partnered !== false ? (s.spouseRrspStart||0)+(s.spouseTfsaStart||0)+(s.spouseNrStart||0) : 0))}</span>
               </div>
             </Section>
 
@@ -1950,17 +2006,25 @@ export default function FatFireCalculator() {
               <div className="text-xs text-slate-500 mb-1">{s.yourName}</div>
               <NumInput label="RRSP room" value={s.yourRrspRoomExisting} onChange={update("yourRrspRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
               <NumInput label="TFSA room" value={s.yourTfsaRoomExisting} onChange={update("yourTfsaRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
-              <div className="text-xs text-slate-500 mt-1.5 mb-1">{s.spouseName}</div>
-              <NumInput label="RRSP room" value={s.spouseRrspRoomExisting} onChange={update("spouseRrspRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
-              <NumInput label="TFSA room" value={s.spouseTfsaRoomExisting} onChange={update("spouseTfsaRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
+              {s.partnered !== false && (
+                <>
+                  <div className="text-xs text-slate-500 mt-1.5 mb-1">{s.spouseName}</div>
+                  <NumInput label="RRSP room" value={s.spouseRrspRoomExisting} onChange={update("spouseRrspRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
+                  <NumInput label="TFSA room" value={s.spouseTfsaRoomExisting} onChange={update("spouseTfsaRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
+                </>
+              )}
 
               <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5 border-t border-slate-100 mt-2">Annual new room (today's $)</div>
               <div className="text-xs text-slate-500 mb-1">{s.yourName}</div>
               <NumInput label="RRSP room / yr" value={s.yourRrspRoomAnnual} onChange={update("yourRrspRoomAnnual")} prefix="$" step={500} />
               <NumInput label="TFSA room / yr" value={s.yourTfsaRoomAnnual} onChange={update("yourTfsaRoomAnnual")} prefix="$" step={500} />
-              <div className="text-xs text-slate-500 mt-1.5 mb-1">{s.spouseName}</div>
-              <NumInput label="RRSP room / yr" value={s.spouseRrspRoomAnnual} onChange={update("spouseRrspRoomAnnual")} prefix="$" step={500} />
-              <NumInput label="TFSA room / yr" value={s.spouseTfsaRoomAnnual} onChange={update("spouseTfsaRoomAnnual")} prefix="$" step={500} />
+              {s.partnered !== false && (
+                <>
+                  <div className="text-xs text-slate-500 mt-1.5 mb-1">{s.spouseName}</div>
+                  <NumInput label="RRSP room / yr" value={s.spouseRrspRoomAnnual} onChange={update("spouseRrspRoomAnnual")} prefix="$" step={500} />
+                  <NumInput label="TFSA room / yr" value={s.spouseTfsaRoomAnnual} onChange={update("spouseTfsaRoomAnnual")} prefix="$" step={500} />
+                </>
+              )}
 
               <div className="pt-2 mt-2 border-t border-slate-100 space-y-0.5 text-xs">
                 <div className="flex justify-between text-slate-600">
