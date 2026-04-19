@@ -602,6 +602,59 @@ function solveWindfall(inputs, windfallAmount, windfallAge) {
 }
 
 // ---------- defaults ----------
+// publicDefaults: blank slate for guests — no personal numbers, just sensible model assumptions
+const publicDefaults = {
+  // Names
+  yourName: "You", spouseName: "Spouse",
+  // Personal
+  currentAge: 40, spouseCurrentAge: 39, deathAge: 90,
+  // Income & tax
+  yourBase: 0, spouseBase: 0,
+  yourBonusPct: 0.1, spouseBonusPct: 0.1,
+  yourEquityPct: 0, spouseEquityPct: 0,
+  taxRate: 0.43, incomeGrowth: 0.03,
+  // Expenses: monthly
+  mortgage: 0, maintenance: 0, propertyTax: 0,
+  utilities: 0, transport: 0, groceries: 0,
+  dining: 0, clothing: 0,
+  childcare: 0, subscriptions: 0, personalCare: 0,
+  // Expenses: annual
+  travel: 0, oneTimeMisc: 0,
+  resp: 0,
+  // Retirement-specific spend
+  retirementTravel: 0, retirementHealthcare: 0,
+  // Mortgage amortization
+  mortgagePrincipal: 0, mortgageRate: 0.05,
+  extraMortgagePayment: 0,
+  // Account balances — per person
+  yourRrspStart: 0, spouseRrspStart: 0,
+  yourTfsaStart: 0, spouseTfsaStart: 0,
+  yourNrStart: 0, spouseNrStart: 0,
+  // Contributions
+  startingMonthly: 0,
+  contribGrowth: 0.03,
+  // Contribution room
+  yourRrspRoomExisting: 0, spouseRrspRoomExisting: 0,
+  yourTfsaRoomExisting: 0, spouseTfsaRoomExisting: 0,
+  yourRrspRoomAnnual: 32490, spouseRrspRoomAnnual: 32490,
+  yourTfsaRoomAnnual: 7000, spouseTfsaRoomAnnual: 7000,
+  // Windfalls
+  yourWindfallAge: 50, yourWindfallAmount: 0,
+  spouseWindfallAge: 50, spouseWindfallAmount: 0,
+  // Terminal target
+  terminalTargetToday: 250000,
+  // Market assumptions
+  investmentReturn: 0.07, inflation: 0.03,
+  // Retirement income / taxes
+  cppAmountToday: 0, cppStartAge: 70,
+  pensionMonthly: 0, pensionStartAge: 60,
+  oasAmountToday: 8500, oasStartAge: 65,
+  oasClawbackThreshold: 95323,
+  rrspTaxRate: 0.37, nrCapGainsRate: 0.21,
+  retirementIncomeTaxRate: 0.37,
+};
+
+// defaults: your personal numbers — only loaded from Supabase when signed in
 const defaults = {
   // Names
   yourName: "Martin", spouseName: "Jessica",
@@ -619,10 +672,9 @@ const defaults = {
   childcare: 0, subscriptions: 300, personalCare: 400,
   // Expenses: annual
   travel: 20000, oneTimeMisc: 20000,
-  resp: 5000, // RESP contributions (annual)
-  // Retirement-specific spend (replaces or adds to working-years spend)
-  retirementTravel: 40000, // snowbird / extended travel
-  retirementHealthcare: 8000, // private health/dental/vision plan
+  resp: 5000,
+  // Retirement-specific spend
+  retirementTravel: 40000, retirementHealthcare: 8000,
   // Mortgage amortization
   mortgagePrincipal: 872000, mortgageRate: 0.0385,
   extraMortgagePayment: 800,
@@ -633,12 +685,12 @@ const defaults = {
   // Contributions
   startingMonthly: 4500,
   contribGrowth: 0.05,
-  // Contribution room (carry-forward + annual new) — split by person
+  // Contribution room
   yourRrspRoomExisting: 80000, spouseRrspRoomExisting: 46000,
   yourTfsaRoomExisting: 25000, spouseTfsaRoomExisting: 39000,
   yourRrspRoomAnnual: 32490, spouseRrspRoomAnnual: 32490,
   yourTfsaRoomAnnual: 7000, spouseTfsaRoomAnnual: 7000,
-  // Windfalls (one per spouse) — model suggests optimal allocation
+  // Windfalls
   yourWindfallAge: 50, yourWindfallAmount: 0,
   spouseWindfallAge: 50, spouseWindfallAmount: 0,
   // Terminal target
@@ -648,9 +700,8 @@ const defaults = {
   // Retirement income / taxes
   cppAmountToday: 40000, cppStartAge: 70,
   pensionMonthly: 650, pensionStartAge: 60,
-  // OAS — per-person amount; both spouses modelled together
   oasAmountToday: 8500, oasStartAge: 65,
-  oasClawbackThreshold: 95323, // 2026 threshold, per person
+  oasClawbackThreshold: 95323,
   rrspTaxRate: 0.37, nrCapGainsRate: 0.21,
   retirementIncomeTaxRate: 0.37,
 };
@@ -864,12 +915,12 @@ const STORAGE_KEY = "fatfire_inputs_v2";
 function loadSaved() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaults;
+    if (!raw) return publicDefaults;
     const parsed = JSON.parse(raw);
-    // Merge with defaults so new fields added in future versions always have a value
-    return { ...defaults, ...parsed };
+    // Merge with publicDefaults so new fields always have a value
+    return { ...publicDefaults, ...parsed };
   } catch {
-    return defaults;
+    return publicDefaults;
   }
 }
 
@@ -910,7 +961,11 @@ export default function FatFireCalculator() {
       .eq("user_id", userId)
       .single();
     if (!error && data?.inputs) {
-      setS({ ...defaults, ...data.inputs });
+      // Merge with publicDefaults so any new fields added later always have a value
+      setS({ ...publicDefaults, ...data.inputs });
+    } else {
+      // First sign-in: no cloud data yet — load personal defaults
+      setS(defaults);
     }
   }
 
@@ -979,7 +1034,7 @@ export default function FatFireCalculator() {
   function resetToDefaults() {
     if (window.confirm("Reset all inputs to defaults? This cannot be undone.")) {
       localStorage.removeItem(STORAGE_KEY);
-      setS(defaults);
+      setS(user ? defaults : publicDefaults);
     }
   }
 
