@@ -602,17 +602,17 @@ function solveWindfall(inputs, windfallAmount, windfallAge) {
 }
 
 // ---------- defaults ----------
-// publicDefaults: blank slate for guests — no personal numbers, just sensible model assumptions
+// publicDefaults: blank slate for guests — no personal numbers
 const publicDefaults = {
   // Names
   yourName: "You", spouseName: "Spouse",
   // Personal
-  currentAge: 40, spouseCurrentAge: 39, deathAge: 90,
+  currentAge: 0, spouseCurrentAge: 0, deathAge: 90,
   // Income & tax
   yourBase: 0, spouseBase: 0,
-  yourBonusPct: 0.1, spouseBonusPct: 0.1,
+  yourBonusPct: 0, spouseBonusPct: 0,
   yourEquityPct: 0, spouseEquityPct: 0,
-  taxRate: 0.43, incomeGrowth: 0.03,
+  taxRate: 0, incomeGrowth: 0,
   // Expenses: monthly
   mortgage: 0, maintenance: 0, propertyTax: 0,
   utilities: 0, transport: 0, groceries: 0,
@@ -624,7 +624,7 @@ const publicDefaults = {
   // Retirement-specific spend
   retirementTravel: 0, retirementHealthcare: 0,
   // Mortgage amortization
-  mortgagePrincipal: 0, mortgageRate: 0.05,
+  mortgagePrincipal: 0, mortgageRate: 0,
   extraMortgagePayment: 0,
   // Account balances — per person
   yourRrspStart: 0, spouseRrspStart: 0,
@@ -632,26 +632,26 @@ const publicDefaults = {
   yourNrStart: 0, spouseNrStart: 0,
   // Contributions
   startingMonthly: 0,
-  contribGrowth: 0.03,
+  contribGrowth: 0,
   // Contribution room
   yourRrspRoomExisting: 0, spouseRrspRoomExisting: 0,
   yourTfsaRoomExisting: 0, spouseTfsaRoomExisting: 0,
-  yourRrspRoomAnnual: 32490, spouseRrspRoomAnnual: 32490,
-  yourTfsaRoomAnnual: 7000, spouseTfsaRoomAnnual: 7000,
+  yourRrspRoomAnnual: 0, spouseRrspRoomAnnual: 0,
+  yourTfsaRoomAnnual: 0, spouseTfsaRoomAnnual: 0,
   // Windfalls
-  yourWindfallAge: 50, yourWindfallAmount: 0,
-  spouseWindfallAge: 50, spouseWindfallAmount: 0,
+  yourWindfallAge: 0, yourWindfallAmount: 0,
+  spouseWindfallAge: 0, spouseWindfallAmount: 0,
   // Terminal target
-  terminalTargetToday: 250000,
+  terminalTargetToday: 0,
   // Market assumptions
-  investmentReturn: 0.07, inflation: 0.03,
+  investmentReturn: 0, inflation: 0,
   // Retirement income / taxes
-  cppAmountToday: 0, cppStartAge: 70,
-  pensionMonthly: 0, pensionStartAge: 60,
-  oasAmountToday: 8500, oasStartAge: 65,
-  oasClawbackThreshold: 95323,
-  rrspTaxRate: 0.37, nrCapGainsRate: 0.21,
-  retirementIncomeTaxRate: 0.37,
+  cppAmountToday: 0, cppStartAge: 0,
+  pensionMonthly: 0, pensionStartAge: 0,
+  oasAmountToday: 0, oasStartAge: 0,
+  oasClawbackThreshold: 0,
+  rrspTaxRate: 0, nrCapGainsRate: 0,
+  retirementIncomeTaxRate: 0,
 };
 
 // defaults: your personal numbers — only loaded from Supabase when signed in
