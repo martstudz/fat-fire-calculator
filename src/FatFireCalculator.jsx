@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef, useEffect, createContext, useContext } from "react";
+import { useState, useMemo, useRef, useEffect, createContext, useContext, useCallback } from "react";
+import { supabase } from "./supabaseClient";
 
 // ---------- privacy context ----------
 const PrivacyContext = createContext(false);
@@ -62,6 +63,7 @@ function rrifMinimum(balance, age) {
 function simulate(p, retirementAge) {
   const years = Math.max(0, p.deathAge - p.currentAge + 1);
   const totalAnnualSpendToday = p.monthlyExpensesTotal * 12 + p.oneTimeAnnualTotal;
+  const retirementAnnualSpendToday = totalAnnualSpendToday + (p.retirementSpendDelta || 0);
   const effectiveMortgagePayment = p.mortgagePayment + p.extraMortgagePayment;
   const payoffAge = payoffAgeFromMonths(
     p.currentAge,
@@ -100,8 +102,10 @@ function simulate(p, retirementAge) {
     rrspRoom += p.rrspRoomAnnual * inf;
     tfsaRoom += p.tfsaRoomAnnual * inf;
 
-    // Required spend. Mortgage drops off after payoff.
-    let baseSpendToday = totalAnnualSpendToday;
+    // Required spend. In retirement use retirement-adjusted spend (higher travel, healthcare; no RESP).
+    // Mortgage drops off after payoff.
+    const baseAnnualSpend = age >= retirementAge ? retirementAnnualSpendToday : totalAnnualSpendToday;
+    let baseSpendToday = baseAnnualSpend;
     if (age >= payoffAge) baseSpendToday -= p.mortgagePayment * 12;
     const requiredSpendNom = baseSpendToday * inf;
 
@@ -317,6 +321,7 @@ function runMonteCarlo(inputs, retirementAge, runs = 1000, annualVolatility = 0.
       monthsToPayoff(p.mortgagePrincipal, effectiveMortgagePayment, p.mortgageRate)
     );
     const totalAnnualSpendToday = p.monthlyExpensesTotal * 12 + p.oneTimeAnnualTotal;
+    const retirementAnnualSpendToday = totalAnnualSpendToday + (p.retirementSpendDelta || 0);
     const baseBonusAfterTax =
       (p.yourBase * p.yourBonusPct + p.spouseBase * p.spouseBonusPct) * (1 - p.taxRate);
     const baseEquityAfterTax =
@@ -353,7 +358,8 @@ function runMonteCarlo(inputs, retirementAge, runs = 1000, annualVolatility = 0.
       rrspRoom += p.rrspRoomAnnual * inf;
       tfsaRoom += p.tfsaRoomAnnual * inf;
 
-      let baseSpendToday = totalAnnualSpendToday;
+      const baseAnnualSpendMC = age >= retirementAge ? retirementAnnualSpendToday : totalAnnualSpendToday;
+      let baseSpendToday = baseAnnualSpendMC;
       if (age >= payoffAge) baseSpendToday -= p.mortgagePayment * 12;
       const requiredSpendNom = baseSpendToday * inf;
 
@@ -597,6 +603,8 @@ function solveWindfall(inputs, windfallAmount, windfallAge) {
 
 // ---------- defaults ----------
 const defaults = {
+  // Names
+  yourName: "Martin", spouseName: "Jessica",
   // Personal
   currentAge: 40, spouseCurrentAge: 39, deathAge: 90,
   // Income & tax
@@ -608,13 +616,20 @@ const defaults = {
   mortgage: 4350, maintenance: 1000, propertyTax: 500,
   utilities: 400, transport: 350, groceries: 1500,
   dining: 1500, clothing: 400,
+  childcare: 0, subscriptions: 300, personalCare: 400,
   // Expenses: annual
   travel: 20000, oneTimeMisc: 20000,
+  resp: 5000, // RESP contributions (annual)
+  // Retirement-specific spend (replaces or adds to working-years spend)
+  retirementTravel: 40000, // snowbird / extended travel
+  retirementHealthcare: 8000, // private health/dental/vision plan
   // Mortgage amortization
   mortgagePrincipal: 872000, mortgageRate: 0.0385,
   extraMortgagePayment: 800,
-  // Account balances
-  rrspStart: 500000, tfsaStart: 300000, nrStart: 5000,
+  // Account balances — per person
+  yourRrspStart: 220000, spouseRrspStart: 344000,
+  yourTfsaStart: 109000, spouseTfsaStart: 139000,
+  yourNrStart: 5000, spouseNrStart: 0,
   // Contributions
   startingMonthly: 4500,
   contribGrowth: 0.05,
@@ -645,9 +660,17 @@ function buildInputs(s) {
     ...s,
     monthlyExpensesTotal:
       s.mortgage + s.maintenance + s.propertyTax + s.utilities +
-      s.transport + s.groceries + s.dining + s.clothing,
-    oneTimeAnnualTotal: s.travel + s.oneTimeMisc,
+      s.transport + s.groceries + s.dining + s.clothing +
+      (s.childcare || 0) + (s.subscriptions || 0) + (s.personalCare || 0),
+    oneTimeAnnualTotal: s.travel + s.oneTimeMisc + (s.resp || 0),
+    // Retirement-specific: swap travel for retirementTravel, add healthcare
+    retirementMonthlyExtra: 0, // placeholder — retirement spend adjustment handled in engine via retirementSpendDelta
+    retirementSpendDelta: (s.retirementTravel || 0) - (s.travel || 0) + (s.retirementHealthcare || 0) - (s.resp || 0),
     mortgagePayment: s.mortgage,
+    // Combine per-person balances for the engine (engine models household as one unit)
+    rrspStart: (s.yourRrspStart || 0) + (s.spouseRrspStart || 0),
+    tfsaStart: (s.yourTfsaStart || 0) + (s.spouseTfsaStart || 0),
+    nrStart:   (s.yourNrStart   || 0) + (s.spouseNrStart   || 0),
     // Combine household room for engine (engine uses single rrspRoom / tfsaRoom totals)
     rrspRoomExisting: s.yourRrspRoomExisting + s.spouseRrspRoomExisting,
     tfsaRoomExisting: s.yourTfsaRoomExisting + s.spouseTfsaRoomExisting,
@@ -836,7 +859,7 @@ function InfoBox({ children }) {
 }
 
 // ---------- main ----------
-const STORAGE_KEY = "fatfire_inputs_v1";
+const STORAGE_KEY = "fatfire_inputs_v2";
 
 function loadSaved() {
   try {
@@ -860,6 +883,57 @@ function saveToStorage(state) {
 
 export default function FatFireCalculator() {
   const [s, setS] = useState(loadSaved);
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [saveStatus, setSaveStatus] = useState("saved"); // "saved" | "saving" | "error"
+  const saveTimerRef = useRef(null);
+
+  // ── Auth: listen for session changes ──────────────────────────────────────
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+      if (session?.user) loadFromCloud(session.user.id);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const newUser = session?.user ?? null;
+      setUser(newUser);
+      if (newUser) loadFromCloud(newUser.id);
+    });
+    return () => subscription.unsubscribe();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadFromCloud(userId) {
+    const { data, error } = await supabase
+      .from("user_inputs")
+      .select("inputs")
+      .eq("user_id", userId)
+      .single();
+    if (!error && data?.inputs) {
+      setS({ ...defaults, ...data.inputs });
+    }
+  }
+
+  const saveToCloud = useCallback(async (state, userId) => {
+    setSaveStatus("saving");
+    const { error } = await supabase
+      .from("user_inputs")
+      .upsert({ user_id: userId, inputs: state, updated_at: new Date().toISOString() },
+               { onConflict: "user_id" });
+    setSaveStatus(error ? "error" : "saved");
+  }, []);
+
+  async function signInWithGoogle() {
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.href },
+    });
+  }
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    setUser(null);
+  }
 
   const inputs   = useMemo(() => buildInputs(s), [s]);
   const solved    = useMemo(() => solveEarliestAge(inputs), [inputs]);
@@ -890,8 +964,15 @@ export default function FatFireCalculator() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useMemo(() => { setMc(null); setMcReverse(null); }, [inputs]);
 
-  // Autosave whenever s changes
-  useEffect(() => { saveToStorage(s); }, [s]);
+  // Autosave: localStorage always; cloud save (debounced 1.5s) when signed in
+  useEffect(() => {
+    saveToStorage(s);
+    if (user) {
+      setSaveStatus("saving");
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => saveToCloud(s, user.id), 1500);
+    }
+  }, [s, user, saveToCloud]);
 
   const update = (k) => (v) => setS((prev) => ({ ...prev, [k]: v }));
 
@@ -980,8 +1061,45 @@ export default function FatFireCalculator() {
                 Canadian tax-optimized · RRSP meltdown strategy · All figures in today's dollars
               </p>
             </div>
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <span>Auto-saved</span>
+            <div className="flex items-center gap-2 text-xs flex-wrap justify-end">
+              {/* Save status */}
+              {user && (
+                <span className={
+                  saveStatus === "saved" ? "text-emerald-600" :
+                  saveStatus === "saving" ? "text-slate-400 italic" :
+                  "text-red-500"
+                }>
+                  {saveStatus === "saved" ? "✓ Cloud saved" :
+                   saveStatus === "saving" ? "Saving…" :
+                   "Save failed"}
+                </span>
+              )}
+              {!user && <span className="text-slate-400">Auto-saved locally</span>}
+
+              {/* Auth */}
+              {authLoading ? null : user ? (
+                <div className="flex items-center gap-2">
+                  {user.user_metadata?.avatar_url && (
+                    <img src={user.user_metadata.avatar_url} alt="" className="w-6 h-6 rounded-full" />
+                  )}
+                  <span className="text-slate-600 max-w-[140px] truncate">{user.email}</span>
+                  <button
+                    onClick={signOut}
+                    className="px-2 py-1 rounded border border-slate-300 text-slate-500 hover:bg-slate-100 transition-colors"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={signInWithGoogle}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors font-medium shadow-sm"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                  Sign in with Google
+                </button>
+              )}
+
               <button
                 onClick={() => setHidden(h => !h)}
                 className={"px-2 py-1 rounded border transition-colors font-medium " + (hidden ? "border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100" : "border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-700")}
@@ -992,7 +1110,7 @@ export default function FatFireCalculator() {
                 onClick={resetToDefaults}
                 className="px-2 py-1 rounded border border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
               >
-                Reset to defaults
+                Reset
               </button>
             </div>
           </div>
@@ -1003,18 +1121,36 @@ export default function FatFireCalculator() {
           <div className="col-span-12 lg:col-span-4 space-y-3">
 
             <Section title="Personal">
-              <NumInput label="Your current age" value={s.currentAge} onChange={update("currentAge")} small />
-              <NumInput label="Spouse current age" value={s.spouseCurrentAge} onChange={update("spouseCurrentAge")} small />
+              <label className="flex items-center justify-between gap-2 text-sm py-0.5">
+                <span className="text-slate-700">Your name</span>
+                <input
+                  type="text"
+                  value={s.yourName}
+                  onChange={(e) => update("yourName")(e.target.value)}
+                  className="border border-slate-300 rounded px-2 py-1 text-sm w-28 text-right"
+                />
+              </label>
+              <label className="flex items-center justify-between gap-2 text-sm py-0.5">
+                <span className="text-slate-700">Spouse's name</span>
+                <input
+                  type="text"
+                  value={s.spouseName}
+                  onChange={(e) => update("spouseName")(e.target.value)}
+                  className="border border-slate-300 rounded px-2 py-1 text-sm w-28 text-right"
+                />
+              </label>
+              <NumInput label={`${s.yourName}'s current age`} value={s.currentAge} onChange={update("currentAge")} small />
+              <NumInput label={`${s.spouseName}'s current age`} value={s.spouseCurrentAge} onChange={update("spouseCurrentAge")} small />
               <NumInput label="End-of-plan age" value={s.deathAge} onChange={update("deathAge")} small />
             </Section>
 
             <Section title="Income & tax (working years)">
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-1 pb-0.5">You</div>
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-1 pb-0.5">{s.yourName}</div>
               <NumInput label="Base pay" value={s.yourBase} onChange={update("yourBase")} prefix="$" step={1000} />
               <PctInput label="Bonus (% of base)" value={s.yourBonusPct} onChange={update("yourBonusPct")} />
               <PctInput label="Equity vesting (% of base)" value={s.yourEquityPct} onChange={update("yourEquityPct")} hint="invested as vested" />
 
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">Spouse</div>
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">{s.spouseName}</div>
               <NumInput label="Base pay" value={s.spouseBase} onChange={update("spouseBase")} prefix="$" step={1000} />
               <PctInput label="Bonus (% of base)" value={s.spouseBonusPct} onChange={update("spouseBonusPct")} />
               <PctInput label="Equity vesting (% of base)" value={s.spouseEquityPct} onChange={update("spouseEquityPct")} hint="invested as vested" />
@@ -1025,11 +1161,11 @@ export default function FatFireCalculator() {
 
               <div className="pt-2 mt-1 border-t border-slate-200 space-y-0.5 text-xs">
                 <div className="flex justify-between text-slate-600">
-                  <span>Your total comp (base + bonus + equity)</span>
+                  <span>{s.yourName}'s total comp (base + bonus + equity)</span>
                   <span className="font-mono">{fmtMoney(s.yourBase + yourBonusAmt + yourEquityAmt)}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
-                  <span>Spouse total comp</span>
+                  <span>{s.spouseName}'s total comp</span>
                   <span className="font-mono">{fmtMoney(s.spouseBase + spouseBonusAmt + spouseEquityAmt)}</span>
                 </div>
                 <div className="flex justify-between font-semibold text-slate-800 pt-1 border-t border-slate-100">
@@ -1067,7 +1203,11 @@ export default function FatFireCalculator() {
               <ExpenseRow label="Groceries" value={s.groceries} onChange={update("groceries")} freq="monthly" />
               <ExpenseRow label="Dining / entertainment" value={s.dining} onChange={update("dining")} freq="monthly" />
               <ExpenseRow label="Clothing / misc" value={s.clothing} onChange={update("clothing")} freq="monthly" />
+              <ExpenseRow label="Childcare / kids' activities" value={s.childcare} onChange={update("childcare")} freq="monthly" step={100} />
+              <ExpenseRow label="Subscriptions / tech / phones" value={s.subscriptions} onChange={update("subscriptions")} freq="monthly" step={50} />
+              <ExpenseRow label="Personal care / gym" value={s.personalCare} onChange={update("personalCare")} freq="monthly" step={50} />
               <ExpenseRow label="Travel" value={s.travel} onChange={update("travel")} freq="annual" step={1000} />
+              <ExpenseRow label="RESP contributions" value={s.resp} onChange={update("resp")} freq="annual" step={500} />
               <ExpenseRow label="Gifts / misc (annual)" value={s.oneTimeMisc} onChange={update("oneTimeMisc")} freq="annual" step={1000} />
               <div className="pt-2 mt-1 border-t border-slate-200 space-y-0.5 text-xs">
                 <div className="flex justify-between text-slate-600">
@@ -1075,27 +1215,67 @@ export default function FatFireCalculator() {
                   <span className="font-mono">{fmtMoney(inputs.monthlyExpensesTotal * 12)}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
-                  <span>One-time annual</span>
+                  <span>One-time annual (incl. RESP)</span>
                   <span className="font-mono">{fmtMoney(inputs.oneTimeAnnualTotal)}</span>
                 </div>
                 <div className="flex justify-between font-semibold text-slate-800 pt-1 border-t border-slate-100">
-                  <span>Grand total / yr</span>
+                  <span>Working years total / yr</span>
                   <span className="font-mono">{fmtMoney(grandAnnual)}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
                   <span>After mortgage payoff</span>
                   <span className="font-mono">{fmtMoney(postMortgageAnnual)}</span>
                 </div>
+                <div className="flex justify-between font-semibold text-emerald-700 pt-1 border-t border-slate-100">
+                  <span>Retirement spend / yr</span>
+                  <span className="font-mono">{fmtMoney(grandAnnual + (inputs.retirementSpendDelta || 0))}</span>
+                </div>
+                <div className="text-slate-400 text-xs">Retirement spend swaps travel for snowbird budget, adds healthcare, removes RESP.</div>
               </div>
             </Section>
 
-            <Section title="Starting portfolio (by account)">
-              <NumInput label="RRSP" value={s.rrspStart} onChange={update("rrspStart")} prefix="$" step={10000} />
-              <NumInput label="TFSA" value={s.tfsaStart} onChange={update("tfsaStart")} prefix="$" step={10000} />
-              <NumInput label="Non-registered" value={s.nrStart} onChange={update("nrStart")} prefix="$" step={10000} />
+            <Section title="Retirement-specific spend" defaultOpen={false}>
+              <div className="text-xs text-slate-500 mb-2">These replace or supplement your working-years budget once retired. The model uses these figures during decumulation.</div>
+              <ExpenseRow label="Snowbird / extended travel" value={s.retirementTravel} onChange={update("retirementTravel")} freq="annual" step={1000} />
+              <ExpenseRow label="Private health / dental / vision" value={s.retirementHealthcare} onChange={update("retirementHealthcare")} freq="annual" step={500} />
+              <div className="pt-2 mt-1 border-t border-slate-100 space-y-0.5 text-xs">
+                <div className="flex justify-between text-slate-600">
+                  <span>Working-years travel budget</span>
+                  <span className="font-mono">{fmtMoney(s.travel)}/yr</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>RESP (drops off in retirement)</span>
+                  <span className="font-mono">−{fmtMoney(s.resp || 0)}/yr</span>
+                </div>
+                <div className={`flex justify-between font-semibold pt-1 border-t border-slate-100 ${(inputs.retirementSpendDelta || 0) > 0 ? "text-rose-600" : "text-emerald-700"}`}>
+                  <span>Net retirement spend change</span>
+                  <span className="font-mono">{(inputs.retirementSpendDelta || 0) > 0 ? "+" : ""}{fmtMoney(inputs.retirementSpendDelta || 0)}/yr</span>
+                </div>
+              </div>
+            </Section>
+
+            <Section title="Starting portfolio (by person)">
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-1 pb-0.5">{s.yourName}</div>
+              <NumInput label="RRSP" value={s.yourRrspStart} onChange={update("yourRrspStart")} prefix="$" step={10000} />
+              <NumInput label="TFSA" value={s.yourTfsaStart} onChange={update("yourTfsaStart")} prefix="$" step={10000} />
+              <NumInput label="Non-registered" value={s.yourNrStart} onChange={update("yourNrStart")} prefix="$" step={10000} />
+              <div className="text-xs text-slate-500 flex justify-between pb-1">
+                <span>{s.yourName}'s subtotal</span>
+                <span className="font-mono">{fmtMoney((s.yourRrspStart||0) + (s.yourTfsaStart||0) + (s.yourNrStart||0))}</span>
+              </div>
+
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5 border-t border-slate-100 mt-1">{s.spouseName}</div>
+              <NumInput label="RRSP" value={s.spouseRrspStart} onChange={update("spouseRrspStart")} prefix="$" step={10000} />
+              <NumInput label="TFSA" value={s.spouseTfsaStart} onChange={update("spouseTfsaStart")} prefix="$" step={10000} />
+              <NumInput label="Non-registered" value={s.spouseNrStart} onChange={update("spouseNrStart")} prefix="$" step={10000} />
+              <div className="text-xs text-slate-500 flex justify-between pb-1">
+                <span>{s.spouseName}'s subtotal</span>
+                <span className="font-mono">{fmtMoney((s.spouseRrspStart||0) + (s.spouseTfsaStart||0) + (s.spouseNrStart||0))}</span>
+              </div>
+
               <div className="pt-1 mt-1 border-t border-slate-200 text-xs text-slate-600 flex justify-between">
-                <span className="font-semibold text-slate-800">Total starting portfolio</span>
-                <span className="font-mono font-semibold text-slate-800">{fmtMoney(s.rrspStart + s.tfsaStart + s.nrStart)}</span>
+                <span className="font-semibold text-slate-800">Household total</span>
+                <span className="font-mono font-semibold text-slate-800">{fmtMoney((s.yourRrspStart||0)+(s.yourTfsaStart||0)+(s.yourNrStart||0)+(s.spouseRrspStart||0)+(s.spouseTfsaStart||0)+(s.spouseNrStart||0))}</span>
               </div>
             </Section>
 
@@ -1143,18 +1323,18 @@ export default function FatFireCalculator() {
 
             <Section title="Contribution room (registered plans)">
               <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-1 pb-0.5">Existing carry-forward room</div>
-              <div className="text-xs text-slate-500 mb-1">You</div>
-              <NumInput label="RRSP room" value={s.yourRrspRoomExisting} onChange={update("yourRrspRoomExisting")} prefix="$" step={1000} hint="(your carry-forward)" />
-              <NumInput label="TFSA room" value={s.yourTfsaRoomExisting} onChange={update("yourTfsaRoomExisting")} prefix="$" step={1000} hint="(your carry-forward)" />
-              <div className="text-xs text-slate-500 mt-1.5 mb-1">Spouse</div>
-              <NumInput label="RRSP room" value={s.spouseRrspRoomExisting} onChange={update("spouseRrspRoomExisting")} prefix="$" step={1000} hint="(spouse carry-forward)" />
-              <NumInput label="TFSA room" value={s.spouseTfsaRoomExisting} onChange={update("spouseTfsaRoomExisting")} prefix="$" step={1000} hint="(spouse carry-forward)" />
+              <div className="text-xs text-slate-500 mb-1">{s.yourName}</div>
+              <NumInput label="RRSP room" value={s.yourRrspRoomExisting} onChange={update("yourRrspRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
+              <NumInput label="TFSA room" value={s.yourTfsaRoomExisting} onChange={update("yourTfsaRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
+              <div className="text-xs text-slate-500 mt-1.5 mb-1">{s.spouseName}</div>
+              <NumInput label="RRSP room" value={s.spouseRrspRoomExisting} onChange={update("spouseRrspRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
+              <NumInput label="TFSA room" value={s.spouseTfsaRoomExisting} onChange={update("spouseTfsaRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
 
               <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5 border-t border-slate-100 mt-2">Annual new room (today's $)</div>
-              <div className="text-xs text-slate-500 mb-1">You</div>
+              <div className="text-xs text-slate-500 mb-1">{s.yourName}</div>
               <NumInput label="RRSP room / yr" value={s.yourRrspRoomAnnual} onChange={update("yourRrspRoomAnnual")} prefix="$" step={500} />
               <NumInput label="TFSA room / yr" value={s.yourTfsaRoomAnnual} onChange={update("yourTfsaRoomAnnual")} prefix="$" step={500} />
-              <div className="text-xs text-slate-500 mt-1.5 mb-1">Spouse</div>
+              <div className="text-xs text-slate-500 mt-1.5 mb-1">{s.spouseName}</div>
               <NumInput label="RRSP room / yr" value={s.spouseRrspRoomAnnual} onChange={update("spouseRrspRoomAnnual")} prefix="$" step={500} />
               <NumInput label="TFSA room / yr" value={s.spouseTfsaRoomAnnual} onChange={update("spouseTfsaRoomAnnual")} prefix="$" step={500} />
 
@@ -1220,12 +1400,12 @@ export default function FatFireCalculator() {
 
             <Section title="Windfalls" defaultOpen={false}>
               <div className="text-xs text-slate-500 mb-2">Enter an expected lump sum (inheritance, property sale, RSU cliff, etc.). The model will recommend the optimal allocation to minimize your retirement age.</div>
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-1 pb-0.5">You</div>
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-1 pb-0.5">{s.yourName}</div>
               <NumInput label="Windfall amount" value={s.yourWindfallAmount} onChange={update("yourWindfallAmount")} prefix="$" step={25000} />
-              <NumInput label="Your age at receipt" value={s.yourWindfallAge} onChange={update("yourWindfallAge")} small />
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">Spouse</div>
+              <NumInput label={`${s.yourName}'s age at receipt`} value={s.yourWindfallAge} onChange={update("yourWindfallAge")} small />
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">{s.spouseName}</div>
               <NumInput label="Windfall amount" value={s.spouseWindfallAmount} onChange={update("spouseWindfallAmount")} prefix="$" step={25000} />
-              <NumInput label="Spouse age at receipt" value={s.spouseWindfallAge} onChange={update("spouseWindfallAge")} small />
+              <NumInput label={`${s.spouseName}'s age at receipt`} value={s.spouseWindfallAge} onChange={update("spouseWindfallAge")} small />
               <div className="text-xs text-slate-400 mt-2">Windfall does not alter the main simulation — recommendations appear below.</div>
             </Section>
 
@@ -1308,8 +1488,8 @@ export default function FatFireCalculator() {
                     ★ = option that minimises retirement age. Ties broken by largest portfolio. Not included in main simulation.
                   </div>
                   <div className="space-y-5">
-                    <WindfallTable advice={yourWindfallAdvice}   label="Your windfall"    age={s.yourWindfallAge}   amount={s.yourWindfallAmount} />
-                    <WindfallTable advice={spouseWindfallAdvice} label="Spouse's windfall" age={s.spouseWindfallAge} amount={s.spouseWindfallAmount} />
+                    <WindfallTable advice={yourWindfallAdvice}   label={`${s.yourName}'s windfall`}   age={s.yourWindfallAge}   amount={s.yourWindfallAmount} />
+                    <WindfallTable advice={spouseWindfallAdvice} label={`${s.spouseName}'s windfall`} age={s.spouseWindfallAge} amount={s.spouseWindfallAmount} />
                   </div>
                 </div>
               );
@@ -1335,6 +1515,9 @@ export default function FatFireCalculator() {
                 {solved.age !== null ? (() => {
                   const retRow = solved.rows.find(r => r.age === solved.age);
                   const portfolioAtRetirement = retRow ? retRow.endTotal / retRow.infFactor : null;
+                  // Per-person retirement ages — offset from household retirement year
+                  const yourRetireAge = solved.age;
+                  const spouseRetireAge = solved.age + (s.spouseCurrentAge - s.currentAge);
                   return (
                     <div>
                       <div className="flex items-baseline gap-4 flex-wrap">
@@ -1346,6 +1529,18 @@ export default function FatFireCalculator() {
                             <span className="font-semibold">{fmtMoney(solved.terminalBal / Math.pow(1 + s.inflation, s.deathAge - s.currentAge))}</span>{" "}
                             at age {s.deathAge} (today's $). Target: {fmtMoney(s.terminalTargetToday)}.
                           </div>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex gap-4 text-sm flex-wrap">
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-xs text-slate-500">{s.yourName}:</span>
+                          <span className="font-semibold text-emerald-700">age {yourRetireAge}</span>
+                          <span className="text-xs text-slate-400">({yourRetireAge - s.currentAge} yrs)</span>
+                        </div>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-xs text-slate-500">{s.spouseName}:</span>
+                          <span className="font-semibold text-emerald-700">age {spouseRetireAge}</span>
+                          <span className="text-xs text-slate-400">({spouseRetireAge - s.spouseCurrentAge} yrs)</span>
                         </div>
                       </div>
                       {portfolioAtRetirement !== null && (
@@ -1371,13 +1566,17 @@ export default function FatFireCalculator() {
                 {isFinite(mortgagePayoff) ? (
                   <>
                     <div className="text-3xl font-bold text-slate-800">age {mortgagePayoff}</div>
+                    <div className="text-xs text-slate-500 mt-1 flex gap-3 flex-wrap">
+                      <span>{s.yourName}: <span className="font-semibold text-slate-700">age {mortgagePayoff}</span></span>
+                      <span>{s.spouseName}: <span className="font-semibold text-slate-700">age {mortgagePayoff + (s.spouseCurrentAge - s.currentAge)}</span></span>
+                    </div>
                     <div className="text-xs text-slate-600 mt-1">
                       {mortgagePayoff - s.currentAge} yrs ({Math.round(solved.mortgagePayoffMonths)} mo).
                     </div>
                     <div className="text-xs text-slate-600 mt-0.5">
-                      Spend drops from{" "}
-                      <span className="font-mono">{fmtMoney(grandAnnual)}</span> →{" "}
-                      <span className="font-mono">{fmtMoney(postMortgageAnnual)}</span>/yr.
+                      Retirement spend drops from{" "}
+                      <span className="font-mono">{fmtMoney(grandAnnual + (inputs.retirementSpendDelta || 0))}</span> →{" "}
+                      <span className="font-mono">{fmtMoney(grandAnnual + (inputs.retirementSpendDelta || 0) - s.mortgage * 12)}</span>/yr after payoff.
                     </div>
                     {yearsSaved > 0 && (
                       <div className="text-xs text-emerald-700 mt-1 font-semibold">
@@ -1646,6 +1845,38 @@ export default function FatFireCalculator() {
                       </div>
                     </div>
 
+                    {/* Reverse solver result */}
+                    {mcReverse && (
+                      <div className="bg-slate-50 rounded border border-slate-200 p-3">
+                        <div className="text-xs font-semibold text-slate-700 mb-1">
+                          Minimum portfolio for {mcTargetRate}% success rate
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl font-bold text-slate-800">{fmtMoney(mcReverse.portfolio)}</span>
+                          <span className="text-xs text-slate-500">needed at retirement (age {solved.age})</span>
+                        </div>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          Achieved {Math.round(mcReverse.successRate * 100)}% success in verification run.
+                        </div>
+                        {(() => {
+                          const retRow = solved.rows && solved.age ? solved.rows.find(r => r.age === solved.age) : null;
+                          const projectedPortfolio = retRow ? retRow.endTotal / retRow.infFactor : null;
+                          if (projectedPortfolio !== null) {
+                            const gap = mcReverse.portfolio - projectedPortfolio;
+                            return (
+                              <div className={`text-xs mt-1 font-semibold ${gap > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                                Your projected portfolio: {fmtMoney(projectedPortfolio)} →{" "}
+                                {gap > 0
+                                  ? `${fmtMoney(gap)} short of target`
+                                  : `${fmtMoney(-gap)} above target ✓`}
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
+                    )}
+
                     <div className="text-xs text-slate-400">
                       Returns drawn from a log-normal distribution (μ = {(inputs.investmentReturn * 100).toFixed(1)}% geometric mean, σ = 14%/yr). Inflation, spending, contributions and tax treatment are held at your base inputs. Re-run to get a fresh set of paths.
                     </div>
@@ -1741,7 +1972,7 @@ export default function FatFireCalculator() {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-slate-700">
               <div className="font-semibold text-slate-800 mb-1">Model notes</div>
               <div className="space-y-0.5">
-                <div>• Retirement target = {fmtMoney(grandAnnual)}/yr today, stepping down by {fmtMoney(s.mortgage * 12)}/yr after mortgage payoff (age {isFinite(mortgagePayoff) ? mortgagePayoff : "N/A"}).</div>
+                <div>• Working-years spend = {fmtMoney(grandAnnual)}/yr. Retirement spend = {fmtMoney(grandAnnual + (inputs.retirementSpendDelta || 0))}/yr (higher travel, healthcare; no RESP). Mortgage ({fmtMoney(s.mortgage * 12)}/yr) drops off after payoff — {s.yourName}: age {isFinite(mortgagePayoff) ? mortgagePayoff : "N/A"} / {s.spouseName}: age {isFinite(mortgagePayoff) ? mortgagePayoff + (s.spouseCurrentAge - s.currentAge) : "N/A"}.</div>
                 <div>• Bonus ({fmtMoney(bonusAfterTax)}/yr after-tax) contributes from year 1. Equity ({fmtMoney(equityAfterTax)}/yr after-tax) contributes from year 4. Both grow with the income growth rate.</div>
                 <div>• Contribution waterfall: TFSA → RRSP → Non-reg. Room inflates annually.</div>
                 <div>• Drawdown: Phase 1 (pre-65) RRSP → NR → TFSA. Phase 2 (65+) RRSP/RRIF → NR → TFSA.</div>
