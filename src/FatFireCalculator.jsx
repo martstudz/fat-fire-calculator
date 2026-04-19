@@ -1,5 +1,22 @@
 import { useState, useMemo, useRef, useEffect, createContext, useContext, useCallback } from "react";
-import { supabase } from "./supabaseClient";
+
+// Supabase client — falls back to a no-op stub if not configured (e.g. running as artifact)
+let supabase;
+try {
+  supabase = require("./supabaseClient").supabase;
+} catch {
+  const noop = () => Promise.resolve({ data: null, error: null });
+  const noopChain = () => ({ select: noopChain, eq: noopChain, single: noop, insert: noop, update: noopChain, upsert: noop, delete: noopChain });
+  supabase = {
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: null } }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      signInWithOAuth: noop, signOut: noop,
+      getUser: () => Promise.resolve({ data: { user: null } }),
+    },
+    from: () => noopChain(),
+  };
+}
 
 // ---------- privacy context ----------
 const PrivacyContext = createContext(false);
@@ -1131,6 +1148,9 @@ export default function FatFireCalculator() {
     await supabase.auth.signOut();
     setUser(null);
     setHousehold(null);
+    setHouseholdMembers([]);
+    localStorage.removeItem(STORAGE_KEY);
+    setS(publicDefaults);
   }
 
   const inputs   = useMemo(() => buildInputs(s), [s]);
@@ -1273,19 +1293,13 @@ export default function FatFireCalculator() {
             </div>
             <div className="flex items-center gap-2 text-xs flex-wrap justify-end">
 
-              {/* Save status */}
-              {household && (
-                <span className={
-                  saveStatus === "saved" ? "text-emerald-600" :
-                  saveStatus === "saving" ? "text-slate-400 italic" :
-                  "text-red-500"
-                }>
-                  {saveStatus === "saved" ? "✓ Cloud saved" :
-                   saveStatus === "saving" ? "Saving…" :
-                   "Save failed"}
-                </span>
-              )}
-              {!user && <span className="text-slate-400">Auto-saved locally</span>}
+              {/* Hide toggle — always first */}
+              <button
+                onClick={() => setHidden(h => !h)}
+                className={"px-2 py-1 rounded border transition-colors font-medium " + (hidden ? "border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100" : "border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-700")}
+              >
+                {hidden ? "🙈 Hidden" : "👁 Hide"}
+              </button>
 
               {/* Household CTA / dropdown */}
               {household && (() => {
@@ -1404,12 +1418,6 @@ export default function FatFireCalculator() {
                 </button>
               )}
 
-              <button
-                onClick={() => setHidden(h => !h)}
-                className={"px-2 py-1 rounded border transition-colors font-medium " + (hidden ? "border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100" : "border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-700")}
-              >
-                {hidden ? "🙈 Hidden" : "👁 Hide"}
-              </button>
               <button
                 onClick={resetToDefaults}
                 className="px-2 py-1 rounded border border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
