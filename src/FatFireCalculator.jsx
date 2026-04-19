@@ -807,7 +807,7 @@ function ExpenseRow({ label, value, onChange, freq, step = 50 }) {
           <span className="text-slate-400 text-xs w-7">{freq === "monthly" ? "/mo" : "/yr"}</span>
         </div>
         <span className="text-slate-500 text-xs w-20 text-right font-mono">
-          {freq === "monthly" ? "= " + (hidden ? MASK : fmtMoney(annualized)) + "/yr" : ""}
+          {freq === "monthly" ? "= " + (hidden ? MASK : fmt$(annualized)) + "/yr" : ""}
         </span>
       </div>
     </div>
