@@ -625,7 +625,7 @@ const publicDefaults = {
   // Household flags (set by onboarding)
   partnered: true, hasKids: false, province: "ON", onboardingComplete: false,
   // Names
-  yourName: "You", spouseName: "Spouse",
+  yourName: "", spouseName: "",
   // Personal
   currentAge: 0, spouseCurrentAge: 0, deathAge: 90,
   // Income & tax
@@ -1747,23 +1747,23 @@ export default function FatFireCalculator() {
             <Section title="Personal">
               <div className="inp-row">
                 <span>Your name</span>
-                <input type="text" value={s.yourName} onChange={(e) => update("yourName")(e.target.value)} className="--sm" />
+                <input type="text" value={s.yourName || ""} placeholder="e.g. Alex" onChange={(e) => update("yourName")(e.target.value)} className="--sm" />
               </div>
               {s.partnered !== false && (
                 <div className="inp-row">
                   <span>Spouse's name</span>
-                  <input type="text" value={s.spouseName} onChange={(e) => update("spouseName")(e.target.value)} className="--sm" />
+                  <input type="text" value={s.spouseName || ""} placeholder="e.g. Jamie" onChange={(e) => update("spouseName")(e.target.value)} className="--sm" />
                 </div>
               )}
-              <NumInput label={`${s.yourName}'s current age`} value={s.currentAge} onChange={update("currentAge")} small />
+              <NumInput label={`${s.yourName || "You"}'s current age`} value={s.currentAge} onChange={update("currentAge")} small />
               {s.partnered !== false && (
-                <NumInput label={`${s.spouseName}'s current age`} value={s.spouseCurrentAge} onChange={update("spouseCurrentAge")} small />
+                <NumInput label={`${s.spouseName || "Spouse"}'s current age`} value={s.spouseCurrentAge} onChange={update("spouseCurrentAge")} small />
               )}
               <NumInput label="End-of-plan age" value={s.deathAge} onChange={update("deathAge")} small />
             </Section>
 
             <Section title="Income & tax (working years)">
-              <div className="ob-person-label">{s.yourName}</div>
+              <div className="ob-person-label">{s.yourName || "You"}</div>
               <NumInput label="Annual base salary" value={s.yourBase} onChange={update("yourBase")} prefix="$" step={1000} />
               <PctInput label="Performance bonus (% of base)" value={s.yourBonusPct} onChange={update("yourBonusPct")} />
               <PctInput label="Equity / RSUs / options (% of base)" value={s.yourEquityPct} onChange={update("yourEquityPct")} hint="total variable equity, invested as vested" />
@@ -1771,7 +1771,7 @@ export default function FatFireCalculator() {
 
               {s.partnered !== false && (
                 <>
-                  <div className="ob-person-label" style={{ paddingTop: 8 }}>{s.spouseName}</div>
+                  <div className="ob-person-label" style={{ paddingTop: 8 }}>{s.spouseName || "Spouse"}</div>
                   <NumInput label="Annual base salary" value={s.spouseBase} onChange={update("spouseBase")} prefix="$" step={1000} />
                   <PctInput label="Performance bonus (% of base)" value={s.spouseBonusPct} onChange={update("spouseBonusPct")} />
                   <PctInput label="Equity / RSUs / options (% of base)" value={s.spouseEquityPct} onChange={update("spouseEquityPct")} hint="total variable equity, invested as vested" />
@@ -1785,12 +1785,12 @@ export default function FatFireCalculator() {
 
               <div style={{ borderTop: "1px solid var(--line)", paddingTop: 8, marginTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
-                  <span>{s.yourName}'s total comp</span>
+                  <span>{s.yourName || "You"}'s total comp</span>
                   <span className="mono">{fmtMoney(s.yourBase + yourBonusAmt + yourEquityAmt)}</span>
                 </div>
                 {s.partnered !== false && (
                   <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
-                    <span>{s.spouseName}'s total comp</span>
+                    <span>{s.spouseName || "Spouse"}'s total comp</span>
                     <span className="mono">{fmtMoney(s.spouseBase + spouseBonusAmt + spouseEquityAmt)}</span>
                   </div>
                 )}
@@ -1895,23 +1895,23 @@ export default function FatFireCalculator() {
             </Section>
 
             <Section title="Starting portfolio (by person)">
-              <div className="ob-person-label">{s.yourName}</div>
+              <div className="ob-person-label">{s.yourName || "You"}</div>
               <NumInput label="RRSP" value={s.yourRrspStart} onChange={update("yourRrspStart")} prefix="$" step={10000} />
               <NumInput label="TFSA" value={s.yourTfsaStart} onChange={update("yourTfsaStart")} prefix="$" step={10000} />
               <NumInput label="Non-registered" value={s.yourNrStart} onChange={update("yourNrStart")} prefix="$" step={10000} />
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--ink-3)", paddingBottom: 4 }}>
-                <span>{s.yourName}'s subtotal</span>
+                <span>{s.yourName || "You"}'s subtotal</span>
                 <span className="mono">{fmtMoney((s.yourRrspStart||0) + (s.yourTfsaStart||0) + (s.yourNrStart||0))}</span>
               </div>
 
               {s.partnered !== false && (
                 <>
-                  <div className="ob-person-label" style={{ paddingTop: 8, borderTop: "1px solid var(--line)", marginTop: 4 }}>{s.spouseName}</div>
+                  <div className="ob-person-label" style={{ paddingTop: 8, borderTop: "1px solid var(--line)", marginTop: 4 }}>{s.spouseName || "Spouse"}</div>
                   <NumInput label="RRSP" value={s.spouseRrspStart} onChange={update("spouseRrspStart")} prefix="$" step={10000} />
                   <NumInput label="TFSA" value={s.spouseTfsaStart} onChange={update("spouseTfsaStart")} prefix="$" step={10000} />
                   <NumInput label="Non-registered" value={s.spouseNrStart} onChange={update("spouseNrStart")} prefix="$" step={10000} />
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--ink-3)", paddingBottom: 4 }}>
-                    <span>{s.spouseName}'s subtotal</span>
+                    <span>{s.spouseName || "Spouse"}'s subtotal</span>
                     <span className="mono">{fmtMoney((s.spouseRrspStart||0) + (s.spouseTfsaStart||0) + (s.spouseNrStart||0))}</span>
                   </div>
                 </>
@@ -1924,13 +1924,13 @@ export default function FatFireCalculator() {
             </Section>
 
             <Section title="Retirement saving">
-              <div className="ob-person-label">{s.yourName} — monthly</div>
+              <div className="ob-person-label">{s.yourName || "You"} — monthly</div>
               <NumInput label="RRSP" value={s.startingMonthly} onChange={update("startingMonthly")} prefix="$" step={100} />
               <NumInput label="TFSA" value={s.yourTfsaMonthly || 0} onChange={update("yourTfsaMonthly")} prefix="$" step={100} />
               <NumInput label="Non-registered" value={s.yourNrMonthly || 0} onChange={update("yourNrMonthly")} prefix="$" step={100} />
               {s.partnered !== false && (
                 <>
-                  <div className="ob-person-label" style={{ paddingTop: 8 }}>{s.spouseName} — monthly</div>
+                  <div className="ob-person-label" style={{ paddingTop: 8 }}>{s.spouseName || "Spouse"} — monthly</div>
                   <NumInput label="RRSP" value={s.spouseMonthly || 0} onChange={update("spouseMonthly")} prefix="$" step={100} />
                   <NumInput label="TFSA" value={s.spouseTfsaMonthly || 0} onChange={update("spouseTfsaMonthly")} prefix="$" step={100} />
                   <NumInput label="Non-registered" value={s.spouseNrMonthly || 0} onChange={update("spouseNrMonthly")} prefix="$" step={100} />
@@ -1982,24 +1982,24 @@ export default function FatFireCalculator() {
 
             <Section title="Contribution room (registered plans)">
               <div className="ob-person-label">Existing carry-forward room</div>
-              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName}</div>
+              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName || "You"}</div>
               <NumInput label="RRSP room" value={s.yourRrspRoomExisting} onChange={update("yourRrspRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
               <NumInput label="TFSA room" value={s.yourTfsaRoomExisting} onChange={update("yourTfsaRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
               {s.partnered !== false && (
                 <>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 6, marginBottom: 4 }}>{s.spouseName}</div>
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 6, marginBottom: 4 }}>{s.spouseName || "Spouse"}</div>
                   <NumInput label="RRSP room" value={s.spouseRrspRoomExisting} onChange={update("spouseRrspRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
                   <NumInput label="TFSA room" value={s.spouseTfsaRoomExisting} onChange={update("spouseTfsaRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
                 </>
               )}
 
               <div style={{ fontSize: "var(--step--2)", fontWeight: 600, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.08em", paddingTop: 8, paddingBottom: 2, borderTop: "1px solid var(--line)", marginTop: 8 }}>Annual new room (today's $)</div>
-              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName}</div>
+              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName || "You"}</div>
               <NumInput label="RRSP room / yr" value={s.yourRrspRoomAnnual} onChange={update("yourRrspRoomAnnual")} prefix="$" step={500} />
               <NumInput label="TFSA room / yr" value={s.yourTfsaRoomAnnual} onChange={update("yourTfsaRoomAnnual")} prefix="$" step={500} />
               {s.partnered !== false && (
                 <>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 6, marginBottom: 4 }}>{s.spouseName}</div>
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 6, marginBottom: 4 }}>{s.spouseName || "Spouse"}</div>
                   <NumInput label="RRSP room / yr" value={s.spouseRrspRoomAnnual} onChange={update("spouseRrspRoomAnnual")} prefix="$" step={500} />
                   <NumInput label="TFSA room / yr" value={s.spouseTfsaRoomAnnual} onChange={update("spouseTfsaRoomAnnual")} prefix="$" step={500} />
                 </>
@@ -2040,11 +2040,11 @@ export default function FatFireCalculator() {
 
             <Section title="Retirement income">
               <div className="ob-person-label">CPP</div>
-              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName}</div>
+              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName || "You"}</div>
               <NumInput label="Estimated CPP (today's $/yr)" value={s.yourCppAmount || Math.round((s.cppAmountToday || 0) / (s.partnered !== false ? 2 : 1))} onChange={update("yourCppAmount")} prefix="$" step={500} hint="check My Service Canada for your estimate" />
               {s.partnered !== false && (
                 <>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 6, marginBottom: 4 }}>{s.spouseName}</div>
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 6, marginBottom: 4 }}>{s.spouseName || "Spouse"}</div>
                   <NumInput label="Estimated CPP (today's $/yr)" value={s.spouseCppAmount || Math.round((s.cppAmountToday || 0) / 2)} onChange={update("spouseCppAmount")} prefix="$" step={500} />
                 </>
               )}
@@ -2062,7 +2062,7 @@ export default function FatFireCalculator() {
               </InfoBox>
 
               <div className="ob-person-label" style={{ paddingTop: 8 }}>Defined Benefit Pension</div>
-              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName}</div>
+              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName || "You"}</div>
               <NumInput label="Monthly pension amount" value={s.pensionMonthly} onChange={update("pensionMonthly")} prefix="$" step={100} hint="today's $, leave 0 if none" />
               <NumInput label="Pension start age" value={s.pensionStartAge} onChange={update("pensionStartAge")} small />
               {s.pensionMonthly > 0 && (
@@ -2073,7 +2073,7 @@ export default function FatFireCalculator() {
               )}
               {s.partnered !== false && (
                 <>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 8, marginBottom: 4 }}>{s.spouseName}</div>
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 8, marginBottom: 4 }}>{s.spouseName || "Spouse"}</div>
                   <NumInput label="Monthly pension amount" value={s.spousePensionMonthly || 0} onChange={update("spousePensionMonthly")} prefix="$" step={100} hint="today's $, leave 0 if none" />
                   <NumInput label="Pension start age" value={s.spousePensionStartAge || s.pensionStartAge} onChange={update("spousePensionStartAge")} small />
                   {(s.spousePensionMonthly || 0) > 0 && (
@@ -2088,12 +2088,12 @@ export default function FatFireCalculator() {
 
             <Section title="Windfalls" defaultOpen={false}>
               <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 8 }}>Enter an expected lump sum (inheritance, property sale, RSU cliff, etc.). The model will recommend the optimal allocation to minimize your retirement age.</div>
-              <div className="ob-person-label">{s.yourName}</div>
+              <div className="ob-person-label">{s.yourName || "You"}</div>
               <NumInput label="Windfall amount" value={s.yourWindfallAmount} onChange={update("yourWindfallAmount")} prefix="$" step={25000} />
-              <NumInput label={`${s.yourName}'s age at receipt`} value={s.yourWindfallAge} onChange={update("yourWindfallAge")} small />
-              <div className="ob-person-label" style={{ paddingTop: 8 }}>{s.spouseName}</div>
+              <NumInput label={`${s.yourName || "You"}'s age at receipt`} value={s.yourWindfallAge} onChange={update("yourWindfallAge")} small />
+              <div className="ob-person-label" style={{ paddingTop: 8 }}>{s.spouseName || "Spouse"}</div>
               <NumInput label="Windfall amount" value={s.spouseWindfallAmount} onChange={update("spouseWindfallAmount")} prefix="$" step={25000} />
-              <NumInput label={`${s.spouseName}'s age at receipt`} value={s.spouseWindfallAge} onChange={update("spouseWindfallAge")} small />
+              <NumInput label={`${s.spouseName || "Spouse"}'s age at receipt`} value={s.spouseWindfallAge} onChange={update("spouseWindfallAge")} small />
               <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 8 }}>Windfall does not alter the main simulation — recommendations appear below.</div>
             </Section>
 
@@ -2176,8 +2176,8 @@ export default function FatFireCalculator() {
                     ★ = option that minimises retirement age. Ties broken by largest portfolio. Not included in main simulation.
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                    <WindfallTable advice={yourWindfallAdvice}   label={`${s.yourName}'s windfall`}   age={s.yourWindfallAge}   amount={s.yourWindfallAmount} />
-                    <WindfallTable advice={spouseWindfallAdvice} label={`${s.spouseName}'s windfall`} age={s.spouseWindfallAge} amount={s.spouseWindfallAmount} />
+                    <WindfallTable advice={yourWindfallAdvice}   label={`${s.yourName || "You"}'s windfall`}   age={s.yourWindfallAge}   amount={s.yourWindfallAmount} />
+                    <WindfallTable advice={spouseWindfallAdvice} label={`${s.spouseName || "Spouse"}'s windfall`} age={s.spouseWindfallAge} amount={s.spouseWindfallAmount} />
                   </div>
                 </div>
               );
@@ -2214,7 +2214,7 @@ export default function FatFireCalculator() {
                         <div style={{ fontSize: "var(--step-1)", color: "var(--ink-2)", maxWidth: 220 }}>
                           <span className="mono">{solved.age - s.currentAge}</span> year{solved.age - s.currentAge === 1 ? "" : "s"} from today.
                           <div style={{ color: "var(--ink-3)", fontSize: "var(--step--1)", marginTop: 4 }}>
-                            {s.yourName} age {yourRetireAge} · {s.spouseName} age {spouseRetireAge}
+                            {s.yourName || "You"} age {yourRetireAge} · {s.spouseName || "Spouse"} age {spouseRetireAge}
                           </div>
                         </div>
                       </div>
@@ -2610,7 +2610,7 @@ export default function FatFireCalculator() {
             {/* ── Model notes ── */}
             <div className="info-box" style={{ lineHeight: 1.65 }}>
               <div style={{ fontWeight: 600, color: "var(--dusk-ink)", marginBottom: 6 }}>Model notes</div>
-              <div>Working spend {fmtMoney(grandAnnual)}/yr. Retirement spend {fmtMoney(grandAnnual + (inputs.retirementSpendDelta || 0))}/yr. Mortgage drops off at payoff ({s.yourName} age {isFinite(mortgagePayoff) ? mortgagePayoff : "N/A"}).</div>
+              <div>Working spend {fmtMoney(grandAnnual)}/yr. Retirement spend {fmtMoney(grandAnnual + (inputs.retirementSpendDelta || 0))}/yr. Mortgage drops off at payoff ({s.yourName || "You"} age {isFinite(mortgagePayoff) ? mortgagePayoff : "N/A"}).</div>
               <div>Bonus {fmtMoney(bonusAfterTax)}/yr after-tax from year 1. Equity {fmtMoney(equityAfterTax)}/yr after-tax from year 4. Both grow with income growth rate.</div>
               <div>Contributions: TFSA → RRSP → Non-reg. Drawdown Phase 1 (pre-65): RRSP → NR → TFSA. Phase 2 (65+): RRSP/RRIF → NR → TFSA.</div>
               {s.pensionMonthly > 0 && <div>DB Pension {fmtMoney(s.pensionMonthly)}/mo from age {s.pensionStartAge}, inflation-indexed.</div>}
