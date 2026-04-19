@@ -680,7 +680,7 @@ function NumInput({ label, value, onChange, step = 1, prefix, suffix, small, hin
 
   function handleChange(e) {
     // Allow digits, minus, dot only
-    const cleaned = e.target.value.replace(/[^0-9.\-]/g, "");
+    const cleaned = e.target.value.replace(/[^0-9.-]/g, "");
     setRaw(cleaned);
     const parsed = parseFloat(cleaned);
     if (!isNaN(parsed)) onChange(parsed);
@@ -764,7 +764,7 @@ function ExpenseRow({ label, value, onChange, freq, step = 50 }) {
 
   function handleFocus() { setRaw(value === 0 ? "" : String(value)); setFocused(true); }
   function handleChange(e) {
-    const cleaned = e.target.value.replace(/[^0-9.\-]/g, "");
+    const cleaned = e.target.value.replace(/[^0-9.-]/g, "");
     setRaw(cleaned);
     const parsed = parseFloat(cleaned);
     if (!isNaN(parsed)) onChange(parsed);
@@ -861,7 +861,7 @@ export default function FatFireCalculator() {
   const [mc, setMc] = useState(null);
   const [mcRunning, setMcRunning] = useState(false);
   const [mcTargetRate, setMcTargetRate] = useState(80); // percent
-  const [mcReverse, setMcReverse] = useState(null);
+  const [, setMcReverse] = useState(null);
 
   function runMC() {
     setMcRunning(true);
@@ -920,7 +920,6 @@ export default function FatFireCalculator() {
   // Base mortgage payoff (no extra payment) for comparison
   const baseMortgageMonths = monthsToPayoff(s.mortgagePrincipal, s.mortgage, s.mortgageRate);
   const baseMortgagePayoffAge = payoffAgeFromMonths(s.currentAge, baseMortgageMonths);
-  const extraMortgageMonths = s.extraMortgagePayment > 0 ? solved.mortgagePayoffMonths : null;
   const yearsSaved = s.extraMortgagePayment > 0 && isFinite(baseMortgagePayoffAge) && isFinite(mortgagePayoff)
     ? baseMortgagePayoffAge - mortgagePayoff
     : 0;
