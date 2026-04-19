@@ -938,10 +938,13 @@ export default function FatFireCalculator() {
   const [authLoading, setAuthLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState("saved"); // "saved" | "saving" | "error"
   const [household, setHousehold] = useState(null); // { id, join_code }
+  const [householdMembers, setHouseholdMembers] = useState([]); // [{ user_id, email, avatar_url, name }]
+  const [showHouseholdPanel, setShowHouseholdPanel] = useState(false);
   const [joinInput, setJoinInput] = useState("");
   const [joinError, setJoinError] = useState("");
   const [showJoinBox, setShowJoinBox] = useState(false);
   const [copied, setCopied] = useState(false);
+  const householdPanelRef = useRef(null);
   const saveTimerRef = useRef(null);
 
   // ── Check URL for ?join=CODE on load ──────────────────────────────────────
@@ -1003,10 +1006,40 @@ export default function FatFireCalculator() {
       } else {
         setS(defaults);
       }
+      fetchMembers(householdId);
+    }
+  }
+
+  async function fetchMembers(householdId) {
+    const { data } = await supabase
+      .from("household_members")
+      .select("user_id, email, name, avatar_url")
+      .eq("household_id", householdId);
+    if (data) setHouseholdMembers(data);
+  }
+
+  async function removeMember(userId) {
+    if (!household) return;
+    if (userId === user?.id) {
+      if (!window.confirm("Remove yourself from this household? You'll lose access to the shared data.")) return;
+    } else {
+      if (!window.confirm("Remove this member from the household?")) return;
+    }
+    await supabase
+      .from("household_members")
+      .delete()
+      .eq("user_id", userId)
+      .eq("household_id", household.id);
+    setHouseholdMembers(prev => prev.filter(m => m.user_id !== userId));
+    if (userId === user?.id) {
+      setHousehold(null);
+      setHouseholdMembers([]);
     }
   }
 
   async function createHousehold(userId) {
+    const { data: sessionData } = await supabase.auth.getUser();
+    const meta = sessionData?.user?.user_metadata || {};
     const { data, error } = await supabase
       .from("households")
       .insert({ created_by: userId, inputs: defaults })
@@ -1014,7 +1047,14 @@ export default function FatFireCalculator() {
       .single();
     if (!error && data) {
       setHousehold({ id: data.id, join_code: data.join_code });
-      await supabase.from("household_members").insert({ user_id: userId, household_id: data.id });
+      await supabase.from("household_members").insert({
+        user_id: userId,
+        household_id: data.id,
+        email: sessionData?.user?.email || "",
+        name: meta.full_name || meta.name || "",
+        avatar_url: meta.avatar_url || "",
+      });
+      await fetchMembers(data.id);
       setS(defaults);
     }
   }
@@ -1026,12 +1066,20 @@ export default function FatFireCalculator() {
       .eq("join_code", code.toUpperCase())
       .single();
     if (!hh) { setJoinError("Code not found — double-check and try again."); return false; }
-    await supabase.from("household_members").insert({ user_id: userId, household_id: hh.id });
+    const { data: sessionData } = await supabase.auth.getUser();
+    const meta = sessionData?.user?.user_metadata || {};
+    await supabase.from("household_members").insert({
+      user_id: userId,
+      household_id: hh.id,
+      email: sessionData?.user?.email || "",
+      name: meta.full_name || meta.name || "",
+      avatar_url: meta.avatar_url || "",
+    });
     setHousehold({ id: hh.id, join_code: hh.join_code });
     if (hh.inputs && Object.keys(hh.inputs).length > 0) {
       setS({ ...publicDefaults, ...hh.inputs });
     }
-    // Clean up the URL
+    await fetchMembers(hh.id);
     window.history.replaceState({}, "", window.location.pathname);
     setShowJoinBox(false);
     return true;
@@ -1104,6 +1152,18 @@ export default function FatFireCalculator() {
       setMcRunning(false);
     }, 30);
   }
+
+  // Close household panel when clicking outside
+  useEffect(() => {
+    if (!showHouseholdPanel) return;
+    function handleClick(e) {
+      if (householdPanelRef.current && !householdPanelRef.current.contains(e.target)) {
+        setShowHouseholdPanel(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showHouseholdPanel]);
 
   // Clear MC results whenever inputs change (they're stale)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1222,16 +1282,57 @@ export default function FatFireCalculator() {
               )}
               {!user && <span className="text-slate-400">Auto-saved locally</span>}
 
-              {/* Share / invite link */}
+              {/* Household dropdown */}
               {household && (
-                <div className="relative">
+                <div className="relative" ref={householdPanelRef}>
                   <button
-                    onClick={copyShareUrl}
-                    className="flex items-center gap-1 px-2 py-1 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors"
-                    title={shareUrl}
+                    onClick={() => setShowHouseholdPanel(p => !p)}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors"
                   >
-                    🔗 {copied ? "Copied!" : "Share"}
+                    <span>🏠</span>
+                    <span>Household</span>
+                    <span className="bg-slate-200 text-slate-600 rounded-full px-1.5 text-xs font-semibold">{householdMembers.length}</span>
+                    <span className="text-slate-400">{showHouseholdPanel ? "▲" : "▼"}</span>
                   </button>
+                  {showHouseholdPanel && (
+                    <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 w-72 p-3">
+                      <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Members</div>
+                      <div className="space-y-2 mb-3">
+                        {householdMembers.map(m => (
+                          <div key={m.user_id} className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {m.avatar_url
+                                ? <img src={m.avatar_url} alt="" className="w-6 h-6 rounded-full flex-shrink-0" />
+                                : <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs text-slate-500 flex-shrink-0">
+                                    {(m.name || m.email || "?")[0].toUpperCase()}
+                                  </div>
+                              }
+                              <div className="min-w-0">
+                                {m.name && <div className="text-xs font-medium text-slate-700 truncate">{m.name}</div>}
+                                <div className="text-xs text-slate-400 truncate">{m.email}</div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => removeMember(m.user_id)}
+                              className="text-slate-300 hover:text-red-400 transition-colors flex-shrink-0 text-base leading-none"
+                              title="Remove from household"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="border-t border-slate-100 pt-2">
+                        <button
+                          onClick={copyShareUrl}
+                          className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 transition-colors"
+                        >
+                          {copied ? "✓ Link copied!" : "＋ Add to household"}
+                        </button>
+                        <div className="text-xs text-slate-400 text-center mt-1">Copies an invite link to share</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
