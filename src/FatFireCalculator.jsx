@@ -729,26 +729,37 @@ const defaults = {
 };
 
 function buildInputs(s) {
+  // Resolve per-person CPP to combined figure the engine expects
+  const cppAmountToday = s.yourCppAmount != null && s.spouseCppAmount != null
+    ? (s.yourCppAmount || 0) + (s.partnered !== false ? (s.spouseCppAmount || 0) : 0)
+    : (s.cppAmountToday || 0);
+
   return {
     ...s,
+    cppAmountToday,
     monthlyExpensesTotal:
-      s.mortgage + s.maintenance + s.propertyTax + s.utilities +
-      s.transport + s.groceries + s.dining + s.clothing +
-      (s.childcare || 0) + (s.subscriptions || 0) + (s.personalCare || 0),
-    oneTimeAnnualTotal: s.travel + s.oneTimeMisc + (s.resp || 0),
+      (s.mortgage || 0) + (s.rent || 0) + (s.maintenance || 0) + (s.propertyTax || 0) +
+      (s.utilities || 0) + (s.homeInsurance || 0) +
+      (s.transport || 0) + (s.groceries || 0) + (s.dining || 0) + (s.clothing || 0) +
+      (s.entertainment || 0) + (s.childcare || 0) + (s.subscriptions || 0) + (s.personalCare || 0),
+    oneTimeAnnualTotal: (s.travel || 0) + (s.oneTimeMisc || 0) + (s.resp || 0),
     // Retirement-specific: swap travel for retirementTravel, add healthcare
-    retirementMonthlyExtra: 0, // placeholder — retirement spend adjustment handled in engine via retirementSpendDelta
+    retirementMonthlyExtra: 0,
     retirementSpendDelta: (s.retirementTravel || 0) - (s.travel || 0) + (s.retirementHealthcare || 0) - (s.resp || 0),
     mortgagePayment: s.mortgage,
-    // Combine per-person balances for the engine (engine models household as one unit)
+    // Combine per-person balances for the engine
     rrspStart: (s.yourRrspStart || 0) + (s.spouseRrspStart || 0),
     tfsaStart: (s.yourTfsaStart || 0) + (s.spouseTfsaStart || 0),
     nrStart:   (s.yourNrStart   || 0) + (s.spouseNrStart   || 0),
-    // Combine household room for engine (engine uses single rrspRoom / tfsaRoom totals)
-    rrspRoomExisting: s.yourRrspRoomExisting + s.spouseRrspRoomExisting,
-    tfsaRoomExisting: s.yourTfsaRoomExisting + s.spouseTfsaRoomExisting,
-    rrspRoomAnnual: s.yourRrspRoomAnnual + s.spouseRrspRoomAnnual,
-    tfsaRoomAnnual: s.yourTfsaRoomAnnual + s.spouseTfsaRoomAnnual,
+    // Combine household contribution room for engine
+    rrspRoomExisting: (s.yourRrspRoomExisting || 0) + (s.spouseRrspRoomExisting || 0),
+    tfsaRoomExisting: (s.yourTfsaRoomExisting || 0) + (s.spouseTfsaRoomExisting || 0),
+    rrspRoomAnnual: (s.yourRrspRoomAnnual || 0) + (s.spouseRrspRoomAnnual || 0),
+    tfsaRoomAnnual: (s.yourTfsaRoomAnnual || 0) + (s.spouseTfsaRoomAnnual || 0),
+    // Total household monthly contributions (all account types, both persons)
+    startingMonthly: (s.startingMonthly || 0)
+      + (s.yourTfsaMonthly || 0) + (s.yourNrMonthly || 0)
+      + (s.spouseMonthly || 0) + (s.spouseTfsaMonthly || 0) + (s.spouseNrMonthly || 0),
   };
 }
 
@@ -997,6 +1008,7 @@ export default function FatFireCalculator() {
   // When both exist, we pause and ask the user which to keep.
   // { cloudInputs, planType: "personal"|"household" }
   const [mergeConflict, setMergeConflict] = useState(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // ── Onboarding ────────────────────────────────────────────────────────────
   // Show onboarding if:
@@ -1418,10 +1430,16 @@ export default function FatFireCalculator() {
   const update = (k) => (v) => setS((prev) => ({ ...prev, [k]: v }));
 
   function resetToDefaults() {
-    if (window.confirm("Reset all inputs to defaults? This cannot be undone.")) {
-      localStorage.removeItem(STORAGE_KEY);
-      setS(activePlan ? defaults : publicDefaults);
-    }
+    setShowResetConfirm(true);
+  }
+
+  function confirmReset() {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(ONBOARDING_KEY);
+    setShowResetConfirm(false);
+    setS(publicDefaults);
+    setActivePlan(null);
+    setShowOnboarding(true);
   }
 
   // Always show in today's dollars (real)
@@ -1460,10 +1478,15 @@ export default function FatFireCalculator() {
   // Contributions summary (year 1 = t=0, equity hasn't started yet)
   const bonusAfterTax = (s.yourBase * s.yourBonusPct + s.spouseBase * s.spouseBonusPct) * (1 - s.taxRate);
   const equityAfterTax = (s.yourBase * s.yourEquityPct + s.spouseBase * s.spouseEquityPct) * (1 - s.taxRate);
-  // Year 1 total: monthly only (equity starts yr 4, bonus starts yr 1)
-  const startingAnnualContrib = s.startingMonthly * 12 + bonusAfterTax;
+  // Total household monthly contributions across all account types and persons
+  const totalMonthlyContrib = (s.startingMonthly || 0)
+    + (s.yourTfsaMonthly || 0) + (s.yourNrMonthly || 0)
+    + (s.spouseMonthly || 0) + (s.spouseTfsaMonthly || 0) + (s.spouseNrMonthly || 0);
+  const annualTopUps = (s.rrspTopUp || 0) + (s.tfsaTopUp || 0) + (s.nrTopUp || 0);
+  // Year 1 total: monthly + bonus + top-ups (equity starts yr 4)
+  const startingAnnualContrib = totalMonthlyContrib * 12 + bonusAfterTax + annualTopUps;
   // Year 4+ total (when equity kicks in)
-  const fullAnnualContrib = s.startingMonthly * 12 + bonusAfterTax + equityAfterTax;
+  const fullAnnualContrib = totalMonthlyContrib * 12 + bonusAfterTax + equityAfterTax + annualTopUps;
 
   // Mortgage extra-payment sensitivity table
   const mortgageSensitivity = useMemo(() => {
@@ -1705,6 +1728,31 @@ export default function FatFireCalculator() {
         </div>
 
         {/* ── Merge conflict ── browser inputs vs cloud */}
+        {showResetConfirm && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-slate-900 mb-1">Start over?</h2>
+              <p className="text-sm text-slate-500 mb-6">
+                This will clear all your inputs and take you back to the beginning. Any unsaved changes will be lost — this can't be undone.
+              </p>
+              <div className="space-y-3">
+                <button
+                  onClick={confirmReset}
+                  className="w-full py-2.5 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors"
+                >
+                  Yes, clear everything and start over
+                </button>
+                <button
+                  onClick={() => setShowResetConfirm(false)}
+                  className="w-full py-2.5 rounded-lg border border-slate-300 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {mergeConflict && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
@@ -1812,16 +1860,18 @@ export default function FatFireCalculator() {
 
             <Section title="Income & tax (working years)">
               <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-1 pb-0.5">{s.yourName}</div>
-              <NumInput label="Base pay" value={s.yourBase} onChange={update("yourBase")} prefix="$" step={1000} />
-              <PctInput label="Bonus (% of base)" value={s.yourBonusPct} onChange={update("yourBonusPct")} />
-              <PctInput label="Equity vesting (% of base)" value={s.yourEquityPct} onChange={update("yourEquityPct")} hint="invested as vested" />
+              <NumInput label="Annual base salary" value={s.yourBase} onChange={update("yourBase")} prefix="$" step={1000} />
+              <PctInput label="Performance bonus (% of base)" value={s.yourBonusPct} onChange={update("yourBonusPct")} />
+              <PctInput label="Equity / RSUs / options (% of base)" value={s.yourEquityPct} onChange={update("yourEquityPct")} hint="total variable equity, invested as vested" />
+              <PctInput label="Commission & profit sharing (% of base)" value={s.yourCommissionPct || 0} onChange={update("yourCommissionPct")} />
 
               {s.partnered !== false && (
                 <>
                   <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">{s.spouseName}</div>
-                  <NumInput label="Base pay" value={s.spouseBase} onChange={update("spouseBase")} prefix="$" step={1000} />
-                  <PctInput label="Bonus (% of base)" value={s.spouseBonusPct} onChange={update("spouseBonusPct")} />
-                  <PctInput label="Equity vesting (% of base)" value={s.spouseEquityPct} onChange={update("spouseEquityPct")} hint="invested as vested" />
+                  <NumInput label="Annual base salary" value={s.spouseBase} onChange={update("spouseBase")} prefix="$" step={1000} />
+                  <PctInput label="Performance bonus (% of base)" value={s.spouseBonusPct} onChange={update("spouseBonusPct")} />
+                  <PctInput label="Equity / RSUs / options (% of base)" value={s.spouseEquityPct} onChange={update("spouseEquityPct")} hint="total variable equity, invested as vested" />
+                  <PctInput label="Commission & profit sharing (% of base)" value={s.spouseCommissionPct || 0} onChange={update("spouseCommissionPct")} />
                 </>
               )}
 
@@ -1831,7 +1881,7 @@ export default function FatFireCalculator() {
 
               <div className="pt-2 mt-1 border-t border-slate-200 space-y-0.5 text-xs">
                 <div className="flex justify-between text-slate-600">
-                  <span>{s.yourName}'s total comp (base + bonus + equity)</span>
+                  <span>{s.yourName}'s total comp</span>
                   <span className="font-mono">{fmtMoney(s.yourBase + yourBonusAmt + yourEquityAmt)}</span>
                 </div>
                 {s.partnered !== false && (
@@ -1848,6 +1898,7 @@ export default function FatFireCalculator() {
             </Section>
 
             <Section title="Expenses (today's $)">
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-1 pb-0.5">Housing</div>
               <ExpenseRow label="Mortgage" value={s.mortgage} onChange={update("mortgage")} freq="monthly" />
               <div className="pl-4 pb-1 border-l-2 border-slate-100 ml-1 space-y-0.5">
                 <NumInput label="Principal remaining" value={s.mortgagePrincipal} onChange={update("mortgagePrincipal")} prefix="$" step={1000} />
@@ -1868,23 +1919,32 @@ export default function FatFireCalculator() {
                   </div>
                 )}
               </div>
-              <ExpenseRow label="Maintenance / condo" value={s.maintenance} onChange={update("maintenance")} freq="monthly" />
+              <ExpenseRow label="Rent" value={s.rent || 0} onChange={update("rent")} freq="monthly" />
               <ExpenseRow label="Property tax" value={s.propertyTax} onChange={update("propertyTax")} freq="monthly" />
-              <ExpenseRow label="Utilities / insurance" value={s.utilities} onChange={update("utilities")} freq="monthly" />
-              <ExpenseRow label="Transportation" value={s.transport} onChange={update("transport")} freq="monthly" />
+              <ExpenseRow label="Home insurance" value={s.homeInsurance || 0} onChange={update("homeInsurance")} freq="monthly" />
+              <ExpenseRow label="Maintenance & repairs" value={s.maintenance} onChange={update("maintenance")} freq="monthly" />
+              <ExpenseRow label="Utilities (hydro, gas, water)" value={s.utilities} onChange={update("utilities")} freq="monthly" />
+
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">Essentials</div>
               <ExpenseRow label="Groceries" value={s.groceries} onChange={update("groceries")} freq="monthly" />
-              <ExpenseRow label="Dining / entertainment" value={s.dining} onChange={update("dining")} freq="monthly" />
-              <ExpenseRow label="Clothing / misc" value={s.clothing} onChange={update("clothing")} freq="monthly" />
+              <ExpenseRow label="Transport & transit" value={s.transport} onChange={update("transport")} freq="monthly" />
+              <ExpenseRow label="Personal care & health" value={s.personalCare} onChange={update("personalCare")} freq="monthly" step={50} />
               {s.hasKids !== false && (
-                <ExpenseRow label="Childcare / kids' activities" value={s.childcare} onChange={update("childcare")} freq="monthly" step={100} />
+                <ExpenseRow label="Childcare & activities" value={s.childcare} onChange={update("childcare")} freq="monthly" step={100} />
               )}
-              <ExpenseRow label="Subscriptions / tech / phones" value={s.subscriptions} onChange={update("subscriptions")} freq="monthly" step={50} />
-              <ExpenseRow label="Personal care / gym" value={s.personalCare} onChange={update("personalCare")} freq="monthly" step={50} />
-              <ExpenseRow label="Travel" value={s.travel} onChange={update("travel")} freq="annual" step={1000} />
+
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">Lifestyle</div>
+              <ExpenseRow label="Dining & takeout" value={s.dining} onChange={update("dining")} freq="monthly" />
+              <ExpenseRow label="Clothing & shopping" value={s.clothing} onChange={update("clothing")} freq="monthly" />
+              <ExpenseRow label="Subscriptions & tech" value={s.subscriptions} onChange={update("subscriptions")} freq="monthly" step={50} />
+              <ExpenseRow label="Entertainment & hobbies" value={s.entertainment || 0} onChange={update("entertainment")} freq="monthly" step={50} />
+
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">Annual</div>
+              <ExpenseRow label="Travel & holidays" value={s.travel} onChange={update("travel")} freq="annual" step={1000} />
               {s.hasKids !== false && (
                 <ExpenseRow label="RESP contributions" value={s.resp} onChange={update("resp")} freq="annual" step={500} />
               )}
-              <ExpenseRow label="Gifts / misc (annual)" value={s.oneTimeMisc} onChange={update("oneTimeMisc")} freq="annual" step={1000} />
+              <ExpenseRow label="Other annual expenses" value={s.oneTimeMisc} onChange={update("oneTimeMisc")} freq="annual" step={1000} />
               <div className="pt-2 mt-1 border-t border-slate-200 space-y-0.5 text-xs">
                 <div className="flex justify-between text-slate-600">
                   <span>Monthly (×12)</span>
@@ -1959,25 +2019,40 @@ export default function FatFireCalculator() {
               </div>
             </Section>
 
-            <Section title="Contributions">
-              <NumInput label="Monthly (starting)" value={s.startingMonthly} onChange={update("startingMonthly")} prefix="$" step={100} />
+            <Section title="Retirement saving">
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-1 pb-0.5">{s.yourName} — monthly</div>
+              <NumInput label="RRSP" value={s.startingMonthly} onChange={update("startingMonthly")} prefix="$" step={100} />
+              <NumInput label="TFSA" value={s.yourTfsaMonthly || 0} onChange={update("yourTfsaMonthly")} prefix="$" step={100} />
+              <NumInput label="Non-registered" value={s.yourNrMonthly || 0} onChange={update("yourNrMonthly")} prefix="$" step={100} />
+              {s.partnered !== false && (
+                <>
+                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">{s.spouseName} — monthly</div>
+                  <NumInput label="RRSP" value={s.spouseMonthly || 0} onChange={update("spouseMonthly")} prefix="$" step={100} />
+                  <NumInput label="TFSA" value={s.spouseTfsaMonthly || 0} onChange={update("spouseTfsaMonthly")} prefix="$" step={100} />
+                  <NumInput label="Non-registered" value={s.spouseNrMonthly || 0} onChange={update("spouseNrMonthly")} prefix="$" step={100} />
+                </>
+              )}
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">Annual lump-sum top-ups</div>
+              <NumInput label="RRSP" value={s.rrspTopUp || 0} onChange={update("rrspTopUp")} prefix="$" step={1000} hint="e.g. year-end bonus contribution" />
+              <NumInput label="TFSA" value={s.tfsaTopUp || 0} onChange={update("tfsaTopUp")} prefix="$" step={1000} />
+              <NumInput label="Non-registered" value={s.nrTopUp || 0} onChange={update("nrTopUp")} prefix="$" step={1000} />
               <PctInput label="Monthly contrib growth" value={s.contribGrowth} onChange={update("contribGrowth")} />
 
               {/* Computed read-only lines */}
               <div className="pt-2 mt-1 border-t border-slate-100 space-y-1 text-xs">
                 <div className="flex justify-between text-slate-600">
-                  <span>
-                    Bonus / yr <span className="text-slate-400">(after-tax, from yr 1)</span>
-                  </span>
+                  <span>Total monthly contributions</span>
+                  <span className="font-mono">{fmtMoney(totalMonthlyContrib)}/mo</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>Bonus / yr <span className="text-slate-400">(after-tax, from yr 1)</span></span>
                   <span className="font-mono">{fmtMoney(bonusAfterTax)}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
-                  <span>
-                    Equity / yr <span className="text-slate-400">(after-tax, from yr 4)</span>
-                  </span>
+                  <span>Equity / yr <span className="text-slate-400">(after-tax, from yr 4)</span></span>
                   <span className="font-mono">{equityAfterTax > 0 ? fmtMoney(equityAfterTax) : "—"}</span>
                 </div>
-                <div className="text-slate-400 text-xs">Both grow with income growth rate. Set % in Income section.</div>
+                <div className="text-slate-400 text-xs">Bonus & equity grow with income growth rate. Set % in Income section.</div>
               </div>
 
               <div className="pt-2 mt-1 border-t border-slate-200 space-y-1 text-xs">
@@ -2061,7 +2136,14 @@ export default function FatFireCalculator() {
 
             <Section title="Retirement income">
               <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-1 pb-0.5">CPP</div>
-              <NumInput label="Combined CPP (today's $/yr)" value={s.cppAmountToday} onChange={update("cppAmountToday")} prefix="$" step={1000} />
+              <div className="text-xs text-slate-500 mb-1">{s.yourName}</div>
+              <NumInput label="Estimated CPP (today's $/yr)" value={s.yourCppAmount || Math.round((s.cppAmountToday || 0) / (s.partnered !== false ? 2 : 1))} onChange={update("yourCppAmount")} prefix="$" step={500} hint="check My Service Canada for your estimate" />
+              {s.partnered !== false && (
+                <>
+                  <div className="text-xs text-slate-500 mt-1.5 mb-1">{s.spouseName}</div>
+                  <NumInput label="Estimated CPP (today's $/yr)" value={s.spouseCppAmount || Math.round((s.cppAmountToday || 0) / 2)} onChange={update("spouseCppAmount")} prefix="$" step={500} />
+                </>
+              )}
               <NumInput label="CPP start age" value={s.cppStartAge} onChange={update("cppStartAge")} small hint="(70 = optimal)" />
               <InfoBox>
                 Delaying CPP to 70 is typically optimal with sufficient assets — it becomes a guaranteed inflation-linked bond and reduces portfolio pressure late in retirement.
@@ -2076,13 +2158,27 @@ export default function FatFireCalculator() {
               </InfoBox>
 
               <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">Defined Benefit Pension</div>
-              <NumInput label="Monthly pension amount" value={s.pensionMonthly} onChange={update("pensionMonthly")} prefix="$" step={100} hint="(today's $)" />
+              <div className="text-xs text-slate-500 mb-1">{s.yourName}</div>
+              <NumInput label="Monthly pension amount" value={s.pensionMonthly} onChange={update("pensionMonthly")} prefix="$" step={100} hint="today's $, leave 0 if none" />
               <NumInput label="Pension start age" value={s.pensionStartAge} onChange={update("pensionStartAge")} small />
               {s.pensionMonthly > 0 && (
                 <div className="text-xs text-slate-600 flex justify-between pt-0.5">
                   <span>Annual pension (today's $)</span>
                   <span className="font-mono font-semibold">{fmtMoney(s.pensionMonthly * 12)}</span>
                 </div>
+              )}
+              {s.partnered !== false && (
+                <>
+                  <div className="text-xs text-slate-500 mt-2 mb-1">{s.spouseName}</div>
+                  <NumInput label="Monthly pension amount" value={s.spousePensionMonthly || 0} onChange={update("spousePensionMonthly")} prefix="$" step={100} hint="today's $, leave 0 if none" />
+                  <NumInput label="Pension start age" value={s.spousePensionStartAge || s.pensionStartAge} onChange={update("spousePensionStartAge")} small />
+                  {(s.spousePensionMonthly || 0) > 0 && (
+                    <div className="text-xs text-slate-600 flex justify-between pt-0.5">
+                      <span>Annual pension (today's $)</span>
+                      <span className="font-mono font-semibold">{fmtMoney((s.spousePensionMonthly || 0) * 12)}</span>
+                    </div>
+                  )}
+                </>
               )}
             </Section>
 
