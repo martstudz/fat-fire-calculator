@@ -954,7 +954,7 @@ export default function FatFireCalculator() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState("saved"); // "saved" | "saving" | "error"
-  const [household, setHousehold] = useState(null); // { id, join_code }
+  const [household, setHousehold] = useState(null); // { id, join_code, created_by }
   const [householdMembers, setHouseholdMembers] = useState([]); // [{ user_id, email, avatar_url, name }]
   const [showHouseholdPanel, setShowHouseholdPanel] = useState(false);
   const [joinInput, setJoinInput] = useState("");
@@ -963,6 +963,12 @@ export default function FatFireCalculator() {
   const [copied, setCopied] = useState(false);
   const householdPanelRef = useRef(null);
   const saveTimerRef = useRef(null);
+
+  // ── Two-plan state ────────────────────────────────────────────────────────
+  // activePlan: "personal" | "household" | null (null = not yet determined)
+  const [activePlan, setActivePlan] = useState(null);
+  const [personalPlanId, setPersonalPlanId] = useState(null);
+  const [showPlanPicker, setShowPlanPicker] = useState(false);
 
   // ── Check URL for ?join=CODE on load ──────────────────────────────────────
   const pendingJoinCode = useMemo(() => {
@@ -975,39 +981,93 @@ export default function FatFireCalculator() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setAuthLoading(false);
-      if (session?.user) initHousehold(session.user.id);
+      if (session?.user) initPlans(session.user.id);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const newUser = session?.user ?? null;
       setUser(newUser);
-      if (newUser) initHousehold(newUser.id);
+      if (newUser) initPlans(newUser.id);
     });
     return () => subscription.unsubscribe();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Household init: join via URL code, load existing, or create new ───────
-  async function initHousehold(userId) {
-    // 1. Check if user already belongs to a household
+  // ── Plans init: load personal plan + check household membership ───────────
+  // Returns true if a plan inputs object has meaningful saved data
+  function hasRealData(inputs) {
+    return inputs && Object.keys(inputs).length > 0;
+  }
+
+  async function initPlans(userId) {
+    // 1. Check if user belongs to a household
     const { data: membership } = await supabase
       .from("household_members")
       .select("household_id")
       .eq("user_id", userId)
       .single();
 
-    if (membership?.household_id) {
-      await loadHousehold(membership.household_id);
-      // If there's a pending join code in URL but user already has a household, ignore it
+    const hasHousehold = !!membership?.household_id;
+
+    // 2. Handle pending join code (only if not already in a household)
+    if (!hasHousehold && pendingJoinCode) {
+      // Load personal plan first so we know if picker is needed after joining
+      const { data: existingPersonal } = await supabase
+        .from("personal_plans")
+        .select("id, inputs")
+        .eq("user_id", userId)
+        .single();
+      if (existingPersonal) setPersonalPlanId(existingPersonal.id);
+
+      await joinHouseholdByCode(userId, pendingJoinCode, existingPersonal);
       return;
     }
 
-    // 2. If there's a join code in the URL, try to join that household
-    if (pendingJoinCode) {
-      const joined = await joinHouseholdByCode(userId, pendingJoinCode);
-      if (joined) return;
-    }
+    if (hasHousehold) {
+      // Load household
+      await loadHousehold(membership.household_id);
 
-    // 3. No household — create one
-    await createHousehold(userId);
+      // Check if user also has a personal plan with real data
+      const { data: existingPersonal } = await supabase
+        .from("personal_plans")
+        .select("id, inputs")
+        .eq("user_id", userId)
+        .single();
+
+      if (existingPersonal && hasRealData(existingPersonal.inputs)) {
+        // User has both — show picker
+        setPersonalPlanId(existingPersonal.id);
+        setShowPlanPicker(true);
+      } else {
+        // No meaningful personal plan — go straight to household
+        if (existingPersonal) setPersonalPlanId(existingPersonal.id);
+        await switchPlanData("household");
+      }
+    } else {
+      // No household — load or create personal plan
+      const { data: existingPersonal } = await supabase
+        .from("personal_plans")
+        .select("id, inputs")
+        .eq("user_id", userId)
+        .single();
+
+      if (existingPersonal) {
+        setPersonalPlanId(existingPersonal.id);
+        if (hasRealData(existingPersonal.inputs)) {
+          setS({ ...publicDefaults, ...existingPersonal.inputs });
+        } else {
+          setS(defaults);
+        }
+      } else {
+        // Brand new user — create personal plan seeded with defaults
+        const { data: newPlan } = await supabase
+          .from("personal_plans")
+          .insert({ user_id: userId, inputs: defaults })
+          .select("id")
+          .single();
+        if (newPlan) setPersonalPlanId(newPlan.id);
+        setS(defaults);
+      }
+      setActivePlan("personal");
+    }
   }
 
   async function loadHousehold(householdId) {
@@ -1018,13 +1078,47 @@ export default function FatFireCalculator() {
       .single();
     if (!error && data) {
       setHousehold({ id: data.id, join_code: data.join_code, created_by: data.created_by });
-      if (data.inputs && Object.keys(data.inputs).length > 0) {
+      // Don't set S here — let the plan picker / switchPlan handle it
+      fetchMembers(householdId);
+      return data;
+    }
+    return null;
+  }
+
+  // Internal: load the data for a plan without touching picker state
+  // Takes an optional householdOverride for cases where household state isn't set yet
+  async function switchPlanData(plan, householdOverride) {
+    setActivePlan(plan);
+    const hh = householdOverride || household;
+    if (plan === "household" && hh) {
+      const { data } = await supabase
+        .from("households")
+        .select("inputs")
+        .eq("id", hh.id)
+        .single();
+      if (data?.inputs && Object.keys(data.inputs).length > 0) {
         setS({ ...publicDefaults, ...data.inputs });
       } else {
         setS(defaults);
       }
-      fetchMembers(householdId);
+    } else if (plan === "personal" && personalPlanId) {
+      const { data } = await supabase
+        .from("personal_plans")
+        .select("inputs")
+        .eq("id", personalPlanId)
+        .single();
+      if (data?.inputs && Object.keys(data.inputs).length > 0) {
+        setS({ ...publicDefaults, ...data.inputs });
+      } else {
+        setS(defaults);
+      }
     }
+  }
+
+  // User-facing: called from tab toggle or plan picker
+  async function switchPlan(plan) {
+    setShowPlanPicker(false);
+    await switchPlanData(plan);
   }
 
   async function fetchMembers(householdId) {
@@ -1056,19 +1150,24 @@ export default function FatFireCalculator() {
     if (isSelf) {
       setHousehold(null);
       setHouseholdMembers([]);
+      // Switch back to personal plan
+      await switchPlanData("personal");
     }
   }
 
-  async function createHousehold(userId) {
+  // Convert personal plan into a household. Seeded with current inputs (s).
+  // Called when user clicks "Add to household" for the first time.
+  async function createHousehold(userId, currentInputs) {
     const { data: sessionData } = await supabase.auth.getUser();
     const meta = sessionData?.user?.user_metadata || {};
     const { data, error } = await supabase
       .from("households")
-      .insert({ created_by: userId, inputs: defaults })
+      .insert({ created_by: userId, inputs: currentInputs })
       .select("id, join_code")
       .single();
     if (!error && data) {
-      setHousehold({ id: data.id, join_code: data.join_code, created_by: userId });
+      const hhObj = { id: data.id, join_code: data.join_code, created_by: userId };
+      setHousehold(hhObj);
       await supabase.from("household_members").insert({
         user_id: userId,
         household_id: data.id,
@@ -1077,11 +1176,18 @@ export default function FatFireCalculator() {
         avatar_url: meta.avatar_url || "",
       });
       await fetchMembers(data.id);
-      setS(defaults);
+      // Switch to household plan (personal plan becomes dormant)
+      setActivePlan("household");
+      // Copy the share URL to clipboard immediately
+      const url = `${window.location.origin}${window.location.pathname}?join=${data.join_code}`;
+      navigator.clipboard.writeText(url).catch(() => {});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   }
 
-  async function joinHouseholdByCode(userId, code) {
+  // existingPersonal: the personal_plans row (if any) — passed in from initPlans or fetched here
+  async function joinHouseholdByCode(userId, code, existingPersonal) {
     const { data: hh } = await supabase
       .from("households")
       .select("id, join_code, inputs, created_by")
@@ -1097,20 +1203,38 @@ export default function FatFireCalculator() {
       name: meta.full_name || meta.name || "",
       avatar_url: meta.avatar_url || "",
     });
-    setHousehold({ id: hh.id, join_code: hh.join_code, created_by: hh.created_by });
-    if (hh.inputs && Object.keys(hh.inputs).length > 0) {
-      setS({ ...publicDefaults, ...hh.inputs });
-    }
+    const hhObj = { id: hh.id, join_code: hh.join_code, created_by: hh.created_by };
+    setHousehold(hhObj);
     await fetchMembers(hh.id);
     window.history.replaceState({}, "", window.location.pathname);
     setShowJoinBox(false);
+
+    // If the joining user already has a personal plan with real data, let them choose
+    // Otherwise go straight to the household plan
+    if (existingPersonal && hasRealData(existingPersonal.inputs)) {
+      setShowPlanPicker(true);
+    } else {
+      // Load the household inputs and switch directly
+      if (hh.inputs && Object.keys(hh.inputs).length > 0) {
+        setS({ ...publicDefaults, ...hh.inputs });
+      } else {
+        setS(defaults);
+      }
+      setActivePlan("household");
+    }
     return true;
   }
 
   async function handleJoinSubmit() {
     if (!user) { signInWithGoogle(); return; }
     setJoinError("");
-    await joinHouseholdByCode(user.id, joinInput.trim());
+    const { data: existingPersonal } = await supabase
+      .from("personal_plans")
+      .select("id, inputs")
+      .eq("user_id", user.id)
+      .single();
+    if (existingPersonal) setPersonalPlanId(existingPersonal.id);
+    await joinHouseholdByCode(user.id, joinInput.trim(), existingPersonal);
   }
 
   const shareUrl = household
@@ -1124,12 +1248,20 @@ export default function FatFireCalculator() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const saveToCloud = useCallback(async (state, householdId) => {
+  const saveToCloud = useCallback(async (state, plan, householdId, planId) => {
     setSaveStatus("saving");
-    const { error } = await supabase
-      .from("households")
-      .update({ inputs: state, updated_at: new Date().toISOString() })
-      .eq("id", householdId);
+    let error = null;
+    if (plan === "household" && householdId) {
+      ({ error } = await supabase
+        .from("households")
+        .update({ inputs: state, updated_at: new Date().toISOString() })
+        .eq("id", householdId));
+    } else if (plan === "personal" && planId) {
+      ({ error } = await supabase
+        .from("personal_plans")
+        .update({ inputs: state, updated_at: new Date().toISOString() })
+        .eq("id", planId));
+    }
     setSaveStatus(error ? "error" : "saved");
   }, []);
 
@@ -1149,6 +1281,9 @@ export default function FatFireCalculator() {
     setUser(null);
     setHousehold(null);
     setHouseholdMembers([]);
+    setActivePlan(null);
+    setPersonalPlanId(null);
+    setShowPlanPicker(false);
     localStorage.removeItem(STORAGE_KEY);
     setS(publicDefaults);
   }
@@ -1194,22 +1329,25 @@ export default function FatFireCalculator() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useMemo(() => { setMc(null); setMcReverse(null); }, [inputs]);
 
-  // Autosave: localStorage always; cloud save (debounced 1.5s) when in a household
+  // Autosave: localStorage always; cloud save (debounced 1.5s) when signed in and on a plan
   useEffect(() => {
     saveToStorage(s);
-    if (household) {
+    if (activePlan && (household || personalPlanId)) {
       setSaveStatus("saving");
       clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => saveToCloud(s, household.id), 1500);
+      saveTimerRef.current = setTimeout(
+        () => saveToCloud(s, activePlan, household?.id, personalPlanId),
+        1500
+      );
     }
-  }, [s, household, saveToCloud]);
+  }, [s, activePlan, household, personalPlanId, saveToCloud]);
 
   const update = (k) => (v) => setS((prev) => ({ ...prev, [k]: v }));
 
   function resetToDefaults() {
     if (window.confirm("Reset all inputs to defaults? This cannot be undone.")) {
       localStorage.removeItem(STORAGE_KEY);
-      setS(household ? defaults : publicDefaults);
+      setS(activePlan ? defaults : publicDefaults);
     }
   }
 
@@ -1301,19 +1439,46 @@ export default function FatFireCalculator() {
                 {hidden ? "🙈 Hidden" : "👁 Hide"}
               </button>
 
+              {/* Plan tab toggle — shown when user has both a personal plan and a household */}
+              {user && household && personalPlanId && activePlan && (
+                <div className="flex items-center rounded border border-slate-300 overflow-hidden">
+                  <button
+                    onClick={() => switchPlan("personal")}
+                    className={"px-3 py-1 transition-colors font-medium " + (activePlan === "personal" ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}
+                  >
+                    My Plan
+                  </button>
+                  <button
+                    onClick={() => switchPlan("household")}
+                    className={"px-3 py-1 transition-colors font-medium border-l border-slate-300 " + (activePlan === "household" ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}
+                  >
+                    🏠 Household
+                  </button>
+                </div>
+              )}
+
               {/* Household CTA / dropdown */}
+              {user && activePlan === "personal" && !household && (
+                <button
+                  onClick={() => createHousehold(user.id, s)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors font-medium shadow-sm text-xs"
+                >
+                  {copied ? "✓ Invite link copied!" : "＋ Add to household"}
+                </button>
+              )}
+
               {household && (() => {
                 const isOwner = user?.id === household.created_by;
                 const hasOthers = householdMembers.length > 1;
 
                 if (!hasOthers) {
-                  // Solo — just show "Add to household" button
+                  // Household created but still solo — show copy invite button
                   return (
                     <button
                       onClick={copyShareUrl}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors font-medium shadow-sm text-xs"
                     >
-                      {copied ? "✓ Link copied!" : "＋ Add to household"}
+                      {copied ? "✓ Link copied!" : "＋ Invite to household"}
                     </button>
                   );
                 }
@@ -1454,6 +1619,38 @@ export default function FatFireCalculator() {
             )}
           </div>
         </div>
+
+        {/* ── Plan picker ── shown when user has both plans */}
+        {showPlanPicker && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-slate-900 mb-1">Which plan would you like to open?</h2>
+              <p className="text-sm text-slate-500 mb-6">You have a personal plan and a shared household plan. You can switch between them anytime.</p>
+              <div className="space-y-3">
+                <button
+                  onClick={() => switchPlan("personal")}
+                  className="w-full flex items-start gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-slate-800 hover:bg-slate-50 transition-all text-left"
+                >
+                  <div className="text-2xl mt-0.5">👤</div>
+                  <div>
+                    <div className="font-semibold text-slate-800">My Personal Plan</div>
+                    <div className="text-xs text-slate-500 mt-0.5">Your private projections — only you can see and edit this</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => switchPlan("household")}
+                  className="w-full flex items-start gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-slate-800 hover:bg-slate-50 transition-all text-left"
+                >
+                  <div className="text-2xl mt-0.5">🏠</div>
+                  <div>
+                    <div className="font-semibold text-slate-800">Household Plan</div>
+                    <div className="text-xs text-slate-500 mt-0.5">Shared with {householdMembers.length > 1 ? `${householdMembers.length} members` : "your household"} — changes sync for everyone</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-12 gap-4">
           {/* ── Inputs panel ── */}
