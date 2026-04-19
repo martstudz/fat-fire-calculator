@@ -513,9 +513,9 @@ function solvePortfolioForSuccessRate(inputs, retirementAge, targetSuccessRate =
 // Run base + conservative + stress scenarios, returning retirement age and portfolio at retirement.
 function solveScenarios(inputs) {
   const scenarios = [
-    { label: "Base",         return: 0.07,  inflation: 0.03,  color: "text-emerald-700" },
-    { label: "Conservative", return: 0.055, inflation: 0.035, color: "text-amber-600"   },
-    { label: "Stress",       return: 0.04,  inflation: 0.04,  color: "text-red-600"     },
+    { label: "Base",         return: 0.07,  inflation: 0.03,  color: "var(--accent-deep)" },
+    { label: "Conservative", return: 0.055, inflation: 0.035, color: "var(--slate)"   },
+    { label: "Stress",       return: 0.04,  inflation: 0.04,  color: "var(--slate)"     },
   ];
   return scenarios.map(sc => {
     const overridden = { ...inputs, investmentReturn: sc.return, inflation: sc.inflation };
@@ -826,13 +826,13 @@ function NumInput({ label, value, onChange, step = 1, prefix, suffix, small, hin
   }
 
   return (
-    <label className="flex items-center justify-between gap-2 text-sm py-0.5">
-      <span className="text-slate-700 flex-1">
+    <div className="inp-row">
+      <span style={{ flex: 1, color: "var(--ink-2)" }}>
         {label}
-        {hint && <span className="text-slate-400 text-xs ml-1">{hint}</span>}
+        {hint && <span className="inp-suffix" style={{ marginLeft: 4 }}>{hint}</span>}
       </span>
-      <div className="flex items-center gap-1">
-        {prefix && <span className="text-slate-500 text-xs">{prefix}</span>}
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        {prefix && <span className="inp-prefix">{prefix}</span>}
         <input
           ref={inputRef}
           type="text"
@@ -842,11 +842,11 @@ function NumInput({ label, value, onChange, step = 1, prefix, suffix, small, hin
           onChange={handleChange}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className={"border border-slate-300 rounded px-2 py-1 text-right text-sm " + (small ? "w-20" : "w-28")}
+          className={small ? "--sm" : ""}
         />
-        {suffix && <span className="text-slate-500 text-xs">{suffix}</span>}
+        {suffix && <span className="inp-suffix">{suffix}</span>}
       </div>
-    </label>
+    </div>
   );
 }
 
@@ -896,26 +896,26 @@ function ExpenseRow({ label, value, onChange, freq, step = 50 }) {
   }
 
   return (
-    <div className="flex items-center justify-between gap-2 text-sm py-0.5">
-      <span className="text-slate-700 flex-1">{label}</span>
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1">
-          <span className="text-slate-500 text-xs">$</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={displayValue}
-            onFocus={handleFocus}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            onKeyDown={handleKeyDown}
-            className="border border-slate-300 rounded px-2 py-1 text-right text-sm w-24"
-          />
-          <span className="text-slate-400 text-xs w-7">{freq === "monthly" ? "/mo" : "/yr"}</span>
-        </div>
-        <span className="text-slate-500 text-xs w-20 text-right font-mono">
-          {freq === "monthly" ? "= " + (hidden ? MASK : fmt$(annualized)) + "/yr" : ""}
-        </span>
+    <div className="inp-row">
+      <span style={{ flex: 1, color: "var(--ink-2)" }}>{label}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span className="inp-prefix">$</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={displayValue}
+          onFocus={handleFocus}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          className="--sm"
+        />
+        <span className="inp-suffix" style={{ minWidth: 24 }}>{freq === "monthly" ? "/mo" : "/yr"}</span>
+        {freq === "monthly" && (
+          <span className="mono inp-suffix" style={{ minWidth: 72, textAlign: "right" }}>
+            {hidden ? MASK : fmt$(annualized)}/yr
+          </span>
+        )}
       </div>
     </div>
   );
@@ -923,11 +923,9 @@ function ExpenseRow({ label, value, onChange, freq, step = 50 }) {
 
 function Section({ title, children, defaultOpen = true }) {
   return (
-    <details open={defaultOpen} className="bg-white rounded-lg shadow-sm border border-slate-200">
-      <summary className="px-3 py-2 font-semibold text-slate-800 cursor-pointer select-none text-sm">
-        {title}
-      </summary>
-      <div className="px-3 py-2 space-y-1 border-t border-slate-100">
+    <details open={defaultOpen} className="inp-section">
+      <summary>{title}</summary>
+      <div className="inp-section__body">
         {children}
       </div>
     </details>
@@ -936,7 +934,7 @@ function Section({ title, children, defaultOpen = true }) {
 
 function InfoBox({ children }) {
   return (
-    <div className="bg-blue-50 border border-blue-200 rounded p-2 text-xs text-slate-700 mt-1">
+    <div className="info-box" style={{ marginTop: 6 }}>
       {children}
     </div>
   );
@@ -1526,38 +1524,37 @@ export default function FatFireCalculator() {
 
   return (
     <PrivacyContext.Provider value={hidden}>
-    <div className="min-h-screen bg-slate-50 p-4 text-slate-900" style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold">FAT FIRE Calculator</h1>
-              <p className="text-sm text-slate-600">
-                Canadian tax-optimized · RRSP meltdown strategy · All figures in today's dollars
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-xs flex-wrap justify-end">
+    <div className="dash-frame">
+      <div className="dash-top">
+        <div>
+          <div className="dash-top__brand">Trailhead</div>
+          <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>
+            Canadian tax-optimized · RRSP meltdown · Today's dollars
+          </div>
+        </div>
+        <div className="dash-top__actions">
 
               {/* Hide toggle — always first */}
               <button
                 onClick={() => setHidden(h => !h)}
-                className={"px-2 py-1 rounded border transition-colors font-medium " + (hidden ? "border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100" : "border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-700")}
+                className={"btn btn--sm btn--outline " + (hidden ? "is-active" : "")}
+                style={hidden ? { background: "var(--sun-soft)", borderColor: "var(--sun)", color: "var(--sun-ink)" } : {}}
               >
                 {hidden ? "🙈 Hidden" : "👁 Hide"}
               </button>
 
               {/* Plan tab toggle — shown when user has both a personal plan and a household */}
               {user && household && personalPlanId && activePlan && (
-                <div className="flex items-center rounded border border-slate-300 overflow-hidden">
+                <div className="seg">
                   <button
                     onClick={() => switchPlan("personal")}
-                    className={"px-3 py-1 transition-colors font-medium " + (activePlan === "personal" ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}
+                    className={activePlan === "personal" ? "is-active" : ""}
                   >
                     My Plan
                   </button>
                   <button
                     onClick={() => switchPlan("household")}
-                    className={"px-3 py-1 transition-colors font-medium border-l border-slate-300 " + (activePlan === "household" ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}
+                    className={activePlan === "household" ? "is-active" : ""}
                   >
                     🏠 Household
                   </button>
@@ -1566,10 +1563,7 @@ export default function FatFireCalculator() {
 
               {/* Household CTA / dropdown */}
               {user && activePlan === "personal" && !household && (
-                <button
-                  onClick={() => createHousehold(user.id, s)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors font-medium shadow-sm text-xs"
-                >
+                <button onClick={() => createHousehold(user.id, s)} className="btn btn--outline btn--sm">
                   {copied ? "✓ Invite link copied!" : "＋ Add to household"}
                 </button>
               )}
@@ -1577,75 +1571,54 @@ export default function FatFireCalculator() {
               {household && (() => {
                 const isOwner = user?.id === household.created_by;
                 const hasOthers = householdMembers.length > 1;
-
                 if (!hasOthers) {
-                  // Household created but still solo — show copy invite button
                   return (
-                    <button
-                      onClick={copyShareUrl}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors font-medium shadow-sm text-xs"
-                    >
+                    <button onClick={copyShareUrl} className="btn btn--outline btn--sm">
                       {copied ? "✓ Link copied!" : "＋ Invite to household"}
                     </button>
                   );
                 }
-
-                // Multi-member — show dropdown
                 return (
-                  <div className="relative" ref={householdPanelRef}>
-                    <button
-                      onClick={() => setShowHouseholdPanel(p => !p)}
-                      className="flex items-center gap-1.5 px-2 py-1 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors"
-                    >
-                      <span>🏠</span>
-                      <span>Household</span>
-                      <span className="text-slate-400">{showHouseholdPanel ? "▲" : "▼"}</span>
+                  <div style={{ position: "relative" }} ref={householdPanelRef}>
+                    <button onClick={() => setShowHouseholdPanel(p => !p)} className="btn btn--outline btn--sm">
+                      🏠 Household {showHouseholdPanel ? "▲" : "▼"}
                     </button>
                     {showHouseholdPanel && (
-                      <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 w-72 p-3">
-                        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Members</div>
-                        <div className="space-y-2 mb-3">
+                      <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", background: "var(--paper)", border: "1px solid var(--line)", borderRadius: "var(--r-3)", boxShadow: "var(--shadow-3)", zIndex: 50, width: 272, padding: 14 }}>
+                        <div className="label-xs" style={{ marginBottom: 10 }}>Members</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
                           {householdMembers.map(m => {
                             const isThisOwner = m.user_id === household.created_by;
                             const canRemove = !isThisOwner && (isOwner || m.user_id === user?.id);
                             return (
-                              <div key={m.user_id} className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2 min-w-0">
+                              <div key={m.user_id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                                   {m.avatar_url
-                                    ? <img src={m.avatar_url} alt="" className="w-6 h-6 rounded-full flex-shrink-0" />
-                                    : <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs text-slate-500 flex-shrink-0">
+                                    ? <img src={m.avatar_url} alt="" style={{ width: 24, height: 24, borderRadius: "50%", flexShrink: 0 }} />
+                                    : <div style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--paper-3)", display: "grid", placeItems: "center", fontSize: 11, color: "var(--ink-3)", flexShrink: 0, fontWeight: 500 }}>
                                         {(m.name || m.email || "?")[0].toUpperCase()}
                                       </div>
                                   }
-                                  <div className="min-w-0">
-                                    <div className="flex items-center gap-1">
-                                      {m.name && <span className="text-xs font-medium text-slate-700 truncate">{m.name}</span>}
-                                      {isThisOwner && <span className="text-xs text-slate-400">(owner)</span>}
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ fontSize: "var(--step--1)", fontWeight: 500, color: "var(--ink)" }}>
+                                      {m.name || m.email}
+                                      {isThisOwner && <span style={{ color: "var(--ink-3)", fontWeight: 400, marginLeft: 4 }}>(owner)</span>}
                                     </div>
-                                    <div className="text-xs text-slate-400 truncate">{m.email}</div>
+                                    {m.name && <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>{m.email}</div>}
                                   </div>
                                 </div>
                                 {canRemove && (
-                                  <button
-                                    onClick={() => removeMember(m.user_id)}
-                                    className="text-slate-300 hover:text-red-400 transition-colors flex-shrink-0 text-base leading-none"
-                                    title={m.user_id === user?.id ? "Leave household" : "Remove member"}
-                                  >
-                                    ✕
-                                  </button>
+                                  <button onClick={() => removeMember(m.user_id)} className="btn--ghost btn--sm" style={{ fontSize: 14, padding: "2px 6px", color: "var(--ink-3)" }} title={m.user_id === user?.id ? "Leave household" : "Remove member"}>✕</button>
                                 )}
                               </div>
                             );
                           })}
                         </div>
-                        <div className="border-t border-slate-100 pt-2">
-                          <button
-                            onClick={copyShareUrl}
-                            className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 transition-colors"
-                          >
+                        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+                          <button onClick={copyShareUrl} className="btn btn--primary btn--sm" style={{ width: "100%" }}>
                             {copied ? "✓ Link copied!" : "＋ Add to household"}
                           </button>
-                          <div className="text-xs text-slate-400 text-center mt-1">Copies an invite link to share</div>
+                          <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", textAlign: "center" }}>Copies an invite link to share</div>
                         </div>
                       </div>
                     )}
@@ -1653,203 +1626,134 @@ export default function FatFireCalculator() {
                 );
               })()}
 
-              {/* Join a household */}
               {user && !household && (
-                <button
-                  onClick={() => setShowJoinBox(j => !j)}
-                  className="px-2 py-1 rounded border border-slate-300 text-slate-500 hover:bg-slate-100 transition-colors"
-                >
-                  Join household
-                </button>
+                <button onClick={() => setShowJoinBox(j => !j)} className="btn btn--ghost btn--sm">Join household</button>
               )}
               {!user && pendingJoinCode && (
-                <span className="text-amber-600 font-medium">Sign in to join household</span>
+                <span style={{ fontSize: "var(--step--1)", color: "var(--sun-ink)", fontWeight: 500 }}>Sign in to join household</span>
               )}
 
               {/* Auth */}
               {authLoading ? null : user ? (
-                <div className="flex items-center gap-2">
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {user.user_metadata?.avatar_url && (
-                    <img src={user.user_metadata.avatar_url} alt="" className="w-6 h-6 rounded-full" />
+                    <img src={user.user_metadata.avatar_url} alt="" style={{ width: 26, height: 26, borderRadius: "50%" }} />
                   )}
-                  <span className="text-slate-600 max-w-[140px] truncate">{user.email}</span>
-                  <button
-                    onClick={signOut}
-                    className="px-2 py-1 rounded border border-slate-300 text-slate-500 hover:bg-slate-100 transition-colors"
-                  >
-                    Sign out
-                  </button>
+                  <span style={{ fontSize: "var(--step--1)", color: "var(--ink-2)", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</span>
+                  <button onClick={signOut} className="btn btn--ghost btn--sm">Sign out</button>
                 </div>
               ) : (
-                <button
-                  onClick={signInWithGoogle}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors font-medium shadow-sm"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                <button onClick={signInWithGoogle} className="btn btn--outline btn--sm" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
                   Sign in with Google
                 </button>
               )}
 
-              <button
-                onClick={resetToDefaults}
-                className="px-2 py-1 rounded border border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-              >
-                Reset
+              <button onClick={resetToDefaults} className="btn btn--ghost btn--sm">Reset</button>
+        </div>
+      </div>
+
+      {/* Join box */}
+        {showJoinBox && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 24px", borderTop: "1px solid var(--line)", background: "var(--paper-2)" }}>
+            <input
+              type="text"
+              placeholder="Enter join code"
+              value={joinInput}
+              onChange={e => setJoinInput(e.target.value.toUpperCase())}
+              className="input mono"
+              style={{ width: 140, padding: "6px 10px", letterSpacing: "0.1em" }}
+            />
+            <button onClick={handleJoinSubmit} className="btn btn--primary btn--sm">Join</button>
+            {joinError && <span style={{ fontSize: "var(--step--2)", color: "oklch(42% 0.12 25)" }}>{joinError}</span>}
+          </div>
+        )}
+
+        {/* Pending join code banner */}
+        {!user && pendingJoinCode && (
+          <div className="callout" style={{ margin: "0 24px 12px", borderRadius: "var(--r-2)" }}>
+            You've been invited to join a household. Sign in with Google to accept.
+          </div>
+        )}
+
+        {/* ── Reset confirm modal ── */}
+        {showResetConfirm && (
+          <div className="modal-overlay">
+            <div className="modal-card">
+              <h2>Start over?</h2>
+              <p>This will clear all your inputs and take you back to the beginning. Any unsaved changes will be lost — this can't be undone.</p>
+              <button onClick={confirmReset} className="btn btn--primary" style={{ width: "100%", marginBottom: 10, background: "oklch(42% 0.14 25)", justifyContent: "center" }}>
+                Yes, clear everything and start over
+              </button>
+              <button onClick={() => setShowResetConfirm(false)} className="btn btn--outline" style={{ width: "100%", justifyContent: "center" }}>
+                Cancel
               </button>
             </div>
-
-            {/* Join box */}
-            {showJoinBox && (
-              <div className="mt-2 flex items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="Enter join code"
-                  value={joinInput}
-                  onChange={e => setJoinInput(e.target.value.toUpperCase())}
-                  className="border border-slate-300 rounded px-2 py-1 text-sm w-36 font-mono tracking-wider"
-                />
-                <button
-                  onClick={handleJoinSubmit}
-                  className="px-3 py-1 rounded bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700"
-                >
-                  Join
-                </button>
-                {joinError && <span className="text-red-500 text-xs">{joinError}</span>}
-              </div>
-            )}
-
-            {/* Pending join code banner for signed-out users */}
-            {!user && pendingJoinCode && (
-              <div className="mt-2 bg-amber-50 border border-amber-200 rounded p-2 text-xs text-amber-800">
-                You've been invited to join a household. Sign in with Google to accept.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── Merge conflict ── browser inputs vs cloud */}
-        {showResetConfirm && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
-              <h2 className="text-xl font-bold text-slate-900 mb-1">Start over?</h2>
-              <p className="text-sm text-slate-500 mb-6">
-                This will clear all your inputs and take you back to the beginning. Any unsaved changes will be lost — this can't be undone.
-              </p>
-              <div className="space-y-3">
-                <button
-                  onClick={confirmReset}
-                  className="w-full py-2.5 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors"
-                >
-                  Yes, clear everything and start over
-                </button>
-                <button
-                  onClick={() => setShowResetConfirm(false)}
-                  className="w-full py-2.5 rounded-lg border border-slate-300 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
           </div>
         )}
 
+        {/* ── Merge conflict modal ── */}
         {mergeConflict && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
-              <h2 className="text-xl font-bold text-slate-900 mb-1">You have unsaved inputs</h2>
-              <p className="text-sm text-slate-500 mb-6">
-                Your browser has inputs from before you signed in. Your {mergeConflict.planType === "household" ? "household" : "saved"} plan also has data. Which would you like to keep?
-              </p>
-              <div className="space-y-3">
-                <button
-                  onClick={() => {
-                    // Keep browser inputs — they'll auto-save to cloud
-                    setMergeConflict(null);
-                  }}
-                  className="w-full flex items-start gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-slate-800 hover:bg-slate-50 transition-all text-left"
-                >
-                  <div className="text-2xl mt-0.5">💻</div>
-                  <div>
-                    <div className="font-semibold text-slate-800">Keep browser inputs</div>
-                    <div className="text-xs text-slate-500 mt-0.5">Use what you just entered — this will overwrite your saved plan</div>
-                  </div>
-                </button>
-                <button
-                  onClick={() => {
-                    const { cloudInputs } = mergeConflict;
-                    setS({ ...publicDefaults, ...cloudInputs });
-                    localStorage.removeItem(STORAGE_KEY);
-                    setMergeConflict(null);
-                  }}
-                  className="w-full flex items-start gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-slate-800 hover:bg-slate-50 transition-all text-left"
-                >
-                  <div className="text-2xl mt-0.5">☁️</div>
-                  <div>
-                    <div className="font-semibold text-slate-800">Load saved plan</div>
-                    <div className="text-xs text-slate-500 mt-0.5">Restore your previously saved {mergeConflict.planType === "household" ? "household" : "personal"} plan — browser inputs will be discarded</div>
-                  </div>
-                </button>
-              </div>
+          <div className="modal-overlay">
+            <div className="modal-card">
+              <h2>You have unsaved inputs</h2>
+              <p>Your browser has inputs from before you signed in. Your {mergeConflict.planType === "household" ? "household" : "saved"} plan also has data. Which would you like to keep?</p>
+              <button onClick={() => setMergeConflict(null)} className="modal-choice-btn">
+                <span className="modal-choice-btn__icon">💻</span>
+                <div>
+                  <div className="modal-choice-btn__title">Keep browser inputs</div>
+                  <div className="modal-choice-btn__desc">Use what you just entered — this will overwrite your saved plan</div>
+                </div>
+              </button>
+              <button onClick={() => { setS({ ...publicDefaults, ...mergeConflict.cloudInputs }); localStorage.removeItem(STORAGE_KEY); setMergeConflict(null); }} className="modal-choice-btn">
+                <span className="modal-choice-btn__icon">☁️</span>
+                <div>
+                  <div className="modal-choice-btn__title">Load saved plan</div>
+                  <div className="modal-choice-btn__desc">Restore your previously saved {mergeConflict.planType === "household" ? "household" : "personal"} plan — browser inputs will be discarded</div>
+                </div>
+              </button>
             </div>
           </div>
         )}
 
-        {/* ── Plan picker ── shown when user has both plans */}
+        {/* ── Plan picker modal ── */}
         {showPlanPicker && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
-              <h2 className="text-xl font-bold text-slate-900 mb-1">Which plan would you like to open?</h2>
-              <p className="text-sm text-slate-500 mb-6">You have a personal plan and a shared household plan. You can switch between them anytime.</p>
-              <div className="space-y-3">
-                <button
-                  onClick={() => switchPlan("personal")}
-                  className="w-full flex items-start gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-slate-800 hover:bg-slate-50 transition-all text-left"
-                >
-                  <div className="text-2xl mt-0.5">👤</div>
-                  <div>
-                    <div className="font-semibold text-slate-800">My Personal Plan</div>
-                    <div className="text-xs text-slate-500 mt-0.5">Your private projections — only you can see and edit this</div>
-                  </div>
-                </button>
-                <button
-                  onClick={() => switchPlan("household")}
-                  className="w-full flex items-start gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-slate-800 hover:bg-slate-50 transition-all text-left"
-                >
-                  <div className="text-2xl mt-0.5">🏠</div>
-                  <div>
-                    <div className="font-semibold text-slate-800">Household Plan</div>
-                    <div className="text-xs text-slate-500 mt-0.5">Shared with {householdMembers.length > 1 ? `${householdMembers.length} members` : "your household"} — changes sync for everyone</div>
-                  </div>
-                </button>
-              </div>
+          <div className="modal-overlay">
+            <div className="modal-card">
+              <h2>Which plan would you like to open?</h2>
+              <p>You have a personal plan and a shared household plan. You can switch between them anytime.</p>
+              <button onClick={() => switchPlan("personal")} className="modal-choice-btn">
+                <span className="modal-choice-btn__icon">👤</span>
+                <div>
+                  <div className="modal-choice-btn__title">My Personal Plan</div>
+                  <div className="modal-choice-btn__desc">Your private projections — only you can see and edit this</div>
+                </div>
+              </button>
+              <button onClick={() => switchPlan("household")} className="modal-choice-btn">
+                <span className="modal-choice-btn__icon">🏠</span>
+                <div>
+                  <div className="modal-choice-btn__title">Household Plan</div>
+                  <div className="modal-choice-btn__desc">Shared with {householdMembers.length > 1 ? `${householdMembers.length} members` : "your household"} — changes sync for everyone</div>
+                </div>
+              </button>
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-12 gap-4">
+        <div className="dash-body">
           {/* ── Inputs panel ── */}
-          <div className="col-span-12 lg:col-span-4 space-y-3">
+          <div className="dash-inputs">
 
             <Section title="Personal">
-              <label className="flex items-center justify-between gap-2 text-sm py-0.5">
-                <span className="text-slate-700">Your name</span>
-                <input
-                  type="text"
-                  value={s.yourName}
-                  onChange={(e) => update("yourName")(e.target.value)}
-                  className="border border-slate-300 rounded px-2 py-1 text-sm w-28 text-right"
-                />
-              </label>
+              <div className="inp-row">
+                <span>Your name</span>
+                <input type="text" value={s.yourName} onChange={(e) => update("yourName")(e.target.value)} className="--sm" />
+              </div>
               {s.partnered !== false && (
-                <label className="flex items-center justify-between gap-2 text-sm py-0.5">
-                  <span className="text-slate-700">Spouse's name</span>
-                  <input
-                    type="text"
-                    value={s.spouseName}
-                    onChange={(e) => update("spouseName")(e.target.value)}
-                    className="border border-slate-300 rounded px-2 py-1 text-sm w-28 text-right"
-                  />
-                </label>
+                <div className="inp-row">
+                  <span>Spouse's name</span>
+                  <input type="text" value={s.spouseName} onChange={(e) => update("spouseName")(e.target.value)} className="--sm" />
+                </div>
               )}
               <NumInput label={`${s.yourName}'s current age`} value={s.currentAge} onChange={update("currentAge")} small />
               {s.partnered !== false && (
@@ -1859,7 +1763,7 @@ export default function FatFireCalculator() {
             </Section>
 
             <Section title="Income & tax (working years)">
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-1 pb-0.5">{s.yourName}</div>
+              <div className="ob-person-label">{s.yourName}</div>
               <NumInput label="Annual base salary" value={s.yourBase} onChange={update("yourBase")} prefix="$" step={1000} />
               <PctInput label="Performance bonus (% of base)" value={s.yourBonusPct} onChange={update("yourBonusPct")} />
               <PctInput label="Equity / RSUs / options (% of base)" value={s.yourEquityPct} onChange={update("yourEquityPct")} hint="total variable equity, invested as vested" />
@@ -1867,7 +1771,7 @@ export default function FatFireCalculator() {
 
               {s.partnered !== false && (
                 <>
-                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">{s.spouseName}</div>
+                  <div className="ob-person-label" style={{ paddingTop: 8 }}>{s.spouseName}</div>
                   <NumInput label="Annual base salary" value={s.spouseBase} onChange={update("spouseBase")} prefix="$" step={1000} />
                   <PctInput label="Performance bonus (% of base)" value={s.spouseBonusPct} onChange={update("spouseBonusPct")} />
                   <PctInput label="Equity / RSUs / options (% of base)" value={s.spouseEquityPct} onChange={update("spouseEquityPct")} hint="total variable equity, invested as vested" />
@@ -1875,47 +1779,47 @@ export default function FatFireCalculator() {
                 </>
               )}
 
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">Tax</div>
+              <div className="ob-person-label" style={{ paddingTop: 8 }}>Tax</div>
               <PctInput label="Blended tax rate" value={s.taxRate} onChange={update("taxRate")} />
               <PctInput label="Income growth (real)" value={s.incomeGrowth} onChange={update("incomeGrowth")} />
 
-              <div className="pt-2 mt-1 border-t border-slate-200 space-y-0.5 text-xs">
-                <div className="flex justify-between text-slate-600">
+              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 8, marginTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
                   <span>{s.yourName}'s total comp</span>
-                  <span className="font-mono">{fmtMoney(s.yourBase + yourBonusAmt + yourEquityAmt)}</span>
+                  <span className="mono">{fmtMoney(s.yourBase + yourBonusAmt + yourEquityAmt)}</span>
                 </div>
                 {s.partnered !== false && (
-                  <div className="flex justify-between text-slate-600">
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
                     <span>{s.spouseName}'s total comp</span>
-                    <span className="font-mono">{fmtMoney(s.spouseBase + spouseBonusAmt + spouseEquityAmt)}</span>
+                    <span className="mono">{fmtMoney(s.spouseBase + spouseBonusAmt + spouseEquityAmt)}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-semibold text-slate-800 pt-1 border-t border-slate-100">
+                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, color: "var(--ink)", fontSize: "var(--step--1)", paddingTop: 6, borderTop: "1px solid var(--line)" }}>
                   <span>{s.partnered !== false ? "Household" : "Total"} gross</span>
-                  <span className="font-mono">{fmtMoney(householdGross)}</span>
+                  <span className="mono">{fmtMoney(householdGross)}</span>
                 </div>
               </div>
             </Section>
 
             <Section title="Expenses (today's $)">
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-1 pb-0.5">Housing</div>
+              <div className="ob-person-label">Housing</div>
               <ExpenseRow label="Mortgage" value={s.mortgage} onChange={update("mortgage")} freq="monthly" />
-              <div className="pl-4 pb-1 border-l-2 border-slate-100 ml-1 space-y-0.5">
+              <div style={{ paddingLeft: 12, borderLeft: "2px solid var(--line)", marginLeft: 4, display: "flex", flexDirection: "column", gap: 2 }}>
                 <NumInput label="Principal remaining" value={s.mortgagePrincipal} onChange={update("mortgagePrincipal")} prefix="$" step={1000} />
                 <PctInput label="Interest rate" value={s.mortgageRate} onChange={update("mortgageRate")} />
                 <NumInput label="Extra payment / mo" value={s.extraMortgagePayment} onChange={update("extraMortgagePayment")} prefix="$" step={100} hint="reduces contributions by same amount" />
-                <div className="text-xs text-slate-600 flex justify-between pt-1">
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--ink-2)", paddingTop: 4 }}>
                   <span>Projected payoff</span>
-                  <span className="font-mono">
+                  <span className="mono">
                     {isFinite(mortgagePayoff)
                       ? `age ${mortgagePayoff} (${Math.round(solved.mortgagePayoffMonths)} mo)`
                       : "payment doesn't cover interest"}
                   </span>
                 </div>
                 {yearsSaved > 0 && (
-                  <div className="text-xs text-emerald-700 flex justify-between">
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--accent-deep)", fontWeight: 500 }}>
                     <span>vs. no extra payment</span>
-                    <span className="font-mono font-semibold">{yearsSaved} yr{yearsSaved !== 1 ? "s" : ""} earlier</span>
+                    <span className="mono" style={{ fontWeight: 600 }}>{yearsSaved} yr{yearsSaved !== 1 ? "s" : ""} earlier</span>
                   </div>
                 )}
               </div>
@@ -1925,7 +1829,7 @@ export default function FatFireCalculator() {
               <ExpenseRow label="Maintenance & repairs" value={s.maintenance} onChange={update("maintenance")} freq="monthly" />
               <ExpenseRow label="Utilities (hydro, gas, water)" value={s.utilities} onChange={update("utilities")} freq="monthly" />
 
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">Essentials</div>
+              <div className="ob-person-label" style={{ paddingTop: 8 }}>Essentials</div>
               <ExpenseRow label="Groceries" value={s.groceries} onChange={update("groceries")} freq="monthly" />
               <ExpenseRow label="Transport & transit" value={s.transport} onChange={update("transport")} freq="monthly" />
               <ExpenseRow label="Personal care & health" value={s.personalCare} onChange={update("personalCare")} freq="monthly" step={50} />
@@ -1933,193 +1837,193 @@ export default function FatFireCalculator() {
                 <ExpenseRow label="Childcare & activities" value={s.childcare} onChange={update("childcare")} freq="monthly" step={100} />
               )}
 
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">Lifestyle</div>
+              <div className="ob-person-label" style={{ paddingTop: 8 }}>Lifestyle</div>
               <ExpenseRow label="Dining & takeout" value={s.dining} onChange={update("dining")} freq="monthly" />
               <ExpenseRow label="Clothing & shopping" value={s.clothing} onChange={update("clothing")} freq="monthly" />
               <ExpenseRow label="Subscriptions & tech" value={s.subscriptions} onChange={update("subscriptions")} freq="monthly" step={50} />
               <ExpenseRow label="Entertainment & hobbies" value={s.entertainment || 0} onChange={update("entertainment")} freq="monthly" step={50} />
 
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">Annual</div>
+              <div className="ob-person-label" style={{ paddingTop: 8 }}>Annual</div>
               <ExpenseRow label="Travel & holidays" value={s.travel} onChange={update("travel")} freq="annual" step={1000} />
               {s.hasKids !== false && (
                 <ExpenseRow label="RESP contributions" value={s.resp} onChange={update("resp")} freq="annual" step={500} />
               )}
               <ExpenseRow label="Other annual expenses" value={s.oneTimeMisc} onChange={update("oneTimeMisc")} freq="annual" step={1000} />
-              <div className="pt-2 mt-1 border-t border-slate-200 space-y-0.5 text-xs">
-                <div className="flex justify-between text-slate-600">
+              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 8, marginTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
                   <span>Monthly (×12)</span>
-                  <span className="font-mono">{fmtMoney(inputs.monthlyExpensesTotal * 12)}</span>
+                  <span className="mono">{fmtMoney(inputs.monthlyExpensesTotal * 12)}</span>
                 </div>
-                <div className="flex justify-between text-slate-600">
+                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
                   <span>One-time annual (incl. RESP)</span>
-                  <span className="font-mono">{fmtMoney(inputs.oneTimeAnnualTotal)}</span>
+                  <span className="mono">{fmtMoney(inputs.oneTimeAnnualTotal)}</span>
                 </div>
-                <div className="flex justify-between font-semibold text-slate-800 pt-1 border-t border-slate-100">
+                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, color: "var(--ink)", fontSize: "var(--step--1)", paddingTop: 6, borderTop: "1px solid var(--line)" }}>
                   <span>Working years total / yr</span>
-                  <span className="font-mono">{fmtMoney(grandAnnual)}</span>
+                  <span className="mono">{fmtMoney(grandAnnual)}</span>
                 </div>
-                <div className="flex justify-between text-slate-600">
+                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
                   <span>After mortgage payoff</span>
-                  <span className="font-mono">{fmtMoney(postMortgageAnnual)}</span>
+                  <span className="mono">{fmtMoney(postMortgageAnnual)}</span>
                 </div>
-                <div className="flex justify-between font-semibold text-emerald-700 pt-1 border-t border-slate-100">
+                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, color: "var(--moss-ink)", fontSize: "var(--step--1)", paddingTop: 6, borderTop: "1px solid var(--line)" }}>
                   <span>Retirement spend / yr</span>
-                  <span className="font-mono">{fmtMoney(grandAnnual + (inputs.retirementSpendDelta || 0))}</span>
+                  <span className="mono">{fmtMoney(grandAnnual + (inputs.retirementSpendDelta || 0))}</span>
                 </div>
-                <div className="text-slate-400 text-xs">Retirement spend swaps travel for snowbird budget, adds healthcare, removes RESP.</div>
+                <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>Retirement spend swaps travel for snowbird budget, adds healthcare, removes RESP.</div>
               </div>
             </Section>
 
             <Section title="Retirement-specific spend" defaultOpen={false}>
-              <div className="text-xs text-slate-500 mb-2">These replace or supplement your working-years budget once retired. The model uses these figures during decumulation.</div>
+              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 8 }}>These replace or supplement your working-years budget once retired. The model uses these figures during decumulation.</div>
               <ExpenseRow label="Snowbird / extended travel" value={s.retirementTravel} onChange={update("retirementTravel")} freq="annual" step={1000} />
               <ExpenseRow label="Private health / dental / vision" value={s.retirementHealthcare} onChange={update("retirementHealthcare")} freq="annual" step={500} />
-              <div className="pt-2 mt-1 border-t border-slate-100 space-y-0.5 text-xs">
-                <div className="flex justify-between text-slate-600">
+              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 8, marginTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
                   <span>Working-years travel budget</span>
-                  <span className="font-mono">{fmtMoney(s.travel)}/yr</span>
+                  <span className="mono">{fmtMoney(s.travel)}/yr</span>
                 </div>
-                <div className="flex justify-between text-slate-600">
+                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
                   <span>RESP (drops off in retirement)</span>
-                  <span className="font-mono">−{fmtMoney(s.resp || 0)}/yr</span>
+                  <span className="mono">−{fmtMoney(s.resp || 0)}/yr</span>
                 </div>
-                <div className={`flex justify-between font-semibold pt-1 border-t border-slate-100 ${(inputs.retirementSpendDelta || 0) > 0 ? "text-rose-600" : "text-emerald-700"}`}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, paddingTop: 4, borderTop: "1px solid var(--line)", color: (inputs.retirementSpendDelta || 0) > 0 ? "var(--slate)" : "var(--accent-deep)" }}>
                   <span>Net retirement spend change</span>
-                  <span className="font-mono">{(inputs.retirementSpendDelta || 0) > 0 ? "+" : ""}{fmtMoney(inputs.retirementSpendDelta || 0)}/yr</span>
+                  <span className="mono">{(inputs.retirementSpendDelta || 0) > 0 ? "+" : ""}{fmtMoney(inputs.retirementSpendDelta || 0)}/yr</span>
                 </div>
               </div>
             </Section>
 
             <Section title="Starting portfolio (by person)">
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-1 pb-0.5">{s.yourName}</div>
+              <div className="ob-person-label">{s.yourName}</div>
               <NumInput label="RRSP" value={s.yourRrspStart} onChange={update("yourRrspStart")} prefix="$" step={10000} />
               <NumInput label="TFSA" value={s.yourTfsaStart} onChange={update("yourTfsaStart")} prefix="$" step={10000} />
               <NumInput label="Non-registered" value={s.yourNrStart} onChange={update("yourNrStart")} prefix="$" step={10000} />
-              <div className="text-xs text-slate-500 flex justify-between pb-1">
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--ink-3)", paddingBottom: 4 }}>
                 <span>{s.yourName}'s subtotal</span>
-                <span className="font-mono">{fmtMoney((s.yourRrspStart||0) + (s.yourTfsaStart||0) + (s.yourNrStart||0))}</span>
+                <span className="mono">{fmtMoney((s.yourRrspStart||0) + (s.yourTfsaStart||0) + (s.yourNrStart||0))}</span>
               </div>
 
               {s.partnered !== false && (
                 <>
-                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5 border-t border-slate-100 mt-1">{s.spouseName}</div>
+                  <div className="ob-person-label" style={{ paddingTop: 8, borderTop: "1px solid var(--line)", marginTop: 4 }}>{s.spouseName}</div>
                   <NumInput label="RRSP" value={s.spouseRrspStart} onChange={update("spouseRrspStart")} prefix="$" step={10000} />
                   <NumInput label="TFSA" value={s.spouseTfsaStart} onChange={update("spouseTfsaStart")} prefix="$" step={10000} />
                   <NumInput label="Non-registered" value={s.spouseNrStart} onChange={update("spouseNrStart")} prefix="$" step={10000} />
-                  <div className="text-xs text-slate-500 flex justify-between pb-1">
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--ink-3)", paddingBottom: 4 }}>
                     <span>{s.spouseName}'s subtotal</span>
-                    <span className="font-mono">{fmtMoney((s.spouseRrspStart||0) + (s.spouseTfsaStart||0) + (s.spouseNrStart||0))}</span>
+                    <span className="mono">{fmtMoney((s.spouseRrspStart||0) + (s.spouseTfsaStart||0) + (s.spouseNrStart||0))}</span>
                   </div>
                 </>
               )}
 
-              <div className="pt-1 mt-1 border-t border-slate-200 text-xs text-slate-600 flex justify-between">
-                <span className="font-semibold text-slate-800">{s.partnered !== false ? "Household total" : "Total"}</span>
-                <span className="font-mono font-semibold text-slate-800">{fmtMoney((s.yourRrspStart||0)+(s.yourTfsaStart||0)+(s.yourNrStart||0)+(s.partnered !== false ? (s.spouseRrspStart||0)+(s.spouseTfsaStart||0)+(s.spouseNrStart||0) : 0))}</span>
+              <div style={{ paddingTop: 4, marginTop: 4, borderTop: "1px solid var(--line)", fontSize: "var(--step--1)", color: "var(--ink-2)", display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontWeight: 600, color: "var(--ink)" }}>{s.partnered !== false ? "Household total" : "Total"}</span>
+                <span className="mono" style={{ fontWeight: 600, color: "var(--ink)" }}>{fmtMoney((s.yourRrspStart||0)+(s.yourTfsaStart||0)+(s.yourNrStart||0)+(s.partnered !== false ? (s.spouseRrspStart||0)+(s.spouseTfsaStart||0)+(s.spouseNrStart||0) : 0))}</span>
               </div>
             </Section>
 
             <Section title="Retirement saving">
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-1 pb-0.5">{s.yourName} — monthly</div>
+              <div className="ob-person-label">{s.yourName} — monthly</div>
               <NumInput label="RRSP" value={s.startingMonthly} onChange={update("startingMonthly")} prefix="$" step={100} />
               <NumInput label="TFSA" value={s.yourTfsaMonthly || 0} onChange={update("yourTfsaMonthly")} prefix="$" step={100} />
               <NumInput label="Non-registered" value={s.yourNrMonthly || 0} onChange={update("yourNrMonthly")} prefix="$" step={100} />
               {s.partnered !== false && (
                 <>
-                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">{s.spouseName} — monthly</div>
+                  <div className="ob-person-label" style={{ paddingTop: 8 }}>{s.spouseName} — monthly</div>
                   <NumInput label="RRSP" value={s.spouseMonthly || 0} onChange={update("spouseMonthly")} prefix="$" step={100} />
                   <NumInput label="TFSA" value={s.spouseTfsaMonthly || 0} onChange={update("spouseTfsaMonthly")} prefix="$" step={100} />
                   <NumInput label="Non-registered" value={s.spouseNrMonthly || 0} onChange={update("spouseNrMonthly")} prefix="$" step={100} />
                 </>
               )}
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">Annual lump-sum top-ups</div>
+              <div className="ob-person-label" style={{ paddingTop: 8 }}>Annual lump-sum top-ups</div>
               <NumInput label="RRSP" value={s.rrspTopUp || 0} onChange={update("rrspTopUp")} prefix="$" step={1000} hint="e.g. year-end bonus contribution" />
               <NumInput label="TFSA" value={s.tfsaTopUp || 0} onChange={update("tfsaTopUp")} prefix="$" step={1000} />
               <NumInput label="Non-registered" value={s.nrTopUp || 0} onChange={update("nrTopUp")} prefix="$" step={1000} />
               <PctInput label="Monthly contrib growth" value={s.contribGrowth} onChange={update("contribGrowth")} />
 
               {/* Computed read-only lines */}
-              <div className="pt-2 mt-1 border-t border-slate-100 space-y-1 text-xs">
-                <div className="flex justify-between text-slate-600">
+              <div style={{ paddingTop: 8, marginTop: 4, borderTop: "1px solid var(--line)", display: "flex", flexDirection: "column", gap: 3 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
                   <span>Total monthly contributions</span>
-                  <span className="font-mono">{fmtMoney(totalMonthlyContrib)}/mo</span>
+                  <span className="mono">{fmtMoney(totalMonthlyContrib)}/mo</span>
                 </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>Bonus / yr <span className="text-slate-400">(after-tax, from yr 1)</span></span>
-                  <span className="font-mono">{fmtMoney(bonusAfterTax)}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
+                  <span>Bonus / yr <span style={{ color: "var(--ink-3)" }}>(after-tax, from yr 1)</span></span>
+                  <span className="mono">{fmtMoney(bonusAfterTax)}</span>
                 </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>Equity / yr <span className="text-slate-400">(after-tax, from yr 4)</span></span>
-                  <span className="font-mono">{equityAfterTax > 0 ? fmtMoney(equityAfterTax) : "—"}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
+                  <span>Equity / yr <span style={{ color: "var(--ink-3)" }}>(after-tax, from yr 4)</span></span>
+                  <span className="mono">{equityAfterTax > 0 ? fmtMoney(equityAfterTax) : "—"}</span>
                 </div>
-                <div className="text-slate-400 text-xs">Bonus & equity grow with income growth rate. Set % in Income section.</div>
+                <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>Bonus & equity grow with income growth rate. Set % in Income section.</div>
               </div>
 
-              <div className="pt-2 mt-1 border-t border-slate-200 space-y-1 text-xs">
+              <div style={{ paddingTop: 8, marginTop: 4, borderTop: "1px solid var(--line)", display: "flex", flexDirection: "column", gap: 3 }}>
                 {s.extraMortgagePayment > 0 && (
-                  <div className="flex justify-between text-rose-600">
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "var(--slate)" }}>
                     <span>Extra mortgage payment / yr</span>
-                    <span className="font-mono">−{fmtMoney(s.extraMortgagePayment * 12)}</span>
+                    <span className="mono">−{fmtMoney(s.extraMortgagePayment * 12)}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-slate-700">
+                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)" }}>
                   <span>Net annual contribution (yrs 1–3)</span>
-                  <span className="font-mono font-semibold">{fmtMoney(Math.max(0, startingAnnualContrib - s.extraMortgagePayment * 12))}</span>
+                  <span className="mono" style={{ fontWeight: 600 }}>{fmtMoney(Math.max(0, startingAnnualContrib - s.extraMortgagePayment * 12))}</span>
                 </div>
                 {equityAfterTax > 0 && (
-                  <div className="flex justify-between font-semibold text-slate-800">
+                  <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, color: "var(--ink)", fontSize: "var(--step--1)" }}>
                     <span>Net annual contribution (yr 4+)</span>
-                    <span className="font-mono">{fmtMoney(Math.max(0, fullAnnualContrib - s.extraMortgagePayment * 12))}</span>
+                    <span className="mono">{fmtMoney(Math.max(0, fullAnnualContrib - s.extraMortgagePayment * 12))}</span>
                   </div>
                 )}
-                <div className="text-slate-500 mt-1">Waterfall: TFSA room → RRSP room → Non-reg overflow.</div>
+                <div style={{ color: "var(--ink-3)", marginTop: 4, fontSize: "var(--step--2)" }}>Waterfall: TFSA room → RRSP room → Non-reg overflow.</div>
               </div>
             </Section>
 
             <Section title="Contribution room (registered plans)">
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-1 pb-0.5">Existing carry-forward room</div>
-              <div className="text-xs text-slate-500 mb-1">{s.yourName}</div>
+              <div className="ob-person-label">Existing carry-forward room</div>
+              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName}</div>
               <NumInput label="RRSP room" value={s.yourRrspRoomExisting} onChange={update("yourRrspRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
               <NumInput label="TFSA room" value={s.yourTfsaRoomExisting} onChange={update("yourTfsaRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
               {s.partnered !== false && (
                 <>
-                  <div className="text-xs text-slate-500 mt-1.5 mb-1">{s.spouseName}</div>
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 6, marginBottom: 4 }}>{s.spouseName}</div>
                   <NumInput label="RRSP room" value={s.spouseRrspRoomExisting} onChange={update("spouseRrspRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
                   <NumInput label="TFSA room" value={s.spouseTfsaRoomExisting} onChange={update("spouseTfsaRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
                 </>
               )}
 
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5 border-t border-slate-100 mt-2">Annual new room (today's $)</div>
-              <div className="text-xs text-slate-500 mb-1">{s.yourName}</div>
+              <div style={{ fontSize: "var(--step--2)", fontWeight: 600, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.08em", paddingTop: 8, paddingBottom: 2, borderTop: "1px solid var(--line)", marginTop: 8 }}>Annual new room (today's $)</div>
+              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName}</div>
               <NumInput label="RRSP room / yr" value={s.yourRrspRoomAnnual} onChange={update("yourRrspRoomAnnual")} prefix="$" step={500} />
               <NumInput label="TFSA room / yr" value={s.yourTfsaRoomAnnual} onChange={update("yourTfsaRoomAnnual")} prefix="$" step={500} />
               {s.partnered !== false && (
                 <>
-                  <div className="text-xs text-slate-500 mt-1.5 mb-1">{s.spouseName}</div>
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 6, marginBottom: 4 }}>{s.spouseName}</div>
                   <NumInput label="RRSP room / yr" value={s.spouseRrspRoomAnnual} onChange={update("spouseRrspRoomAnnual")} prefix="$" step={500} />
                   <NumInput label="TFSA room / yr" value={s.spouseTfsaRoomAnnual} onChange={update("spouseTfsaRoomAnnual")} prefix="$" step={500} />
                 </>
               )}
 
-              <div className="pt-2 mt-2 border-t border-slate-100 space-y-0.5 text-xs">
-                <div className="flex justify-between text-slate-600">
+              <div style={{ paddingTop: 8, marginTop: 8, borderTop: "1px solid var(--line)", display: "flex", flexDirection: "column", gap: 3 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
                   <span>Total existing RRSP room</span>
-                  <span className="font-mono">{fmtMoney(s.yourRrspRoomExisting + s.spouseRrspRoomExisting)}</span>
+                  <span className="mono">{fmtMoney(s.yourRrspRoomExisting + s.spouseRrspRoomExisting)}</span>
                 </div>
-                <div className="flex justify-between text-slate-600">
+                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
                   <span>Total existing TFSA room</span>
-                  <span className="font-mono">{fmtMoney(s.yourTfsaRoomExisting + s.spouseTfsaRoomExisting)}</span>
+                  <span className="mono">{fmtMoney(s.yourTfsaRoomExisting + s.spouseTfsaRoomExisting)}</span>
                 </div>
-                <div className="flex justify-between text-slate-600">
+                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
                   <span>Total new RRSP room / yr</span>
-                  <span className="font-mono">{fmtMoney(s.yourRrspRoomAnnual + s.spouseRrspRoomAnnual)}</span>
+                  <span className="mono">{fmtMoney(s.yourRrspRoomAnnual + s.spouseRrspRoomAnnual)}</span>
                 </div>
-                <div className="flex justify-between text-slate-600">
+                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
                   <span>Total new TFSA room / yr</span>
-                  <span className="font-mono">{fmtMoney(s.yourTfsaRoomAnnual + s.spouseTfsaRoomAnnual)}</span>
+                  <span className="mono">{fmtMoney(s.yourTfsaRoomAnnual + s.spouseTfsaRoomAnnual)}</span>
                 </div>
               </div>
-              <div className="pt-1 mt-1 text-xs text-slate-500">
+              <div style={{ paddingTop: 4, marginTop: 4, fontSize: "var(--step--2)", color: "var(--ink-3)" }}>
                 Annual new room inflates with inflation (CRA indexes limits).
               </div>
             </Section>
@@ -2127,20 +2031,20 @@ export default function FatFireCalculator() {
             <Section title="Market assumptions">
               <PctInput label="Nominal return" value={s.investmentReturn} onChange={update("investmentReturn")} />
               <PctInput label="Inflation" value={s.inflation} onChange={update("inflation")} />
-              <div className="pt-1 mt-1 border-t border-slate-100" />
+              <div style={{ paddingTop: 4, marginTop: 4, borderTop: "1px solid var(--line)" }} />
               <NumInput label="Terminal target (age 90)" value={s.terminalTargetToday} onChange={update("terminalTargetToday")} prefix="$" step={25000} hint="(today's $)" />
-              <div className="text-xs text-slate-500">
+              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>
                 Solver finds the earliest age where spending is fully covered <em>and</em> portfolio ends at or above this amount. Lower = earlier retirement.
               </div>
             </Section>
 
             <Section title="Retirement income">
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-1 pb-0.5">CPP</div>
-              <div className="text-xs text-slate-500 mb-1">{s.yourName}</div>
+              <div className="ob-person-label">CPP</div>
+              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName}</div>
               <NumInput label="Estimated CPP (today's $/yr)" value={s.yourCppAmount || Math.round((s.cppAmountToday || 0) / (s.partnered !== false ? 2 : 1))} onChange={update("yourCppAmount")} prefix="$" step={500} hint="check My Service Canada for your estimate" />
               {s.partnered !== false && (
                 <>
-                  <div className="text-xs text-slate-500 mt-1.5 mb-1">{s.spouseName}</div>
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 6, marginBottom: 4 }}>{s.spouseName}</div>
                   <NumInput label="Estimated CPP (today's $/yr)" value={s.spouseCppAmount || Math.round((s.cppAmountToday || 0) / 2)} onChange={update("spouseCppAmount")} prefix="$" step={500} />
                 </>
               )}
@@ -2149,7 +2053,7 @@ export default function FatFireCalculator() {
                 Delaying CPP to 70 is typically optimal with sufficient assets — it becomes a guaranteed inflation-linked bond and reduces portfolio pressure late in retirement.
               </InfoBox>
 
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">OAS (Old Age Security)</div>
+              <div className="ob-person-label" style={{ paddingTop: 8 }}>OAS (Old Age Security)</div>
               <NumInput label="OAS per person (today's $/yr)" value={s.oasAmountToday} onChange={update("oasAmountToday")} prefix="$" step={100} />
               <NumInput label="OAS start age" value={s.oasStartAge} onChange={update("oasStartAge")} small hint="(65 or 70)" />
               <NumInput label="Clawback threshold / person" value={s.oasClawbackThreshold} onChange={update("oasClawbackThreshold")} prefix="$" step={1000} hint="(2026: $95,323)" />
@@ -2157,25 +2061,25 @@ export default function FatFireCalculator() {
                 OAS is taxable as ordinary income and subject to a 15% clawback on net income above ~$95,323/person (2026). Deferring to 70 increases OAS by 36% and avoids early clawback if RRIF income is high. The model estimates clawback based on projected RRIF + CPP + pension income.
               </InfoBox>
 
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">Defined Benefit Pension</div>
-              <div className="text-xs text-slate-500 mb-1">{s.yourName}</div>
+              <div className="ob-person-label" style={{ paddingTop: 8 }}>Defined Benefit Pension</div>
+              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName}</div>
               <NumInput label="Monthly pension amount" value={s.pensionMonthly} onChange={update("pensionMonthly")} prefix="$" step={100} hint="today's $, leave 0 if none" />
               <NumInput label="Pension start age" value={s.pensionStartAge} onChange={update("pensionStartAge")} small />
               {s.pensionMonthly > 0 && (
-                <div className="text-xs text-slate-600 flex justify-between pt-0.5">
+                <div style={{ fontSize: "var(--step--2)", color: "var(--ink-2)", display: "flex", justifyContent: "space-between", paddingTop: 2 }}>
                   <span>Annual pension (today's $)</span>
-                  <span className="font-mono font-semibold">{fmtMoney(s.pensionMonthly * 12)}</span>
+                  <span className="mono" style={{ fontWeight: 600 }}>{fmtMoney(s.pensionMonthly * 12)}</span>
                 </div>
               )}
               {s.partnered !== false && (
                 <>
-                  <div className="text-xs text-slate-500 mt-2 mb-1">{s.spouseName}</div>
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 8, marginBottom: 4 }}>{s.spouseName}</div>
                   <NumInput label="Monthly pension amount" value={s.spousePensionMonthly || 0} onChange={update("spousePensionMonthly")} prefix="$" step={100} hint="today's $, leave 0 if none" />
                   <NumInput label="Pension start age" value={s.spousePensionStartAge || s.pensionStartAge} onChange={update("spousePensionStartAge")} small />
                   {(s.spousePensionMonthly || 0) > 0 && (
-                    <div className="text-xs text-slate-600 flex justify-between pt-0.5">
+                    <div style={{ fontSize: "var(--step--2)", color: "var(--ink-2)", display: "flex", justifyContent: "space-between", paddingTop: 2 }}>
                       <span>Annual pension (today's $)</span>
-                      <span className="font-mono font-semibold">{fmtMoney((s.spousePensionMonthly || 0) * 12)}</span>
+                      <span className="mono" style={{ fontWeight: 600 }}>{fmtMoney((s.spousePensionMonthly || 0) * 12)}</span>
                     </div>
                   )}
                 </>
@@ -2183,14 +2087,14 @@ export default function FatFireCalculator() {
             </Section>
 
             <Section title="Windfalls" defaultOpen={false}>
-              <div className="text-xs text-slate-500 mb-2">Enter an expected lump sum (inheritance, property sale, RSU cliff, etc.). The model will recommend the optimal allocation to minimize your retirement age.</div>
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-1 pb-0.5">{s.yourName}</div>
+              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 8 }}>Enter an expected lump sum (inheritance, property sale, RSU cliff, etc.). The model will recommend the optimal allocation to minimize your retirement age.</div>
+              <div className="ob-person-label">{s.yourName}</div>
               <NumInput label="Windfall amount" value={s.yourWindfallAmount} onChange={update("yourWindfallAmount")} prefix="$" step={25000} />
               <NumInput label={`${s.yourName}'s age at receipt`} value={s.yourWindfallAge} onChange={update("yourWindfallAge")} small />
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 pb-0.5">{s.spouseName}</div>
+              <div className="ob-person-label" style={{ paddingTop: 8 }}>{s.spouseName}</div>
               <NumInput label="Windfall amount" value={s.spouseWindfallAmount} onChange={update("spouseWindfallAmount")} prefix="$" step={25000} />
               <NumInput label={`${s.spouseName}'s age at receipt`} value={s.spouseWindfallAge} onChange={update("spouseWindfallAge")} small />
-              <div className="text-xs text-slate-400 mt-2">Windfall does not alter the main simulation — recommendations appear below.</div>
+              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 8 }}>Windfall does not alter the main simulation — recommendations appear below.</div>
             </Section>
 
             {/* Windfall advisor — inline below inputs */}
@@ -2201,49 +2105,49 @@ export default function FatFireCalculator() {
                 const best = alternatives[0];
                 return (
                   <div>
-                    <div className="text-xs font-semibold text-slate-700 mb-1">
+                    <div style={{ fontSize: "var(--step--2)", fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>
                       {label} — {fmtMoney(amount)} at age {age}
                     </div>
-                    <div className="text-xs text-slate-500 mb-2">
-                      Base (no windfall): retire age <span className="font-semibold">{base.age ?? "—"}</span>,
-                      portfolio <span className="font-semibold">{fmtMoney(base.portfolioAtRetirement)}</span>
+                    <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 8 }}>
+                      Base (no windfall): retire age <span style={{ fontWeight: 600 }}>{base.age ?? "—"}</span>,
+                      portfolio <span style={{ fontWeight: 600 }}>{fmtMoney(base.portfolioAtRetirement)}</span>
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
+                      <table className="dd-table">
                         <thead>
-                          <tr className="bg-slate-50 border-b border-slate-200">
-                            <th className="px-2 py-1.5 text-left font-semibold text-slate-600">Allocation</th>
-                            <th className="px-2 py-1.5 text-right font-semibold text-slate-600">Retire age</th>
-                            <th className="px-2 py-1.5 text-right font-semibold text-slate-600">vs. base</th>
-                            <th className="px-2 py-1.5 text-right font-semibold text-slate-600">Portfolio</th>
-                            <th className="px-2 py-1.5 text-right font-semibold text-slate-600">vs. base</th>
+                          <tr >
+                            <th style={{ textAlign: "left" }}>Allocation</th>
+                            <th >Retire age</th>
+                            <th >vs. base</th>
+                            <th >Portfolio</th>
+                            <th >vs. base</th>
                           </tr>
                         </thead>
                         <tbody>
                           {alternatives.map((a, i) => {
                             const isBest = i === 0;
                             return (
-                              <tr key={a.label} className={"border-t border-slate-100 " + (isBest ? "bg-emerald-50" : "")}>
-                                <td className="px-2 py-1.5">
-                                  <div className="font-semibold">
-                                    {isBest && <span className="text-emerald-600 mr-1">★</span>}
+                              <tr key={a.label} className={"" + (isBest ? "is-active" : "")}>
+                                <td style={{ padding: "6px 8px" }}>
+                                  <div style={{ fontWeight: 600 }}>
+                                    {isBest && <span style={{ color: "var(--accent)", marginRight: 4 }}>★</span>}
                                     {a.label}
                                   </div>
-                                  <div className="text-slate-400 text-xs leading-tight">{a.description}</div>
+                                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", lineHeight: 1.4 }}>{a.description}</div>
                                 </td>
-                                <td className="px-2 py-1.5 text-right font-mono">{a.age ?? "—"}</td>
-                                <td className="px-2 py-1.5 text-right font-mono">
+                                <td style={{ padding: "6px 8px", textAlign: "right", fontFamily: "var(--font-mono)" }}>{a.age ?? "—"}</td>
+                                <td style={{ padding: "6px 8px", textAlign: "right", fontFamily: "var(--font-mono)" }}>
                                   {a.ageDiff === null ? "—" : a.ageDiff === 0
-                                    ? <span className="text-slate-400">—</span>
-                                    : <span className={a.ageDiff < 0 ? "text-emerald-600 font-semibold" : "text-red-500"}>
+                                    ? <span style={{ color: "var(--ink-3)" }}>—</span>
+                                    : <span style={{ color: a.ageDiff < 0 ? "var(--accent-deep)" : "var(--slate)", fontWeight: a.ageDiff < 0 ? 600 : 400 }}>
                                         {a.ageDiff > 0 ? "+" : ""}{a.ageDiff}yr
                                       </span>
                                   }
                                 </td>
-                                <td className="px-2 py-1.5 text-right font-mono">{fmtMoney(a.portfolioAtRetirement)}</td>
-                                <td className="px-2 py-1.5 text-right font-mono">
+                                <td style={{ padding: "6px 8px", textAlign: "right", fontFamily: "var(--font-mono)" }}>{fmtMoney(a.portfolioAtRetirement)}</td>
+                                <td style={{ padding: "6px 8px", textAlign: "right", fontFamily: "var(--font-mono)" }}>
                                   {a.portDiff === null ? "—" : (
-                                    <span className={a.portDiff >= 0 ? "text-emerald-600" : "text-red-500"}>
+                                    <span style={{ color: a.portDiff >= 0 ? "var(--accent-deep)" : "var(--slate)" }}>
                                       {a.portDiff >= 0 ? "+" : ""}{fmtMoney(a.portDiff)}
                                     </span>
                                   )}
@@ -2254,10 +2158,10 @@ export default function FatFireCalculator() {
                         </tbody>
                       </table>
                     </div>
-                    <div className="mt-1.5 text-xs text-slate-500">
-                      ★ Recommended: <span className="font-semibold text-emerald-700">{best.label}</span>
+                    <div style={{ marginTop: 6, fontSize: "var(--step--2)", color: "var(--ink-3)" }}>
+                      ★ Recommended: <span style={{ fontWeight: 600, color: "var(--moss-ink)" }}>{best.label}</span>
                       {best.ageDiff !== null && best.ageDiff < 0 && (
-                        <span> — retires <span className="font-semibold">{Math.abs(best.ageDiff)} yr{Math.abs(best.ageDiff) !== 1 ? "s" : ""} earlier</span></span>
+                        <span> — retires <span style={{ fontWeight: 600 }}>{Math.abs(best.ageDiff)} yr{Math.abs(best.ageDiff) !== 1 ? "s" : ""} earlier</span></span>
                       )}
                       {best.ageDiff === 0 && <span> — same retirement age, largest portfolio</span>}
                     </div>
@@ -2266,12 +2170,12 @@ export default function FatFireCalculator() {
               }
 
               return (
-                <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3">
-                  <div className="text-sm font-semibold text-slate-800 mb-1">Windfall Allocation Advisor</div>
-                  <div className="text-xs text-slate-500 mb-3">
+                <div className="dash-panel">
+                  <div style={{ fontSize: "var(--step-0)", fontWeight: 600, color: "var(--ink)", marginBottom: 6 }}>Windfall Allocation Advisor</div>
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 12 }}>
                     ★ = option that minimises retirement age. Ties broken by largest portfolio. Not included in main simulation.
                   </div>
-                  <div className="space-y-5">
+                  <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                     <WindfallTable advice={yourWindfallAdvice}   label={`${s.yourName}'s windfall`}   age={s.yourWindfallAge}   amount={s.yourWindfallAmount} />
                     <WindfallTable advice={spouseWindfallAdvice} label={`${s.spouseName}'s windfall`} age={s.spouseWindfallAge} amount={s.spouseWindfallAmount} />
                   </div>
@@ -2290,178 +2194,170 @@ export default function FatFireCalculator() {
           </div>
 
           {/* ── Results panel ── */}
-          <div className="col-span-12 lg:col-span-8 space-y-3">
+          <div className="dash-results">
 
-            {/* Dashboard cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4 md:col-span-2">
-                <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">Earliest sustainable retirement age</div>
+            {/* ── Hero: FI age ── */}
+            <div className="dash-hero">
+              <div className="dash-hero__moment dot-bg">
+                <div className="label-xs">Your path crosses independence at</div>
                 {solved.age !== null ? (() => {
                   const retRow = solved.rows.find(r => r.age === solved.age);
                   const portfolioAtRetirement = retRow ? retRow.endTotal / retRow.infFactor : null;
-                  // Per-person retirement ages — offset from household retirement year
                   const yourRetireAge = solved.age;
                   const spouseRetireAge = solved.age + (s.spouseCurrentAge - s.currentAge);
                   return (
-                    <div>
-                      <div className="flex items-baseline gap-4 flex-wrap">
-                        <div className="text-5xl font-bold text-emerald-700">{solved.age}</div>
-                        <div className="text-sm text-slate-700">
-                          <div>{solved.age - s.currentAge} year{solved.age - s.currentAge === 1 ? "" : "s"} away.</div>
-                          <div className="text-slate-600">
-                            Portfolio reaches{" "}
-                            <span className="font-semibold">{fmtMoney(solved.terminalBal / Math.pow(1 + s.inflation, s.deathAge - s.currentAge))}</span>{" "}
-                            at age {s.deathAge} (today's $). Target: {fmtMoney(s.terminalTargetToday)}.
+                    <>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
+                        <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 100, lineHeight: 0.9, letterSpacing: "-0.04em", color: "var(--accent-deep)" }}>
+                          {solved.age}
+                        </div>
+                        <div style={{ fontSize: "var(--step-1)", color: "var(--ink-2)", maxWidth: 220 }}>
+                          <span className="mono">{solved.age - s.currentAge}</span> year{solved.age - s.currentAge === 1 ? "" : "s"} from today.
+                          <div style={{ color: "var(--ink-3)", fontSize: "var(--step--1)", marginTop: 4 }}>
+                            {s.yourName} age {yourRetireAge} · {s.spouseName} age {spouseRetireAge}
                           </div>
-                        </div>
-                      </div>
-                      <div className="mt-2 flex gap-4 text-sm flex-wrap">
-                        <div className="flex items-baseline gap-1.5">
-                          <span className="text-xs text-slate-500">{s.yourName}:</span>
-                          <span className="font-semibold text-emerald-700">age {yourRetireAge}</span>
-                          <span className="text-xs text-slate-400">({yourRetireAge - s.currentAge} yrs)</span>
-                        </div>
-                        <div className="flex items-baseline gap-1.5">
-                          <span className="text-xs text-slate-500">{s.spouseName}:</span>
-                          <span className="font-semibold text-emerald-700">age {spouseRetireAge}</span>
-                          <span className="text-xs text-slate-400">({spouseRetireAge - s.spouseCurrentAge} yrs)</span>
                         </div>
                       </div>
                       {portfolioAtRetirement !== null && (
-                        <div className="mt-3 pt-3 border-t border-slate-100 flex items-baseline gap-3">
-                          <div>
-                            <div className="text-xs uppercase tracking-wide text-slate-500 mb-0.5">Portfolio at retirement</div>
-                            <div className="text-2xl font-bold text-slate-700">{fmtMoney(portfolioAtRetirement)}</div>
-                          </div>
-                          <div className="text-xs text-slate-500">(today's $, end of age {solved.age})</div>
+                        <div style={{ marginTop: 16, display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                          <span className="label-xs">Portfolio at retirement</span>
+                          <span className="mono" style={{ fontSize: "var(--step-2)", color: "var(--ink)", fontWeight: 500 }}>{fmtMoney(portfolioAtRetirement)}</span>
+                          <span style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>today's $</span>
                         </div>
                       )}
-                    </div>
+                      <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <span className="chip chip--sun">Fat FIRE</span>
+                        {s.partnered !== false && <span className="chip">Partnered</span>}
+                        <span className="chip">RRSP-first drawdown</span>
+                      </div>
+                    </>
                   );
                 })() : (
-                  <div>
-                    <div className="text-3xl font-bold text-red-600">Not reachable</div>
-                    <div className="text-sm text-slate-600">No retirement age draws the portfolio down to {fmtMoney(s.terminalTargetToday)} (today's $) by age {s.deathAge} while covering all spending.</div>
-                  </div>
+                  <>
+                    <div style={{ fontSize: "var(--step-5)", fontWeight: 700, color: "var(--slate)", marginTop: 12 }}>Not reachable</div>
+                    <div style={{ fontSize: "var(--step--1)", color: "var(--ink-3)", marginTop: 8 }}>
+                      No retirement age draws the portfolio down to {fmtMoney(s.terminalTargetToday)} (today's $) by age {s.deathAge} while covering all spending.
+                    </div>
+                  </>
                 )}
               </div>
-              <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
-                <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">Mortgage payoff</div>
-                {isFinite(mortgagePayoff) ? (
-                  <>
-                    <div className="text-3xl font-bold text-slate-800">age {mortgagePayoff}</div>
-                    <div className="text-xs text-slate-500 mt-1 flex gap-3 flex-wrap">
-                      <span>{s.yourName}: <span className="font-semibold text-slate-700">age {mortgagePayoff}</span></span>
-                      <span>{s.spouseName}: <span className="font-semibold text-slate-700">age {mortgagePayoff + (s.spouseCurrentAge - s.currentAge)}</span></span>
-                    </div>
-                    <div className="text-xs text-slate-600 mt-1">
-                      {mortgagePayoff - s.currentAge} yrs ({Math.round(solved.mortgagePayoffMonths)} mo).
-                    </div>
-                    <div className="text-xs text-slate-600 mt-0.5">
-                      Retirement spend drops from{" "}
-                      <span className="font-mono">{fmtMoney(grandAnnual + (inputs.retirementSpendDelta || 0))}</span> →{" "}
-                      <span className="font-mono">{fmtMoney(grandAnnual + (inputs.retirementSpendDelta || 0) - s.mortgage * 12)}</span>/yr after payoff.
-                    </div>
-                    {yearsSaved > 0 && (
-                      <div className="text-xs text-emerald-700 mt-1 font-semibold">
-                        Extra ${s.extraMortgagePayment.toLocaleString()}/mo saves {yearsSaved} yr{yearsSaved !== 1 ? "s" : ""}.
+
+              <div className="dash-hero__aside">
+                <div className="mini-stat">
+                  <div className="label-xs">Mortgage-free</div>
+                  {isFinite(mortgagePayoff) ? (
+                    <>
+                      <div className="mono" style={{ fontSize: "var(--step-3)", fontWeight: 500, marginTop: 6 }}>age {mortgagePayoff}</div>
+                      <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 4 }}>
+                        {mortgagePayoff - s.currentAge} yrs · {Math.round(solved.mortgagePayoffMonths)} mo
+                        {yearsSaved > 0 && <span style={{ color: "var(--moss-ink)", marginLeft: 6 }}>+${s.extraMortgagePayment.toLocaleString()}/mo saves {yearsSaved}yr</span>}
                       </div>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="text-lg font-bold text-red-600">Never</div>
-                    <div className="text-xs text-slate-600">Payment doesn't cover interest.</div>
-                  </>
-                )}
+                    </>
+                  ) : (
+                    <div className="mono" style={{ fontSize: "var(--step-2)", fontWeight: 500, marginTop: 6, color: "var(--slate)" }}>Never</div>
+                  )}
+                </div>
+                <div className="mini-stat">
+                  <div className="label-xs">Annual spend in retirement</div>
+                  <div className="mono" style={{ fontSize: "var(--step-3)", fontWeight: 500, marginTop: 6 }}>
+                    {fmtMoney(grandAnnual + (inputs.retirementSpendDelta || 0))}<span style={{ fontSize: "var(--step--1)", color: "var(--ink-3)", fontWeight: 400 }}>/yr</span>
+                  </div>
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 4 }}>
+                    drops to {fmtMoney(grandAnnual + (inputs.retirementSpendDelta || 0) - s.mortgage * 12)}/yr after mortgage
+                  </div>
+                </div>
+                <div className="mini-stat">
+                  <div className="label-xs">Terminal portfolio target</div>
+                  <div className="mono" style={{ fontSize: "var(--step-3)", fontWeight: 500, marginTop: 6 }}>{fmtMoney(s.terminalTargetToday)}</div>
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 4 }}>at age {s.deathAge} · today's $</div>
+                </div>
               </div>
             </div>
 
-            {/* Drawdown strategy legend */}
-            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
-              <div className="text-sm font-semibold text-slate-800 mb-2">Drawdown Strategy — Canadian Tax-Optimized</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            {/* ── Drawdown strategy ── */}
+            <div className="dash-panel">
+              <div className="dash-panel__head">
                 <div>
-                  <div className="font-semibold text-amber-700 mb-1">Phase 1: FAT FIRE → 65 (lowest-tax window)</div>
-                  <div className="space-y-0.5 text-slate-700">
-                    <div>① <strong>RRSP first</strong> — draw down before CPP/OAS arrives</div>
-                    <div>② Non-registered — capital gains only 50% taxable</div>
-                    <div>③ TFSA last — preserve the tax-free shield</div>
-                  </div>
-                  <div className="text-slate-500 mt-1">Uses the lowest-tax window to deplete RRSP before forced RRIF withdrawals and guaranteed income stack up.</div>
+                  <div className="label-xs">Canadian tax-optimized</div>
+                  <h3 style={{ fontSize: "var(--step-2)", fontWeight: 600, marginTop: 4 }}>RRSP-first meltdown.</h3>
                 </div>
-                <div>
-                  <div className="font-semibold text-blue-700 mb-1">Phase 2: 65+ (CPP / OAS / Pension in play)</div>
-                  <div className="space-y-0.5 text-slate-700">
-                    <div>① <strong>RRSP/RRIF</strong> — mandatory minimums enforced at 71+</div>
-                    <div>② RRIF surplus above spending → TFSA → Non-reg</div>
-                    <div>③ Remaining gap → Non-reg → <strong>TFSA</strong> (OAS clawback shield)</div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16 }}>
+                <div style={{ padding: "14px 16px", background: "var(--sun-soft)", borderRadius: "var(--r-3)", border: "1px solid oklch(88% 0.08 70)" }}>
+                  <div style={{ fontWeight: 600, fontSize: "var(--step--1)", color: "var(--sun-ink)", marginBottom: 8 }}>Phase 1 · FAT FIRE → 65</div>
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-2)", lineHeight: 1.7 }}>
+                    ① RRSP first — lowest-tax window<br/>
+                    ② Non-registered — 50% cap gains inclusion<br/>
+                    ③ TFSA last — preserve tax-free shield
                   </div>
-                  <div className="text-slate-500 mt-1">OAS clawback ~$95k/person (2026). TFSA fills gaps tax-free.</div>
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 6, lineHeight: 1.5 }}>Depletes RRSP before forced RRIF withdrawals.</div>
+                </div>
+                <div style={{ padding: "14px 16px", background: "var(--dusk-soft)", borderRadius: "var(--r-3)", border: "1px solid oklch(88% 0.04 235)" }}>
+                  <div style={{ fontWeight: 600, fontSize: "var(--step--1)", color: "var(--dusk-ink)", marginBottom: 8 }}>Phase 2 · 65+ CPP/OAS/Pension</div>
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-2)", lineHeight: 1.7 }}>
+                    ① RRSP/RRIF — mandatory minimums at 71+<br/>
+                    ② RRIF surplus → TFSA → Non-reg<br/>
+                    ③ Gap → Non-reg → TFSA (OAS clawback shield)
+                  </div>
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 6, lineHeight: 1.5 }}>OAS clawback ~$95k/person (2026).</div>
                 </div>
               </div>
               {s.pensionMonthly > 0 && (
-                <div className="mt-2 pt-2 border-t border-slate-100 text-xs text-slate-700">
-                  <span className="font-semibold text-emerald-700">DB Pension:</span>{" "}
-                  {fmtMoney(s.pensionMonthly)}/mo starting at age {s.pensionStartAge} reduces portfolio withdrawal pressure.
-                  Pension + CPP combined = {fmtMoney((s.pensionMonthly * 12 + s.cppAmountToday))} /yr (today's $) from age {Math.max(s.pensionStartAge, s.cppStartAge)}.
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)", fontSize: "var(--step--1)", color: "var(--ink-2)" }}>
+                  <span style={{ fontWeight: 600, color: "var(--moss-ink)" }}>DB Pension:</span>{" "}
+                  {fmtMoney(s.pensionMonthly)}/mo from age {s.pensionStartAge}. Combined with CPP: {fmtMoney(s.pensionMonthly * 12 + s.cppAmountToday)}/yr today's $.
                 </div>
               )}
             </div>
 
-            {/* Scenario comparison */}
+            {/* ── Scenario pressure test ── */}
             {(() => {
               const base = scenarios.find(sc => sc.label === "Base");
               return (
-                <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
-                  <div className="text-sm font-semibold text-slate-800 mb-3">Scenario Pressure Test</div>
-                  <div className="grid grid-cols-3 gap-3">
+                <div className="dash-panel">
+                  <div className="dash-panel__head">
+                    <div>
+                      <div className="label-xs">Pressure test</div>
+                      <h3 style={{ fontSize: "var(--step-2)", fontWeight: 600, marginTop: 4 }}>What if markets disappoint?</h3>
+                    </div>
+                  </div>
+                  <div className="dash-scenario-grid">
                     {scenarios.map(sc => {
-                      const ageDiff = base && base.age !== null && sc.age !== null
-                        ? sc.age - base.age : null;
-                      const portDiff = base && base.portfolioAtRetirement !== null && sc.portfolioAtRetirement !== null
-                        ? sc.portfolioAtRetirement - base.portfolioAtRetirement : null;
+                      const ageDiff = base && base.age !== null && sc.age !== null ? sc.age - base.age : null;
+                      const portDiff = base && base.portfolioAtRetirement !== null && sc.portfolioAtRetirement !== null ? sc.portfolioAtRetirement - base.portfolioAtRetirement : null;
                       const isBase = sc.label === "Base";
                       return (
-                        <div key={sc.label} className={"rounded-lg border p-3 " + (isBase ? "border-slate-300 bg-slate-50" : "border-slate-200")}>
-                          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">{sc.label}</div>
-                          <div className="text-xs text-slate-500 mb-2">{(sc.return * 100).toFixed(1)}% return · {(sc.inflation * 100).toFixed(1)}% inflation</div>
-                          <div className="mb-2">
-                            <div className="text-xs text-slate-500">Retirement age</div>
-                            {sc.age !== null ? (
-                              <div className="flex items-baseline gap-1.5 flex-wrap">
-                                <span className={"text-2xl font-bold " + sc.color}>{sc.age}</span>
-                                {!isBase && ageDiff !== null && (
-                                  <span className={"text-sm font-semibold " + (ageDiff > 0 ? "text-red-500" : "text-emerald-600")}>
-                                    {ageDiff > 0 ? "+" : ""}{ageDiff} yr{Math.abs(ageDiff) !== 1 ? "s" : ""}
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-sm font-bold text-red-600">Not reachable</span>
-                            )}
-                          </div>
-                          <div>
-                            <div className="text-xs text-slate-500">Portfolio at retirement</div>
-                            {sc.portfolioAtRetirement !== null ? (
-                              <div className="flex items-baseline gap-1.5 flex-wrap">
-                                <span className="text-sm font-semibold text-slate-700">{fmtMoney(sc.portfolioAtRetirement)}</span>
-                                {!isBase && portDiff !== null && (
-                                  <span className={"text-xs font-semibold " + (portDiff < 0 ? "text-red-500" : "text-emerald-600")}>
-                                    {portDiff > 0 ? "+" : ""}{fmtMoney(portDiff)}
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-xs text-slate-500">—</span>
-                            )}
-                          </div>
+                        <div key={sc.label} className={"scen-card" + (isBase ? " is-active" : "")}>
+                          <div className="label-xs">{sc.label}</div>
+                          <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", margin: "4px 0 8px" }}>{(sc.return * 100).toFixed(1)}% ret · {(sc.inflation * 100).toFixed(1)}% inf</div>
+                          {sc.age !== null ? (
+                            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                              <div className="mono" style={{ fontSize: "var(--step-3)", fontWeight: 500, color: isBase ? "var(--accent)" : "var(--ink)" }}>{sc.age}</div>
+                              {!isBase && ageDiff !== null && (
+                                <div className="mono" style={{ fontSize: "var(--step--1)", color: ageDiff > 0 ? "var(--slate-ink)" : "var(--moss-ink)" }}>
+                                  {ageDiff > 0 ? "+" : ""}{ageDiff}y
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: "var(--step-0)", fontWeight: 600, color: "var(--slate)" }}>—</div>
+                          )}
+                          {sc.portfolioAtRetirement !== null && (
+                            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 4 }}>
+                              {fmtMoney(sc.portfolioAtRetirement)}
+                              {!isBase && portDiff !== null && (
+                                <span style={{ marginLeft: 4, color: portDiff < 0 ? "var(--slate-ink)" : "var(--moss-ink)" }}>
+                                  {portDiff > 0 ? "+" : ""}{fmtMoney(portDiff)}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
                   </div>
-                  <div className="mt-2 text-xs text-slate-500">
-                    All other inputs held constant. Differences shown relative to Base scenario.
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 12 }}>
+                    All other inputs held constant. Differences relative to Base.
                   </div>
                 </div>
               );
@@ -2471,66 +2367,61 @@ export default function FatFireCalculator() {
             {(() => {
               const base = mortgageSensitivity[0]; // $0 extra
               return (
-                <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
-                  <div className="text-sm font-semibold text-slate-800 mb-1">Mortgage Extra-Payment Sensitivity</div>
-                  <div className="text-xs text-slate-500 mb-3">
-                    Each extra $/mo accelerates payoff and reduces retirement spend, but also reduces annual contributions. Shows the net effect on retirement age and portfolio size.
+                <div className="dash-panel">
+                  <div className="dash-panel__head">
+                    <div>
+                      <div className="label-xs">Mortgage accelerator</div>
+                      <h3 style={{ fontSize: "var(--step-2)", fontWeight: 600, marginTop: 4 }}>Extra payment sensitivity.</h3>
+                    </div>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
+                  <p style={{ fontSize: "var(--step--1)", color: "var(--ink-3)", margin: "8px 0 14px", lineHeight: 1.5 }}>
+                    Each extra $/mo accelerates payoff and reduces retirement spend, but also reduces contributions. Net effect on retirement age and portfolio:
+                  </p>
+                  <div style={{ overflowX: "auto" }}>
+                    <table className="dd-table">
                       <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="px-3 py-2 text-left font-semibold text-slate-600">Extra / mo</th>
-                          <th className="px-3 py-2 text-left font-semibold text-slate-600">Extra / yr</th>
-                          <th className="px-3 py-2 text-left font-semibold text-slate-600">Mortgage payoff</th>
-                          <th className="px-3 py-2 text-left font-semibold text-slate-600">Retire age</th>
-                          <th className="px-3 py-2 text-right font-semibold text-slate-600">vs. $0 extra</th>
-                          <th className="px-3 py-2 text-right font-semibold text-slate-600">Portfolio at retirement</th>
-                          <th className="px-3 py-2 text-right font-semibold text-slate-600">vs. $0 extra</th>
+                        <tr>
+                          <th style={{ textAlign: "left" }}>Extra / mo</th>
+                          <th style={{ textAlign: "left" }}>Contrib lost</th>
+                          <th style={{ textAlign: "left" }}>Payoff</th>
+                          <th style={{ textAlign: "left" }}>Retire age</th>
+                          <th>vs. $0</th>
+                          <th>Portfolio</th>
+                          <th>vs. $0</th>
                         </tr>
                       </thead>
                       <tbody>
                         {mortgageSensitivity.map((row, i) => {
                           const isActive = row.extra === s.extraMortgagePayment;
-                          const ageDiff = base.retirementAge !== null && row.retirementAge !== null
-                            ? row.retirementAge - base.retirementAge : null;
-                          const portDiff = base.portfolioAtRetirement !== null && row.portfolioAtRetirement !== null
-                            ? row.portfolioAtRetirement - base.portfolioAtRetirement : null;
+                          const ageDiff = base.retirementAge !== null && row.retirementAge !== null ? row.retirementAge - base.retirementAge : null;
+                          const portDiff = base.portfolioAtRetirement !== null && row.portfolioAtRetirement !== null ? row.portfolioAtRetirement - base.portfolioAtRetirement : null;
                           return (
-                            <tr key={row.extra} className={"border-t border-slate-100 " + (isActive ? "bg-amber-50 font-semibold" : i % 2 === 0 ? "" : "bg-slate-50/50")}>
-                              <td className="px-3 py-2 font-mono">
-                                {isActive && <span className="mr-1 text-amber-600">▶</span>}
+                            <tr key={row.extra} className={isActive ? "is-retire" : i % 2 !== 0 ? "is-decum" : ""}>
+                              <td style={{ textAlign: "left", fontFamily: "var(--font-mono)" }}>
+                                {isActive && <span style={{ color: "var(--accent)", marginRight: 4 }}>▶</span>}
                                 ${row.extra.toLocaleString()}
                               </td>
-                              <td className="px-3 py-2 font-mono text-rose-600">
+                              <td style={{ textAlign: "left", fontFamily: "var(--font-mono)", color: "var(--slate-ink)" }}>
                                 {row.extra > 0 ? `−${fmtMoney(row.extra * 12)}` : "—"}
                               </td>
-                              <td className="px-3 py-2 font-mono">
+                              <td style={{ textAlign: "left", fontFamily: "var(--font-mono)" }}>
                                 {isFinite(row.payoffAge) ? `age ${row.payoffAge}` : "never"}
                               </td>
-                              <td className="px-3 py-2 font-mono">
+                              <td style={{ textAlign: "left", fontFamily: "var(--font-mono)" }}>
                                 {row.retirementAge !== null ? row.retirementAge : "—"}
                               </td>
-                              <td className="px-3 py-2 text-right font-mono">
-                                {i === 0 ? (
-                                  <span className="text-slate-400">baseline</span>
-                                ) : ageDiff !== null ? (
-                                  <span className={ageDiff < 0 ? "text-emerald-600 font-semibold" : ageDiff > 0 ? "text-red-500" : "text-slate-400"}>
-                                    {ageDiff === 0 ? "no change" : (ageDiff > 0 ? "+" : "") + ageDiff + " yr" + (Math.abs(ageDiff) !== 1 ? "s" : "")}
-                                  </span>
-                                ) : "—"}
+                              <td>
+                                {i === 0 ? <span style={{ color: "var(--ink-3)" }}>base</span>
+                                  : ageDiff !== null ? <span style={{ color: ageDiff < 0 ? "var(--moss-ink)" : ageDiff > 0 ? "var(--slate-ink)" : "var(--ink-3)" }}>
+                                    {ageDiff === 0 ? "—" : (ageDiff > 0 ? "+" : "") + ageDiff + "y"}
+                                  </span> : "—"}
                               </td>
-                              <td className="px-3 py-2 text-right font-mono">
-                                {row.portfolioAtRetirement !== null ? fmtMoney(row.portfolioAtRetirement) : "—"}
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono">
-                                {i === 0 ? (
-                                  <span className="text-slate-400">baseline</span>
-                                ) : portDiff !== null ? (
-                                  <span className={portDiff >= 0 ? "text-emerald-600" : "text-red-500"}>
+                              <td>{row.portfolioAtRetirement !== null ? fmtMoney(row.portfolioAtRetirement) : "—"}</td>
+                              <td>
+                                {i === 0 ? <span style={{ color: "var(--ink-3)" }}>base</span>
+                                  : portDiff !== null ? <span style={{ color: portDiff >= 0 ? "var(--moss-ink)" : "var(--slate-ink)" }}>
                                     {portDiff >= 0 ? "+" : ""}{fmtMoney(portDiff)}
-                                  </span>
-                                ) : "—"}
+                                  </span> : "—"}
                               </td>
                             </tr>
                           );
@@ -2538,202 +2429,167 @@ export default function FatFireCalculator() {
                       </tbody>
                     </table>
                   </div>
-                  <div className="mt-2 text-xs text-slate-500">
-                    Amber row = your current setting. Portfolio figures in today's dollars. All other inputs held constant.
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 8 }}>
+                    Highlighted row = your current setting. Portfolio in today's $.
                   </div>
                 </div>
               );
             })()}
 
-            {/* Monte Carlo */}
-            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
-              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            {/* ── Monte Carlo ── */}
+            <div className="dash-panel">
+              <div className="dash-panel__head">
                 <div>
-                  <div className="text-sm font-semibold text-slate-800">Monte Carlo Simulation</div>
-                  <div className="text-xs text-slate-500">1,000 random return paths · 14% annual volatility · retiring at age {solved.age ?? "—"}</div>
+                  <div className="label-xs">Monte Carlo · 1,000 paths</div>
+                  <h3 style={{ fontSize: "var(--step-2)", fontWeight: 600, marginTop: 4 }}>How sure can we be?</h3>
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 2 }}>14% annual volatility · retiring at age {solved.age ?? "—"}</div>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <label className="flex items-center gap-1.5 text-xs text-slate-600">
-                    <span>Target success rate</span>
-                    <div className="flex items-center gap-0.5">
-                      <input
-                        type="number"
-                        min={50} max={99} step={5}
-                        value={mcTargetRate}
-                        onChange={(e) => setMcTargetRate(parseFloat(e.target.value) || 80)}
-                        className="border border-slate-300 rounded px-2 py-1 text-right text-xs w-16"
-                      />
-                      <span className="text-slate-500">%</span>
-                    </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--step--1)", color: "var(--ink-2)" }}>
+                    Target
+                    <input
+                      type="number" min={50} max={99} step={5}
+                      value={mcTargetRate}
+                      onChange={(e) => setMcTargetRate(parseFloat(e.target.value) || 80)}
+                      style={{ width: 52, border: "1px solid var(--line)", borderRadius: "var(--r-1)", padding: "4px 6px", fontFamily: "var(--font-mono)", fontSize: "var(--step--1)", textAlign: "right", background: "var(--paper)", color: "var(--ink)" }}
+                    />
+                    <span style={{ color: "var(--ink-3)" }}>%</span>
                   </label>
-                  <button
-                    onClick={runMC}
-                    disabled={mcRunning || solved.age === null}
-                    className="px-3 py-1.5 text-xs font-semibold rounded bg-slate-800 text-white disabled:opacity-40 hover:bg-slate-700 transition-colors"
-                  >
+                  <button onClick={runMC} disabled={mcRunning || solved.age === null} className="btn btn--primary btn--sm" style={{ opacity: (mcRunning || solved.age === null) ? 0.4 : 1 }}>
                     {mcRunning ? "Running…" : mc ? "Re-run" : "Run simulation"}
                   </button>
                 </div>
               </div>
 
               {!mc && !mcRunning && (
-                <div className="text-xs text-slate-400 italic">
-                  Click "Run simulation" to stress-test your plan across 1,000 randomised market paths. Each path uses the same mean return as your base assumption but with realistic year-to-year volatility — capturing sequence-of-returns risk that the deterministic model misses.
-                </div>
+                <p style={{ fontSize: "var(--step--1)", color: "var(--ink-3)", marginTop: 12, lineHeight: 1.6 }}>
+                  Run 1,000 randomised market paths to stress-test your plan. Captures sequence-of-returns risk that the deterministic model misses.
+                </p>
               )}
-
-              {mcRunning && (
-                <div className="text-xs text-slate-500 italic">Running 1,000 simulations…</div>
-              )}
+              {mcRunning && <p style={{ fontSize: "var(--step--1)", color: "var(--ink-3)", marginTop: 12 }}>Running 1,000 simulations…</p>}
 
               {mc && (() => {
                 const pct = Math.round(mc.successRate * 100);
-                const barColor = pct >= 90 ? "bg-emerald-500" : pct >= 75 ? "bg-amber-400" : "bg-red-500";
-                const labelColor = pct >= 90 ? "text-emerald-700" : pct >= 75 ? "text-amber-600" : "text-red-600";
+                const ringColor = pct >= 90 ? "var(--accent)" : pct >= 75 ? "var(--sun)" : "var(--slate)";
+                const labelColor = pct >= 90 ? "var(--moss-ink)" : pct >= 75 ? "var(--sun-ink)" : "var(--slate-ink)";
                 return (
-                  <div className="space-y-4">
-                    {/* Success rate hero */}
-                    <div>
-                      <div className="flex items-baseline gap-2 mb-1">
-                        <span className={"text-4xl font-bold " + labelColor}>{pct}%</span>
-                        <span className="text-sm text-slate-600">of paths succeed</span>
-                        <span className="text-xs text-slate-400">(portfolio ≥ {fmtMoney(inputs.terminalTargetToday)} at age {s.deathAge})</span>
-                      </div>
-                      <div className="w-full bg-slate-100 rounded-full h-3">
-                        <div className={"h-3 rounded-full transition-all " + barColor} style={{ width: pct + "%" }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-slate-400 mt-0.5">
-                        <span>0%</span>
-                        <span className="text-amber-500">75% target</span>
-                        <span className="text-emerald-600">90% target</span>
-                        <span>100%</span>
-                      </div>
-                    </div>
-
-                    {/* Terminal balance distribution */}
-                    <div>
-                      <div className="text-xs font-semibold text-slate-600 mb-2">Terminal portfolio distribution at age {s.deathAge} (today's $)</div>
-                      <div className="grid grid-cols-5 gap-1.5 text-center">
-                        {[
-                          { label: "Worst 10%", val: mc.p10, color: "bg-red-50 border-red-200 text-red-700" },
-                          { label: "25th pct",  val: mc.p25, color: "bg-amber-50 border-amber-200 text-amber-700" },
-                          { label: "Median",    val: mc.p50, color: "bg-slate-50 border-slate-300 text-slate-800" },
-                          { label: "75th pct",  val: mc.p75, color: "bg-emerald-50 border-emerald-200 text-emerald-700" },
-                          { label: "Best 10%",  val: mc.p90, color: "bg-emerald-50 border-emerald-300 text-emerald-800" },
-                        ].map(({ label, val, color }) => (
-                          <div key={label} className={"rounded border px-1.5 py-2 " + color}>
-                            <div className="text-xs font-medium mb-1 leading-tight">{label}</div>
-                            <div className="text-sm font-bold font-mono leading-tight">{fmtMoney(val)}</div>
+                  <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div className="mc-grid">
+                      <div className="mc-ring-wrap">
+                        <div style={{ width: 140, height: 140, borderRadius: "50%", background: `conic-gradient(${ringColor} ${pct}%, var(--paper-3) 0)`, display: "grid", placeItems: "center", position: "relative" }}>
+                          <div style={{ position: "absolute", inset: 12, background: "var(--paper)", borderRadius: "50%" }} />
+                          <div style={{ position: "relative", zIndex: 1, textAlign: "center" }}>
+                            <div className="mono" style={{ fontSize: "var(--step-4)", fontWeight: 600, color: labelColor, lineHeight: 1 }}>{pct}</div>
+                            <div className="label-xs" style={{ marginTop: 2 }}>% succeed</div>
                           </div>
-                        ))}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        <div style={{ fontSize: "var(--step--1)", color: "var(--ink-2)", lineHeight: 1.6 }}>
+                          In <span className="mono">{pct}%</span> of simulated lifetimes, your portfolio ends above target at age {s.deathAge}. The other {100 - pct}% run out.
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6 }}>
+                          {[
+                            { l: "P10", v: mc.p10, tone: "slate" },
+                            { l: "P25", v: mc.p25, tone: "ink" },
+                            { l: "P50", v: mc.p50, tone: "ink" },
+                            { l: "P75", v: mc.p75, tone: "moss" },
+                            { l: "P90", v: mc.p90, tone: "moss" },
+                          ].map(p => (
+                            <div key={p.l} className="mc-pct">
+                              <div className="label-xs" style={{ fontSize: 10 }}>{p.l}</div>
+                              <div className="mono" style={{ fontSize: "var(--step--1)", fontWeight: 600, color: p.tone === "slate" ? "var(--slate-ink)" : p.tone === "moss" ? "var(--moss-ink)" : "var(--ink)", marginTop: 3 }}>{fmtMoney(p.v)}</div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Reverse solver result */}
                     {mcReverse && (
-                      <div className="bg-slate-50 rounded border border-slate-200 p-3">
-                        <div className="text-xs font-semibold text-slate-700 mb-1">
-                          Minimum portfolio for {mcTargetRate}% success rate
-                        </div>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-2xl font-bold text-slate-800">{fmtMoney(mcReverse.portfolio)}</span>
-                          <span className="text-xs text-slate-500">needed at retirement (age {solved.age})</span>
-                        </div>
-                        <div className="text-xs text-slate-500 mt-0.5">
-                          Achieved {Math.round(mcReverse.successRate * 100)}% success in verification run.
+                      <div style={{ padding: "14px 16px", background: "var(--paper-2)", borderRadius: "var(--r-3)", border: "1px solid var(--line)" }}>
+                        <div className="label-xs" style={{ marginBottom: 6 }}>Minimum portfolio for {mcTargetRate}% success</div>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+                          <span className="mono" style={{ fontSize: "var(--step-3)", fontWeight: 600 }}>{fmtMoney(mcReverse.portfolio)}</span>
+                          <span style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>needed at retirement (age {solved.age})</span>
                         </div>
                         {(() => {
                           const retRow = solved.rows && solved.age ? solved.rows.find(r => r.age === solved.age) : null;
-                          const projectedPortfolio = retRow ? retRow.endTotal / retRow.infFactor : null;
-                          if (projectedPortfolio !== null) {
-                            const gap = mcReverse.portfolio - projectedPortfolio;
-                            return (
-                              <div className={`text-xs mt-1 font-semibold ${gap > 0 ? "text-red-600" : "text-emerald-600"}`}>
-                                Your projected portfolio: {fmtMoney(projectedPortfolio)} →{" "}
-                                {gap > 0
-                                  ? `${fmtMoney(gap)} short of target`
-                                  : `${fmtMoney(-gap)} above target ✓`}
-                              </div>
-                            );
-                          }
-                          return null;
+                          const proj = retRow ? retRow.endTotal / retRow.infFactor : null;
+                          if (!proj) return null;
+                          const gap = mcReverse.portfolio - proj;
+                          return (
+                            <div style={{ fontSize: "var(--step--2)", marginTop: 6, fontWeight: 600, color: gap > 0 ? "var(--slate-ink)" : "var(--moss-ink)" }}>
+                              Your projection: {fmtMoney(proj)} → {gap > 0 ? `${fmtMoney(gap)} short` : `${fmtMoney(-gap)} above target ✓`}
+                            </div>
+                          );
                         })()}
                       </div>
                     )}
-
-                    <div className="text-xs text-slate-400">
-                      Returns drawn from a log-normal distribution (μ = {(inputs.investmentReturn * 100).toFixed(1)}% geometric mean, σ = 14%/yr). Inflation, spending, contributions and tax treatment are held at your base inputs. Re-run to get a fresh set of paths.
+                    <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", lineHeight: 1.5 }}>
+                      Log-normal returns (μ = {(inputs.investmentReturn * 100).toFixed(1)}%, σ = 14%/yr). Inflation, spending, contributions held constant.
                     </div>
                   </div>
                 );
               })()}
             </div>
 
-            {/* Year-by-year table */}
-            <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-              <div className="px-3 py-2 border-b border-slate-200 flex justify-between items-center text-sm">
-                <span className="font-semibold">Year-by-year projection</span>
-                <span className="text-slate-500 text-xs">Today's $ (real)</span>
+            {/* ── Year-by-year table ── */}
+            <div className="dash-panel" style={{ padding: 0, overflow: "hidden" }}>
+              <div className="dash-panel__head" style={{ padding: "14px 20px" }}>
+                <div>
+                  <div className="label-xs">Year-by-year projection</div>
+                  <h3 style={{ fontSize: "var(--step-1)", fontWeight: 600, marginTop: 4 }}>Every year on the trail.</h3>
+                </div>
+                <span style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>Today's $ · real</span>
               </div>
-              <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: "70vh" }}>
-                <table className="w-full text-xs">
-                  <thead className="bg-slate-100 sticky top-0">
+              <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "70vh" }}>
+                <table className="dd-table">
+                  <thead style={{ position: "sticky", top: 0 }}>
                     <tr>
-                      <th className="px-2 py-2 text-left font-semibold">Yr</th>
-                      <th className="px-2 py-2 text-left font-semibold">Age</th>
-                      <th className="px-2 py-2 text-left font-semibold">Phase</th>
-                      <th className="px-2 py-2 text-right font-semibold">RRSP</th>
-                      <th className="px-2 py-2 text-right font-semibold">TFSA</th>
-                      <th className="px-2 py-2 text-right font-semibold">Non-reg</th>
-                      <th className="px-2 py-2 text-right font-semibold">Total</th>
-                      <th className="px-2 py-2 text-right font-semibold">Contrib</th>
-                      <th className="px-2 py-2 text-right font-semibold">Withdraw</th>
-                      <th className="px-2 py-2 text-right font-semibold">Spend</th>
-                      <th className="px-2 py-2 text-right font-semibold">Guar. Income</th>
+                      <th style={{ textAlign: "left" }}>Yr</th>
+                      <th style={{ textAlign: "left" }}>Age</th>
+                      <th style={{ textAlign: "left" }}>Phase</th>
+                      <th>RRSP</th>
+                      <th>TFSA</th>
+                      <th>Non-reg</th>
+                      <th>Total</th>
+                      <th>Contrib</th>
+                      <th>Withdraw</th>
+                      <th>Spend</th>
+                      <th>Guar. Income</th>
                     </tr>
                   </thead>
                   <tbody>
                     {displayRows.map((r) => {
                       const isRetYr = r.age === solved.age;
                       const isDecum = r.phase === "decum";
-                      const rowClass = isRetYr
-                        ? "bg-amber-50 font-semibold"
-                        : isDecum
-                        ? "bg-slate-50"
-                        : "";
                       const combinedIncome = r.cppDisp + r.pensionDisp + (r.oasDisp || 0);
                       const incomeTooltip = [
-                        r.cppDisp > 0    ? `CPP: ${fmtMoney(r.cppDisp)}` : null,
+                        r.cppDisp > 0 ? `CPP: ${fmtMoney(r.cppDisp)}` : null,
                         r.pensionDisp > 0 ? `Pension: ${fmtMoney(r.pensionDisp)}` : null,
-                        r.oasDisp > 0    ? `OAS: ${fmtMoney(r.oasDisp)}${r.oasClawbackDisp > 0 ? ` (clawback: −${fmtMoney(r.oasClawbackDisp)})` : ""}` : null,
+                        r.oasDisp > 0 ? `OAS: ${fmtMoney(r.oasDisp)}${r.oasClawbackDisp > 0 ? ` (clawback: −${fmtMoney(r.oasClawbackDisp)})` : ""}` : null,
                       ].filter(Boolean).join(" · ");
                       return (
-                        <tr key={r.t} className={"border-t border-slate-100 " + rowClass}>
-                          <td className="px-2 py-1 text-left">{r.year}</td>
-                          <td className="px-2 py-1 text-left whitespace-nowrap">{r.age}/{r.spouseAge}</td>
-                          <td className="px-2 py-1 text-left">
+                        <tr key={r.t} className={isRetYr ? "is-retire" : isDecum ? "is-decum" : ""}>
+                          <td style={{ textAlign: "left", fontFamily: "var(--font-ui)" }}>{r.year}</td>
+                          <td style={{ textAlign: "left", fontFamily: "var(--font-ui)", whiteSpace: "nowrap" }}>{r.age}/{r.spouseAge}</td>
+                          <td style={{ textAlign: "left", fontFamily: "var(--font-ui)" }}>
                             {isDecum ? (
-                              <span className={r.drawdownPhase === "Phase 1" ? "text-amber-600" : "text-blue-600"}>
+                              <span style={{ color: r.drawdownPhase === "Phase 1" ? "var(--sun-ink)" : "var(--dusk-ink)" }}>
                                 {r.drawdownPhase}
                               </span>
                             ) : "—"}
                           </td>
-                          <td className="px-2 py-1 text-right font-mono">{fmtMoney(r.rrspDisp)}</td>
-                          <td className="px-2 py-1 text-right font-mono">{fmtMoney(r.tfsaDisp)}</td>
-                          <td className="px-2 py-1 text-right font-mono">{fmtMoney(r.nrDisp)}</td>
-                          <td className={"px-2 py-1 text-right font-mono font-semibold " + (r.endTotal <= 0 ? "text-red-600" : "text-slate-800")}>
-                            {fmtMoney(r.endDisp)}
-                          </td>
-                          <td className="px-2 py-1 text-right font-mono text-emerald-700">
-                            {r.totalContrib > 0 ? fmtMoney(r.contribDisp) : "—"}
-                          </td>
-                          <td className="px-2 py-1 text-right font-mono text-rose-700">
-                            {r.totalWd > 0 ? fmtMoney(r.wdDisp) : "—"}
-                          </td>
-                          <td className="px-2 py-1 text-right font-mono">{fmtMoney(r.spendDisp)}</td>
-                          <td className="px-2 py-1 text-right font-mono">
+                          <td>{fmtMoney(r.rrspDisp)}</td>
+                          <td>{fmtMoney(r.tfsaDisp)}</td>
+                          <td>{fmtMoney(r.nrDisp)}</td>
+                          <td style={{ fontWeight: 600, color: r.endTotal <= 0 ? "var(--slate)" : "var(--ink)" }}>{fmtMoney(r.endDisp)}</td>
+                          <td style={{ color: "var(--moss-ink)" }}>{r.totalContrib > 0 ? fmtMoney(r.contribDisp) : "—"}</td>
+                          <td style={{ color: "var(--slate-ink)" }}>{r.totalWd > 0 ? fmtMoney(r.wdDisp) : "—"}</td>
+                          <td>{fmtMoney(r.spendDisp)}</td>
+                          <td>
                             {combinedIncome > 0
-                              ? <span title={incomeTooltip} className="cursor-help border-b border-dotted border-slate-400">{fmtMoney(combinedIncome)}</span>
+                              ? <span title={incomeTooltip} style={{ cursor: "help", borderBottom: "1px dotted var(--line-strong)" }}>{fmtMoney(combinedIncome)}</span>
                               : "—"}
                           </td>
                         </tr>
@@ -2742,34 +2598,27 @@ export default function FatFireCalculator() {
                   </tbody>
                 </table>
               </div>
-              <div className="px-3 py-2 text-xs text-slate-500 border-t border-slate-200 flex gap-4 flex-wrap">
-                <span>Amber row = solved retirement year.</span>
-                <span>Light grey = retirement years.</span>
-                <span className="text-amber-600">Phase 1 = RRSP-first (pre-65).</span>
-                <span className="text-blue-600">Phase 2 = CPP/OAS years (65+).</span>
-                <span className="text-emerald-700">Green = contributions.</span>
-                <span className="text-rose-700">Red = gross withdrawals.</span>
+              <div style={{ padding: "10px 20px", borderTop: "1px solid var(--line)", display: "flex", gap: 16, flexWrap: "wrap", fontSize: "var(--step--2)", color: "var(--ink-3)" }}>
+                <span>Highlighted = retirement year.</span>
+                <span style={{ color: "var(--sun-ink)" }}>Phase 1 = RRSP-first (pre-65).</span>
+                <span style={{ color: "var(--dusk-ink)" }}>Phase 2 = CPP/OAS (65+).</span>
+                <span style={{ color: "var(--moss-ink)" }}>Green = contributions.</span>
+                <span style={{ color: "var(--slate-ink)" }}>Muted = withdrawals.</span>
               </div>
             </div>
 
-            {/* Model notes */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-slate-700">
-              <div className="font-semibold text-slate-800 mb-1">Model notes</div>
-              <div className="space-y-0.5">
-                <div>• Working-years spend = {fmtMoney(grandAnnual)}/yr. Retirement spend = {fmtMoney(grandAnnual + (inputs.retirementSpendDelta || 0))}/yr (higher travel, healthcare; no RESP). Mortgage ({fmtMoney(s.mortgage * 12)}/yr) drops off after payoff — {s.yourName}: age {isFinite(mortgagePayoff) ? mortgagePayoff : "N/A"} / {s.spouseName}: age {isFinite(mortgagePayoff) ? mortgagePayoff + (s.spouseCurrentAge - s.currentAge) : "N/A"}.</div>
-                <div>• Bonus ({fmtMoney(bonusAfterTax)}/yr after-tax) contributes from year 1. Equity ({fmtMoney(equityAfterTax)}/yr after-tax) contributes from year 4. Both grow with the income growth rate.</div>
-                <div>• Contribution waterfall: TFSA → RRSP → Non-reg. Room inflates annually.</div>
-                <div>• Drawdown: Phase 1 (pre-65) RRSP → NR → TFSA. Phase 2 (65+) RRSP/RRIF → NR → TFSA.</div>
-                {s.pensionMonthly > 0 && <div>• DB Pension: {fmtMoney(s.pensionMonthly)}/mo ({fmtMoney(s.pensionMonthly * 12)}/yr today's $) from age {s.pensionStartAge}, inflation-indexed.</div>}
-                <div>• CPP start age {s.cppStartAge}. Delaying to 70 maximizes the guaranteed inflation-protected income stream.</div>
-                <div>• CPP ({fmtMoney(s.cppAmountToday)}/yr), OAS ({fmtMoney(s.oasAmountToday * 2)}/yr combined, from age {s.oasStartAge}), and DB pension ({fmtMoney(s.pensionMonthly * 12)}/yr) are all taxed at {Math.round(s.retirementIncomeTaxRate * 100)}%. OAS subject to 15% clawback above {fmtMoney(s.oasClawbackThreshold)}/person. Net after-tax combined at peak: {fmtMoney((s.cppAmountToday + s.oasAmountToday * 2 + s.pensionMonthly * 12) * (1 - s.retirementIncomeTaxRate))}/yr.</div>
-                <div>• RRSP tax refunds (at {Math.round(s.taxRate * 100)}% marginal rate) are recycled into TFSA (if room available) then non-reg each accumulation year.</div>
-                <div>• Single deterministic return path, no full CRA marginal brackets.</div>
-              </div>
+            {/* ── Model notes ── */}
+            <div className="info-box" style={{ lineHeight: 1.65 }}>
+              <div style={{ fontWeight: 600, color: "var(--dusk-ink)", marginBottom: 6 }}>Model notes</div>
+              <div>Working spend {fmtMoney(grandAnnual)}/yr. Retirement spend {fmtMoney(grandAnnual + (inputs.retirementSpendDelta || 0))}/yr. Mortgage drops off at payoff ({s.yourName} age {isFinite(mortgagePayoff) ? mortgagePayoff : "N/A"}).</div>
+              <div>Bonus {fmtMoney(bonusAfterTax)}/yr after-tax from year 1. Equity {fmtMoney(equityAfterTax)}/yr after-tax from year 4. Both grow with income growth rate.</div>
+              <div>Contributions: TFSA → RRSP → Non-reg. Drawdown Phase 1 (pre-65): RRSP → NR → TFSA. Phase 2 (65+): RRSP/RRIF → NR → TFSA.</div>
+              {s.pensionMonthly > 0 && <div>DB Pension {fmtMoney(s.pensionMonthly)}/mo from age {s.pensionStartAge}, inflation-indexed.</div>}
+              <div>CPP age {s.cppStartAge} · OAS age {s.oasStartAge} · All retirement income taxed at {Math.round(s.retirementIncomeTaxRate * 100)}% · OAS clawback above {fmtMoney(s.oasClawbackThreshold)}/person.</div>
+              <div>RRSP refunds recycled into TFSA (if room) then non-reg. Single deterministic return path.</div>
             </div>
           </div>
         </div>
-      </div>
     </div>
     </PrivacyContext.Provider>
   );
