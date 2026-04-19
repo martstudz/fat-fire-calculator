@@ -937,57 +937,147 @@ export default function FatFireCalculator() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState("saved"); // "saved" | "saving" | "error"
+  const [household, setHousehold] = useState(null); // { id, join_code }
+  const [joinInput, setJoinInput] = useState("");
+  const [joinError, setJoinError] = useState("");
+  const [showJoinBox, setShowJoinBox] = useState(false);
+  const [copied, setCopied] = useState(false);
   const saveTimerRef = useRef(null);
+
+  // ── Check URL for ?join=CODE on load ──────────────────────────────────────
+  const pendingJoinCode = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("join") || null;
+  }, []);
 
   // ── Auth: listen for session changes ──────────────────────────────────────
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setAuthLoading(false);
-      if (session?.user) loadFromCloud(session.user.id);
+      if (session?.user) initHousehold(session.user.id);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const newUser = session?.user ?? null;
       setUser(newUser);
-      if (newUser) loadFromCloud(newUser.id);
+      if (newUser) initHousehold(newUser.id);
     });
     return () => subscription.unsubscribe();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function loadFromCloud(userId) {
-    const { data, error } = await supabase
-      .from("user_inputs")
-      .select("inputs")
+  // ── Household init: join via URL code, load existing, or create new ───────
+  async function initHousehold(userId) {
+    // 1. Check if user already belongs to a household
+    const { data: membership } = await supabase
+      .from("household_members")
+      .select("household_id")
       .eq("user_id", userId)
       .single();
-    if (!error && data?.inputs) {
-      // Merge with publicDefaults so any new fields added later always have a value
-      setS({ ...publicDefaults, ...data.inputs });
-    } else {
-      // First sign-in: no cloud data yet — load personal defaults
+
+    if (membership?.household_id) {
+      await loadHousehold(membership.household_id);
+      // If there's a pending join code in URL but user already has a household, ignore it
+      return;
+    }
+
+    // 2. If there's a join code in the URL, try to join that household
+    if (pendingJoinCode) {
+      const joined = await joinHouseholdByCode(userId, pendingJoinCode);
+      if (joined) return;
+    }
+
+    // 3. No household — create one
+    await createHousehold(userId);
+  }
+
+  async function loadHousehold(householdId) {
+    const { data, error } = await supabase
+      .from("households")
+      .select("id, join_code, inputs")
+      .eq("id", householdId)
+      .single();
+    if (!error && data) {
+      setHousehold({ id: data.id, join_code: data.join_code });
+      if (data.inputs && Object.keys(data.inputs).length > 0) {
+        setS({ ...publicDefaults, ...data.inputs });
+      } else {
+        setS(defaults);
+      }
+    }
+  }
+
+  async function createHousehold(userId) {
+    const { data, error } = await supabase
+      .from("households")
+      .insert({ created_by: userId, inputs: defaults })
+      .select("id, join_code")
+      .single();
+    if (!error && data) {
+      setHousehold({ id: data.id, join_code: data.join_code });
+      await supabase.from("household_members").insert({ user_id: userId, household_id: data.id });
       setS(defaults);
     }
   }
 
-  const saveToCloud = useCallback(async (state, userId) => {
+  async function joinHouseholdByCode(userId, code) {
+    const { data: hh } = await supabase
+      .from("households")
+      .select("id, join_code, inputs")
+      .eq("join_code", code.toUpperCase())
+      .single();
+    if (!hh) { setJoinError("Code not found — double-check and try again."); return false; }
+    await supabase.from("household_members").insert({ user_id: userId, household_id: hh.id });
+    setHousehold({ id: hh.id, join_code: hh.join_code });
+    if (hh.inputs && Object.keys(hh.inputs).length > 0) {
+      setS({ ...publicDefaults, ...hh.inputs });
+    }
+    // Clean up the URL
+    window.history.replaceState({}, "", window.location.pathname);
+    setShowJoinBox(false);
+    return true;
+  }
+
+  async function handleJoinSubmit() {
+    if (!user) { signInWithGoogle(); return; }
+    setJoinError("");
+    await joinHouseholdByCode(user.id, joinInput.trim());
+  }
+
+  const shareUrl = household
+    ? `${window.location.origin}${window.location.pathname}?join=${household.join_code}`
+    : null;
+
+  function copyShareUrl() {
+    if (!shareUrl) return;
+    navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  const saveToCloud = useCallback(async (state, householdId) => {
     setSaveStatus("saving");
     const { error } = await supabase
-      .from("user_inputs")
-      .upsert({ user_id: userId, inputs: state, updated_at: new Date().toISOString() },
-               { onConflict: "user_id" });
+      .from("households")
+      .update({ inputs: state, updated_at: new Date().toISOString() })
+      .eq("id", householdId);
     setSaveStatus(error ? "error" : "saved");
   }, []);
 
   async function signInWithGoogle() {
+    // Preserve join code through the OAuth redirect
+    const redirectTo = pendingJoinCode
+      ? `${window.location.origin}${window.location.pathname}?join=${pendingJoinCode}`
+      : window.location.href;
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: window.location.href },
+      options: { redirectTo },
     });
   }
 
   async function signOut() {
     await supabase.auth.signOut();
     setUser(null);
+    setHousehold(null);
   }
 
   const inputs   = useMemo(() => buildInputs(s), [s]);
@@ -1019,22 +1109,22 @@ export default function FatFireCalculator() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useMemo(() => { setMc(null); setMcReverse(null); }, [inputs]);
 
-  // Autosave: localStorage always; cloud save (debounced 1.5s) when signed in
+  // Autosave: localStorage always; cloud save (debounced 1.5s) when in a household
   useEffect(() => {
     saveToStorage(s);
-    if (user) {
+    if (household) {
       setSaveStatus("saving");
       clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => saveToCloud(s, user.id), 1500);
+      saveTimerRef.current = setTimeout(() => saveToCloud(s, household.id), 1500);
     }
-  }, [s, user, saveToCloud]);
+  }, [s, household, saveToCloud]);
 
   const update = (k) => (v) => setS((prev) => ({ ...prev, [k]: v }));
 
   function resetToDefaults() {
     if (window.confirm("Reset all inputs to defaults? This cannot be undone.")) {
       localStorage.removeItem(STORAGE_KEY);
-      setS(user ? defaults : publicDefaults);
+      setS(household ? defaults : publicDefaults);
     }
   }
 
@@ -1117,8 +1207,9 @@ export default function FatFireCalculator() {
               </p>
             </div>
             <div className="flex items-center gap-2 text-xs flex-wrap justify-end">
+
               {/* Save status */}
-              {user && (
+              {household && (
                 <span className={
                   saveStatus === "saved" ? "text-emerald-600" :
                   saveStatus === "saving" ? "text-slate-400 italic" :
@@ -1130,6 +1221,32 @@ export default function FatFireCalculator() {
                 </span>
               )}
               {!user && <span className="text-slate-400">Auto-saved locally</span>}
+
+              {/* Share / invite link */}
+              {household && (
+                <div className="relative">
+                  <button
+                    onClick={copyShareUrl}
+                    className="flex items-center gap-1 px-2 py-1 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors"
+                    title={shareUrl}
+                  >
+                    🔗 {copied ? "Copied!" : "Share"}
+                  </button>
+                </div>
+              )}
+
+              {/* Join a household */}
+              {user && !household && (
+                <button
+                  onClick={() => setShowJoinBox(j => !j)}
+                  className="px-2 py-1 rounded border border-slate-300 text-slate-500 hover:bg-slate-100 transition-colors"
+                >
+                  Join household
+                </button>
+              )}
+              {!user && pendingJoinCode && (
+                <span className="text-amber-600 font-medium">Sign in to join household</span>
+              )}
 
               {/* Auth */}
               {authLoading ? null : user ? (
@@ -1168,6 +1285,33 @@ export default function FatFireCalculator() {
                 Reset
               </button>
             </div>
+
+            {/* Join box */}
+            {showJoinBox && (
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Enter join code"
+                  value={joinInput}
+                  onChange={e => setJoinInput(e.target.value.toUpperCase())}
+                  className="border border-slate-300 rounded px-2 py-1 text-sm w-36 font-mono tracking-wider"
+                />
+                <button
+                  onClick={handleJoinSubmit}
+                  className="px-3 py-1 rounded bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700"
+                >
+                  Join
+                </button>
+                {joinError && <span className="text-red-500 text-xs">{joinError}</span>}
+              </div>
+            )}
+
+            {/* Pending join code banner for signed-out users */}
+            {!user && pendingJoinCode && (
+              <div className="mt-2 bg-amber-50 border border-amber-200 rounded p-2 text-xs text-amber-800">
+                You've been invited to join a household. Sign in with Google to accept.
+              </div>
+            )}
           </div>
         </div>
 
