@@ -996,11 +996,11 @@ export default function FatFireCalculator() {
   async function loadHousehold(householdId) {
     const { data, error } = await supabase
       .from("households")
-      .select("id, join_code, inputs")
+      .select("id, join_code, inputs, created_by")
       .eq("id", householdId)
       .single();
     if (!error && data) {
-      setHousehold({ id: data.id, join_code: data.join_code });
+      setHousehold({ id: data.id, join_code: data.join_code, created_by: data.created_by });
       if (data.inputs && Object.keys(data.inputs).length > 0) {
         setS({ ...publicDefaults, ...data.inputs });
       } else {
@@ -1020,18 +1020,23 @@ export default function FatFireCalculator() {
 
   async function removeMember(userId) {
     if (!household) return;
-    if (userId === user?.id) {
-      if (!window.confirm("Remove yourself from this household? You'll lose access to the shared data.")) return;
-    } else {
-      if (!window.confirm("Remove this member from the household?")) return;
-    }
+    // Owner cannot be removed
+    if (userId === household.created_by) return;
+    // Only the owner or the member themselves can remove
+    const isOwner = user?.id === household.created_by;
+    const isSelf = user?.id === userId;
+    if (!isOwner && !isSelf) return;
+    const msg = isSelf
+      ? "Leave this household? You'll lose access to the shared data."
+      : "Remove this member from the household?";
+    if (!window.confirm(msg)) return;
     await supabase
       .from("household_members")
       .delete()
       .eq("user_id", userId)
       .eq("household_id", household.id);
     setHouseholdMembers(prev => prev.filter(m => m.user_id !== userId));
-    if (userId === user?.id) {
+    if (isSelf) {
       setHousehold(null);
       setHouseholdMembers([]);
     }
@@ -1046,7 +1051,7 @@ export default function FatFireCalculator() {
       .select("id, join_code")
       .single();
     if (!error && data) {
-      setHousehold({ id: data.id, join_code: data.join_code });
+      setHousehold({ id: data.id, join_code: data.join_code, created_by: userId });
       await supabase.from("household_members").insert({
         user_id: userId,
         household_id: data.id,
@@ -1062,7 +1067,7 @@ export default function FatFireCalculator() {
   async function joinHouseholdByCode(userId, code) {
     const { data: hh } = await supabase
       .from("households")
-      .select("id, join_code, inputs")
+      .select("id, join_code, inputs, created_by")
       .eq("join_code", code.toUpperCase())
       .single();
     if (!hh) { setJoinError("Code not found — double-check and try again."); return false; }
@@ -1075,7 +1080,7 @@ export default function FatFireCalculator() {
       name: meta.full_name || meta.name || "",
       avatar_url: meta.avatar_url || "",
     });
-    setHousehold({ id: hh.id, join_code: hh.join_code });
+    setHousehold({ id: hh.id, join_code: hh.join_code, created_by: hh.created_by });
     if (hh.inputs && Object.keys(hh.inputs).length > 0) {
       setS({ ...publicDefaults, ...hh.inputs });
     }
@@ -1282,59 +1287,85 @@ export default function FatFireCalculator() {
               )}
               {!user && <span className="text-slate-400">Auto-saved locally</span>}
 
-              {/* Household dropdown */}
-              {household && (
-                <div className="relative" ref={householdPanelRef}>
-                  <button
-                    onClick={() => setShowHouseholdPanel(p => !p)}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors"
-                  >
-                    <span>🏠</span>
-                    <span>Household</span>
-                    <span className="bg-slate-200 text-slate-600 rounded-full px-1.5 text-xs font-semibold">{householdMembers.length}</span>
-                    <span className="text-slate-400">{showHouseholdPanel ? "▲" : "▼"}</span>
-                  </button>
-                  {showHouseholdPanel && (
-                    <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 w-72 p-3">
-                      <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Members</div>
-                      <div className="space-y-2 mb-3">
-                        {householdMembers.map(m => (
-                          <div key={m.user_id} className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              {m.avatar_url
-                                ? <img src={m.avatar_url} alt="" className="w-6 h-6 rounded-full flex-shrink-0" />
-                                : <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs text-slate-500 flex-shrink-0">
-                                    {(m.name || m.email || "?")[0].toUpperCase()}
+              {/* Household CTA / dropdown */}
+              {household && (() => {
+                const isOwner = user?.id === household.created_by;
+                const hasOthers = householdMembers.length > 1;
+
+                if (!hasOthers) {
+                  // Solo — just show "Add to household" button
+                  return (
+                    <button
+                      onClick={copyShareUrl}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors font-medium shadow-sm text-xs"
+                    >
+                      {copied ? "✓ Link copied!" : "＋ Add to household"}
+                    </button>
+                  );
+                }
+
+                // Multi-member — show dropdown
+                return (
+                  <div className="relative" ref={householdPanelRef}>
+                    <button
+                      onClick={() => setShowHouseholdPanel(p => !p)}
+                      className="flex items-center gap-1.5 px-2 py-1 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      <span>🏠</span>
+                      <span>Household</span>
+                      <span className="text-slate-400">{showHouseholdPanel ? "▲" : "▼"}</span>
+                    </button>
+                    {showHouseholdPanel && (
+                      <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 w-72 p-3">
+                        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Members</div>
+                        <div className="space-y-2 mb-3">
+                          {householdMembers.map(m => {
+                            const isThisOwner = m.user_id === household.created_by;
+                            const canRemove = !isThisOwner && (isOwner || m.user_id === user?.id);
+                            return (
+                              <div key={m.user_id} className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {m.avatar_url
+                                    ? <img src={m.avatar_url} alt="" className="w-6 h-6 rounded-full flex-shrink-0" />
+                                    : <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs text-slate-500 flex-shrink-0">
+                                        {(m.name || m.email || "?")[0].toUpperCase()}
+                                      </div>
+                                  }
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1">
+                                      {m.name && <span className="text-xs font-medium text-slate-700 truncate">{m.name}</span>}
+                                      {isThisOwner && <span className="text-xs text-slate-400">(owner)</span>}
+                                    </div>
+                                    <div className="text-xs text-slate-400 truncate">{m.email}</div>
                                   </div>
-                              }
-                              <div className="min-w-0">
-                                {m.name && <div className="text-xs font-medium text-slate-700 truncate">{m.name}</div>}
-                                <div className="text-xs text-slate-400 truncate">{m.email}</div>
+                                </div>
+                                {canRemove && (
+                                  <button
+                                    onClick={() => removeMember(m.user_id)}
+                                    className="text-slate-300 hover:text-red-400 transition-colors flex-shrink-0 text-base leading-none"
+                                    title={m.user_id === user?.id ? "Leave household" : "Remove member"}
+                                  >
+                                    ✕
+                                  </button>
+                                )}
                               </div>
-                            </div>
-                            <button
-                              onClick={() => removeMember(m.user_id)}
-                              className="text-slate-300 hover:text-red-400 transition-colors flex-shrink-0 text-base leading-none"
-                              title="Remove from household"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ))}
+                            );
+                          })}
+                        </div>
+                        <div className="border-t border-slate-100 pt-2">
+                          <button
+                            onClick={copyShareUrl}
+                            className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 transition-colors"
+                          >
+                            {copied ? "✓ Link copied!" : "＋ Add to household"}
+                          </button>
+                          <div className="text-xs text-slate-400 text-center mt-1">Copies an invite link to share</div>
+                        </div>
                       </div>
-                      <div className="border-t border-slate-100 pt-2">
-                        <button
-                          onClick={copyShareUrl}
-                          className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 transition-colors"
-                        >
-                          {copied ? "✓ Link copied!" : "＋ Add to household"}
-                        </button>
-                        <div className="text-xs text-slate-400 text-center mt-1">Copies an invite link to share</div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Join a household */}
               {user && !household && (
