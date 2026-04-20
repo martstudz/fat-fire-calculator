@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useContext } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { PrivacyContext } from "./FatFireCalculator";
 
 // ── Primitives ────────────────────────────────────────────────────────────────
@@ -247,14 +247,9 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
     { id: "assumptions", label: "Assumptions" },
   ];
 
-  // Ref to the scrollable content column — used for IntersectionObserver root
-  const scrollRef = useRef(null);
-
-  // Track which section is currently in view
+  // Track which section is currently in view (observes against the viewport/window)
   const [activeSection, setActiveSection] = useState("household");
   useEffect(() => {
-    const root = scrollRef.current;
-    if (!root) return;
     const els = sections.map(sec => document.getElementById(`pe-${sec.id}`)).filter(Boolean);
     const observer = new IntersectionObserver(
       (entries) => {
@@ -265,26 +260,20 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
           setActiveSection(visible[0].target.id.replace("pe-", ""));
         }
       },
-      { root, rootMargin: "-10% 0px -60% 0px", threshold: 0 }
+      { root: null, rootMargin: "-10% 0px -60% 0px", threshold: 0 }
     );
     els.forEach(el => observer.observe(el));
     return () => observer.disconnect();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function scrollToSection(id) {
-    const root = scrollRef.current;
     const el = document.getElementById(`pe-${id}`);
-    if (!root || !el) return;
-    // Use getBoundingClientRect so position is relative to the scroll viewport,
-    // then add current scrollTop to get the absolute scroll target.
-    const rootRect = root.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
-    const offset = root.scrollTop + (elRect.top - rootRect.top) - 16;
-    root.scrollTo({ top: offset, behavior: "smooth" });
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   return (
-    <div className="pe-frame" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div className="pe-frame">
       {/* Header */}
       <div style={{
         padding: "16px 24px",
@@ -293,7 +282,9 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
         alignItems: "center",
         justifyContent: "space-between",
         background: "var(--paper)",
-        flexShrink: 0,
+        position: "sticky",
+        top: 0,
+        zIndex: 10,
       }}>
         <div>
           <div style={{ fontSize: "var(--step-0)", fontWeight: 600, color: "var(--ink)" }}>Plan Editor</div>
@@ -302,17 +293,19 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
         <SaveIndicator saveStatus={saveStatus} />
       </div>
 
-      {/* Body: ToC + scrollable content side by side, filling remaining height */}
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+      {/* Body: ToC sidebar + content, natural document flow */}
+      <div style={{ display: "flex", alignItems: "flex-start" }}>
 
-        {/* ToC sidebar — fixed height, never scrolls */}
+        {/* ToC sidebar — sticky, scrolls with page but sticks in viewport */}
         <div style={{
           width: 172,
           flexShrink: 0,
           padding: "24px 12px 24px 20px",
           borderRight: "1px solid var(--line)",
+          position: "sticky",
+          top: 57,
+          maxHeight: "calc(100vh - 57px)",
           overflowY: "auto",
-          height: "100%",
         }}>
           <div style={{ fontSize: "var(--step--2)", fontWeight: 600, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Sections</div>
           {sections.map(sec => {
@@ -344,8 +337,8 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
           })}
         </div>
 
-        {/* Main content — this is the ONLY thing that scrolls */}
-        <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", height: "100%" }}>
+        {/* Main content — natural document flow, outer shell scrolls */}
+        <div style={{ flex: 1, minWidth: 0 }}>
         <div className="pe-stack" style={{ padding: "0 32px 60px", maxWidth: 680 }}>
 
           {/* ── Household ── */}
@@ -735,3 +728,4 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
     </div>
   );
 }
+

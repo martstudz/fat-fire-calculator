@@ -960,7 +960,6 @@ input, select, textarea {
 .pe-frame {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
 }
 .pe-head {
   /* sticky header — styles applied inline */
