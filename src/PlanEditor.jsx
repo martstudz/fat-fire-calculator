@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { PrivacyContext } from "./FatFireCalculator";
 
 // ── Primitives ────────────────────────────────────────────────────────────────
@@ -9,37 +9,82 @@ function fmt$(n, hidden) {
   return "$" + Math.round(n).toLocaleString("en-CA");
 }
 
-function NumInput({ label, value, onChange, prefix, step = 1, small, hint }) {
+function formatCommas(n) {
+  if (n == null || n === "" || !isFinite(n)) return "";
+  return Math.round(n).toLocaleString("en-CA");
+}
+
+// Comma-formatted number input: shows commas when blurred, raw digits when focused
+function CommaInput({ value, onChange, small, className = "" }) {
+  const [focused, setFocused] = useState(false);
+  const [raw, setRaw] = useState(value != null ? String(value) : "");
+  useEffect(() => {
+    if (!focused) setRaw(value != null ? String(value) : "");
+  }, [value, focused]);
+  const display = focused ? raw : formatCommas(value);
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      className={[small ? "--sm" : "", "mono", className].filter(Boolean).join(" ")}
+      value={display || ""}
+      onFocus={() => { setFocused(true); setRaw(value != null ? String(value) : ""); }}
+      onChange={(e) => {
+        const cleaned = e.target.value.replace(/[^0-9]/g, "");
+        setRaw(cleaned);
+        const n = parseInt(cleaned, 10);
+        onChange(isNaN(n) ? 0 : n);
+      }}
+      onBlur={() => {
+        setFocused(false);
+        const n = parseInt(raw, 10);
+        setRaw(isNaN(n) ? "" : String(n));
+      }}
+    />
+  );
+}
+
+function NumInput({ label, value, onChange, prefix, small, hint }) {
   return (
     <div className="inp-row">
       <span>{label}{hint && <span className="inp-hint"> · {hint}</span>}</span>
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
         {prefix && <span style={{ color: "var(--ink-3)", fontSize: "var(--step--1)" }}>{prefix}</span>}
-        <input
-          type="number"
-          value={value ?? ""}
-          step={step}
-          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-          className={small ? "--sm" : ""}
-        />
+        <CommaInput value={value} onChange={onChange} small={small} />
       </div>
     </div>
   );
 }
 
 function PctInput({ label, value, onChange, hint }) {
+  const [focused, setFocused] = useState(false);
+  const [raw, setRaw] = useState("");
+  const display = focused ? raw : (value ? parseFloat((value * 100).toFixed(2)).toString() : "");
+  useEffect(() => {
+    if (!focused) setRaw(value ? parseFloat((value * 100).toFixed(2)).toString() : "");
+  }, [value, focused]);
   return (
     <div className="inp-row">
       <span>{label}{hint && <span className="inp-hint"> · {hint}</span>}</span>
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
         <input
-          type="number"
-          value={Math.round((value ?? 0) * 1000) / 10}
-          step={0.5}
-          min={0}
-          max={100}
-          onChange={(e) => onChange((parseFloat(e.target.value) || 0) / 100)}
-          className="--sm"
+          type="text"
+          inputMode="decimal"
+          className="--sm mono"
+          value={display}
+          onFocus={() => { setFocused(true); setRaw(value ? parseFloat((value * 100).toFixed(2)).toString() : ""); }}
+          onChange={(e) => {
+            const cleaned = e.target.value.replace(/[^0-9.]/g, "");
+            setRaw(cleaned);
+            const n = parseFloat(cleaned);
+            if (!isNaN(n)) onChange(n / 100);
+            else if (cleaned === "") onChange(0);
+          }}
+          onBlur={() => {
+            setFocused(false);
+            const n = parseFloat(raw);
+            setRaw(isNaN(n) ? "" : parseFloat(n.toFixed(2)).toString());
+          }}
         />
         <span style={{ color: "var(--ink-3)", fontSize: "var(--step--1)" }}>%</span>
       </div>
@@ -47,19 +92,13 @@ function PctInput({ label, value, onChange, hint }) {
   );
 }
 
-function ExpenseRow({ label, value, onChange, freq, step = 100 }) {
+function ExpenseRow({ label, value, onChange, freq }) {
   return (
     <div className="inp-row">
       <span>{label} <span style={{ color: "var(--ink-3)", fontSize: "var(--step--2)" }}>/{freq === "annual" ? "yr" : "mo"}</span></span>
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
         <span style={{ color: "var(--ink-3)", fontSize: "var(--step--1)" }}>$</span>
-        <input
-          type="number"
-          value={value ?? ""}
-          step={step}
-          min={0}
-          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-        />
+        <CommaInput value={value} onChange={onChange} />
       </div>
     </div>
   );

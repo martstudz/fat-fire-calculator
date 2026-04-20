@@ -723,7 +723,7 @@ const defaults = {
   // Market assumptions
   investmentReturn: 0.07, inflation: 0.03,
   // Retirement income / taxes
-  cppAmountToday: 40000, cppStartAge: 70,
+  cppAmountToday: 36000, cppStartAge: 65, yourCppAmount: 18000, spouseCppAmount: 18000,
   pensionMonthly: 650, pensionStartAge: 60,
   oasAmountToday: 8500, oasStartAge: 65,
   oasClawbackThreshold: 95323,
@@ -839,7 +839,7 @@ function NumInput({ label, value, onChange, step = 1, prefix, suffix, small, hin
         <input
           ref={inputRef}
           type="text"
-          inputMode="numeric"
+          inputMode="decimal"
           value={displayValue}
           onFocus={handleFocus}
           onChange={handleChange}
@@ -1346,6 +1346,7 @@ export default function FatFireCalculator() {
     setS(computedState);
     localStorage.setItem(ONBOARDING_KEY, "1");
     setShowOnboarding(false);
+    setPage("dashboard");
   }
 
   function handleOnboardingSignIn() {

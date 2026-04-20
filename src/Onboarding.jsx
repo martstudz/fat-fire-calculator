@@ -2,19 +2,19 @@ import { useState, useEffect } from "react";
 
 // ---------- province data ----------
 const PROVINCES = [
-  { code: "ON", name: "Ontario" },
-  { code: "BC", name: "British Columbia" },
   { code: "AB", name: "Alberta" },
-  { code: "QC", name: "Quebec" },
-  { code: "NS", name: "Nova Scotia" },
-  { code: "NB", name: "New Brunswick" },
+  { code: "BC", name: "British Columbia" },
   { code: "MB", name: "Manitoba" },
-  { code: "SK", name: "Saskatchewan" },
+  { code: "NB", name: "New Brunswick" },
   { code: "NL", name: "Newfoundland & Labrador" },
-  { code: "PE", name: "Prince Edward Island" },
   { code: "NT", name: "Northwest Territories" },
-  { code: "YT", name: "Yukon" },
+  { code: "NS", name: "Nova Scotia" },
   { code: "NU", name: "Nunavut" },
+  { code: "ON", name: "Ontario" },
+  { code: "PE", name: "Prince Edward Island" },
+  { code: "QC", name: "Quebec" },
+  { code: "SK", name: "Saskatchewan" },
+  { code: "YT", name: "Yukon" },
 ];
 
 const LIFE_EXPECTANCY = {
@@ -94,12 +94,18 @@ function Field({ label, children, hint }) {
   );
 }
 
+function formatWithCommas(n) {
+  if (!isFinite(n) || n === "" || n == null) return "";
+  return Math.round(n).toLocaleString("en-CA");
+}
+
 function DollarInput({ value, onChange, placeholder = "0" }) {
+  const [focused, setFocused] = useState(false);
   const [raw, setRaw] = useState(value ? String(value) : "");
   useEffect(() => {
-    if (document.activeElement?.dataset?.dollar !== "true")
-      setRaw(value ? String(value) : "");
-  }, [value]);
+    if (!focused) setRaw(value ? String(value) : "");
+  }, [value, focused]);
+  const display = focused ? raw : (value ? formatWithCommas(value) : "");
   return (
     <div className="input-group">
       <span className="adornment --left">$</span>
@@ -109,7 +115,8 @@ function DollarInput({ value, onChange, placeholder = "0" }) {
         inputMode="numeric"
         className="input mono"
         placeholder={placeholder}
-        value={raw}
+        value={display}
+        onFocus={() => { setFocused(true); setRaw(value ? String(value) : ""); }}
         onChange={(e) => {
           const cleaned = e.target.value.replace(/[^0-9.]/g, "");
           setRaw(cleaned);
@@ -118,6 +125,7 @@ function DollarInput({ value, onChange, placeholder = "0" }) {
           else if (cleaned === "") onChange(0);
         }}
         onBlur={() => {
+          setFocused(false);
           const n = parseFloat(raw);
           setRaw(isNaN(n) ? "" : String(n));
         }}
@@ -127,20 +135,31 @@ function DollarInput({ value, onChange, placeholder = "0" }) {
 }
 
 function PctInput({ value, onChange, placeholder = "0" }) {
-  const pctVal = value ? Math.round(value * 100) : "";
+  const [focused, setFocused] = useState(false);
+  const [raw, setRaw] = useState(() => value ? parseFloat((value * 100).toFixed(2)).toString() : "");
+  useEffect(() => {
+    if (!focused) setRaw(value ? parseFloat((value * 100).toFixed(2)).toString() : "");
+  }, [value, focused]);
   return (
     <div className="input-group">
       <input
         type="text"
-        inputMode="numeric"
+        inputMode="decimal"
         className="input mono --suffix"
         placeholder={placeholder}
-        value={pctVal === 0 ? "" : pctVal}
+        value={focused ? raw : (value ? parseFloat((value * 100).toFixed(2)).toString() : "")}
+        onFocus={() => { setFocused(true); setRaw(value ? parseFloat((value * 100).toFixed(2)).toString() : ""); }}
         onChange={(e) => {
           const cleaned = e.target.value.replace(/[^0-9.]/g, "");
+          setRaw(cleaned);
           const n = parseFloat(cleaned);
           if (!isNaN(n)) onChange(n / 100);
           else if (cleaned === "") onChange(0);
+        }}
+        onBlur={() => {
+          setFocused(false);
+          const n = parseFloat(raw);
+          setRaw(isNaN(n) ? "" : parseFloat(n.toFixed(2)).toString());
         }}
       />
       <span className="adornment --right">%</span>
@@ -183,15 +202,6 @@ function CardWelcome({ onNext, onSignIn }) {
     <div className="ob-scene">
       <div className="ob-card">
         <div className="ob-card__body" style={{ textAlign: "center", padding: "56px 48px" }}>
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: 8,
-            padding: "6px 12px", borderRadius: 999,
-            background: "var(--accent-soft)", color: "var(--accent-ink)",
-            fontSize: 12, fontWeight: 500, marginBottom: 28
-          }}>
-            <span style={{ width: 6, height: 6, borderRadius: 3, background: "var(--accent)" }} />
-            Canadian-optimized
-          </div>
           <h1 style={{
             fontFamily: "var(--font-display)", fontWeight: 600,
             fontSize: 42, lineHeight: 1.05, letterSpacing: "-0.03em"
@@ -202,15 +212,12 @@ function CardWelcome({ onNext, onSignIn }) {
             color: "var(--ink-2)", fontSize: 15, lineHeight: 1.55,
             marginTop: 20, maxWidth: 360, marginLeft: "auto", marginRight: "auto"
           }}>
-            Ten quick questions. We'll handle the Canadian tax math — RRSP, TFSA, OAS, CPP,
+            A few quick questions. We'll handle the Canadian tax math — RRSP, TFSA, CPP,
             provincial brackets — and show you the exact age when the numbers work.
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 32, maxWidth: 320, marginLeft: "auto", marginRight: "auto" }}>
             <button onClick={onNext} className="btn btn--accent btn--lg" style={{ width: "100%" }}>Let's go →</button>
             <button onClick={onSignIn} className="btn btn--ghost" style={{ width: "100%" }}>I already have an account</button>
-          </div>
-          <div style={{ marginTop: 24, fontSize: 11, color: "var(--ink-3)" }}>
-            Nothing is shared or stored without your say-so.
           </div>
         </div>
       </div>
@@ -223,7 +230,7 @@ function CardAboutYou({ data, onChange, onNext, onSkip, onBack }) {
   const name = data.yourName?.trim();
   const canExit = !!name;
   return (
-    <Card step={1} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+    <Card step={1} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
       <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
         {name ? `Nice to meet you, ${name}.` : "Let's start with you."}
       </h2>
@@ -277,7 +284,7 @@ function CardHousehold({ data, onChange, onNext, onSkip, onBack }) {
   const partnerFillsOwn = data.partnerFillsOwn === true;
 
   return (
-    <Card step={2} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+    <Card step={2} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
       <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
         Who are we planning for?
       </h2>
@@ -362,7 +369,7 @@ function CardVision({ data, onChange, onNext, onSkip, onBack }) {
   const planFor = partnered && spouseName ? `${name} & ${spouseName}` : partnered ? `${name} & your partner` : name;
 
   return (
-    <Card step={3} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+    <Card step={3} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
       <div className="chip chip--accent" style={{ marginBottom: 16 }}>Planning for {planFor}</div>
       <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
         What does the horizon look like?
@@ -437,6 +444,53 @@ function ModeToggle({ mode, onChange }) {
   );
 }
 
+const MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+function VestDatePicker({ value, onChange }) {
+  // value stored as "YYYY-MM" string, e.g. "2026-06"
+  const parts = value ? value.split("-") : ["", ""];
+  const year = parts[0] || "";
+  const month = parts[1] || "";
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 15 }, (_, i) => String(currentYear + i));
+
+  function update(newYear, newMonth) {
+    if (newYear && newMonth) onChange(`${newYear}-${newMonth}`);
+    else onChange(`${newYear || ""}-${newMonth || ""}`);
+  }
+
+  return (
+    <div style={{ display: "flex", gap: 8 }}>
+      <select
+        className="input"
+        value={month}
+        onChange={(e) => update(year, e.target.value)}
+        style={{ flex: 1 }}
+      >
+        <option value="">Month</option>
+        {MONTHS.map((m, i) => (
+          <option key={m} value={String(i + 1).padStart(2, "0")}>{m}</option>
+        ))}
+      </select>
+      <select
+        className="input"
+        value={year}
+        onChange={(e) => update(e.target.value, month)}
+        style={{ flex: 1 }}
+      >
+        <option value="">Year</option>
+        {years.map((y) => (
+          <option key={y} value={y}>{y}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function CompRow({ label, hint, hasKey, modeKey, pctKey, dollarKey, data, onChange, vestDateKey, vestDateLabel }) {
   const has      = data[hasKey]    === true;
   const mode     = data[modeKey]   || "%";
@@ -460,9 +514,10 @@ function CompRow({ label, hint, hasKey, modeKey, pctKey, dollarKey, data, onChan
           )}
           {vestDateKey && (
             <Field label={vestDateLabel || "Vesting date / cliff"} hint="Optional — helps model timing">
-              <input className="input" type="text" placeholder="e.g. Jun 2026"
+              <VestDatePicker
                 value={data[vestDateKey] || ""}
-                onChange={(e) => onChange(vestDateKey, e.target.value)} />
+                onChange={(v) => onChange(vestDateKey, v)}
+              />
             </Field>
           )}
         </div>
@@ -513,7 +568,7 @@ function CardIncome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false
   const estimatedRate = estimateBlendedTax(combined);
 
   return (
-    <Card step={4} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+    <Card step={4} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
       <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
         {showSpouse ? `${name} & ${spouseName}'s income` : `${name}'s income`}
       </h2>
@@ -556,12 +611,13 @@ function PersonContributions({ monthlyRrspKey, monthlyTfsaKey, monthlyNrKey, ann
       <Field label="TFSA">
         <DollarInput value={data[monthlyTfsaKey]} onChange={(v) => onChange(monthlyTfsaKey, v)} placeholder="e.g. 500" />
       </Field>
-      <Field label="Non-registered" hint="Taxable brokerage, ETFs, etc.">
+      <Field label="Non-registered">
         <DollarInput value={data[monthlyNrKey]} onChange={(v) => onChange(monthlyNrKey, v)} placeholder="0" />
       </Field>
       <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 4 }}>
-        <div className="label-xs" style={{ marginBottom: 10 }}>Annual lump-sum top-ups</div>
-        <Field label="RRSP" hint="e.g. year-end bonus contribution">
+        <div className="label-xs" style={{ marginBottom: 4 }}>Annual lump-sum top-ups</div>
+        <p className="ob-hint" style={{ marginBottom: 10 }}>The model will suggest top-ups based on available cash — enter any you already plan to make.</p>
+        <Field label="RRSP">
           <DollarInput value={data[annualRrspKey]} onChange={(v) => onChange(annualRrspKey, v)} placeholder="0" />
         </Field>
         <Field label="TFSA">
@@ -585,7 +641,7 @@ function CardContributions({ data, onChange, onNext, onSkip, onBack, hideSpouse 
   const hasKids = data.hasKids === true;
 
   return (
-    <Card step={5} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+    <Card step={5} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
       <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
         Retirement saving
       </h2>
@@ -640,7 +696,7 @@ function CardSavings({ data, onChange, onNext, onSkip, onBack, hideSpouse = fals
   const showSpouse = partnered && !hideSpouse;
 
   return (
-    <Card step={6} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+    <Card step={6} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
       <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
         What's already saved?
       </h2>
@@ -696,7 +752,7 @@ function CardPension({ data, onChange, onNext, onSkip, onBack, hideSpouse = fals
   const spouseHasPension = data.spouseHasPension === true;
 
   return (
-    <Card step={7} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+    <Card step={7} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
       <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
         Any defined-benefit pensions?
       </h2>
@@ -764,7 +820,7 @@ function CardHome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }
   const rents    = data.ownsHome === false;
 
   return (
-    <Card step={8} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+    <Card step={8} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
       <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
         Housing
       </h2>
@@ -856,7 +912,7 @@ function CardSpending({ data, onChange, onNext, onSkip, onBack, hideSpouse = fal
   const totalMonthly = [...nonDiscMonthly, ...discMonthly].reduce((s, c) => s + (data[c.key] || 0), 0);
 
   return (
-    <Card step={9} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+    <Card step={9} totalSteps={9} onSkip={onSkip} canExit={false} onExit={onSkip} onBack={onBack}>
       <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
         {showSpouse ? `How do ${name} & ${spouseName} spend today?` : `How does ${name} spend today?`}
       </h2>
@@ -899,7 +955,7 @@ function CardSpending({ data, onChange, onNext, onSkip, onBack, hideSpouse = fal
         </Field>
       </div>
 
-      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Continue</button>
+      <button onClick={onNext} className="btn btn--accent" style={{ width: "100%", marginTop: 20 }}>Build my plan →</button>
     </Card>
   );
 }
@@ -1114,7 +1170,6 @@ export default function Onboarding({ onComplete, onSignIn, publicDefaults }) {
   if (step === 6)  return <CardSavings       data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
   if (step === 7)  return <CardPension       data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
   if (step === 8)  return <CardHome          data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
-  if (step === 9)  return <CardSpending      data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
-  if (step === 10) return <CardRetirement    data={data} onChange={update} onNext={skip} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
+  if (step === 9)  return <CardSpending      data={data} onChange={update} onNext={skip} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
   return null;
 }
