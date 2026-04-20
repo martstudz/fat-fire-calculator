@@ -656,8 +656,8 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
             <PctInput label="Market return (nominal)" value={s.investmentReturn != null ? s.investmentReturn : 0.07} onChange={update("investmentReturn")} hint="long-run nominal; 7% = ~4% real + 3% inflation" />
             <PctInput label="Inflation" value={s.inflation != null ? s.inflation : 0.03} onChange={update("inflation")} hint="3% = Bank of Canada target" />
 
-            <div className="ob-person-label" style={{ paddingTop: 8 }}>Target</div>
-            <NumInput label="Terminal target (age 90)" value={s.terminalTargetToday} onChange={update("terminalTargetToday")} prefix="$" step={25000} hint="today's $" />
+            <div className="ob-person-label" style={{ paddingTop: 8 }}>Die with</div>
+            <NumInput label="Die with (today's $)" value={s.terminalTargetToday} onChange={update("terminalTargetToday")} prefix="$" step={25000} hint="today's $" />
             <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>
               Solver finds the earliest age where spending is fully covered and portfolio ends at or above this amount.
             </div>

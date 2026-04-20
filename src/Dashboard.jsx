@@ -18,6 +18,23 @@ function fmtK(n, hidden) {
   return "$" + Math.round(n).toLocaleString();
 }
 
+// ── CashRow ───────────────────────────────────────────────────────────────────
+
+function CashRow({ label, value, fmt }) {
+  const isNeg = value < 0;
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+      <span style={{ fontSize: "var(--step--1)", color: "var(--ink-3)" }}>{label}</span>
+      <span className="mono" style={{
+        fontSize: "var(--step--1)",
+        color: isNeg ? "var(--slate-ink)" : "var(--ink-2)",
+      }}>
+        {isNeg ? "−" : "+"}{fmt(Math.abs(value))}
+      </span>
+    </div>
+  );
+}
+
 // ── Panel wrapper ─────────────────────────────────────────────────────────────
 
 function Panel({ children, style }) {
@@ -355,6 +372,31 @@ export default function Dashboard({
   const householdNetIncome = (s.yourBase + s.spouseBase) * (1 - s.taxRate) + bonusAfterTax;
   const totalAnnualSaving = totalMonthlyContrib * 12;
 
+  // ── Per-person excess cash ────────────────────────────────────────────────
+  // Net take-home per person (base + bonus + equity, after blended tax)
+  const yourEquityAmt = s.yourBase * (s.yourEquityPct || 0);
+  const spouseEquityAmt = s.spouseBase * (s.spouseEquityPct || 0);
+  const yourNetIncome  = (s.yourBase  + s.yourBase  * (s.yourBonusPct  || 0) + yourEquityAmt)  * (1 - (s.taxRate || 0));
+  const spouseNetIncome = (s.spouseBase + s.spouseBase * (s.spouseBonusPct || 0) + spouseEquityAmt) * (1 - (s.taxRate || 0));
+
+  // Shared household expenses split proportionally to income (or 50/50 if solo)
+  const partnered = s.partnered !== false;
+  const totalNet = yourNetIncome + (partnered ? spouseNetIncome : 0);
+  const yourShare  = totalNet > 0 ? yourNetIncome  / totalNet : 1;
+  const spouseShare = totalNet > 0 ? spouseNetIncome / totalNet : 0;
+
+  const yourAnnualExpenses  = grandAnnual * yourShare;
+  const spouseAnnualExpenses = grandAnnual * spouseShare;
+
+  // Per-person savings contributions
+  const yourAnnualSavings   = ((s.startingMonthly || 0) + (s.yourTfsaMonthly || 0) + (s.yourNrMonthly || 0)) * 12
+    + (s.rrspTopUp || 0) + (s.tfsaTopUp || 0) + (s.nrTopUp || 0);
+  const spouseAnnualSavings = ((s.spouseMonthly || 0) + (s.spouseTfsaMonthly || 0) + (s.spouseNrMonthly || 0)) * 12;
+
+  const yourExcess   = yourNetIncome   - yourAnnualExpenses  - yourAnnualSavings;
+  const spouseExcess = spouseNetIncome - spouseAnnualExpenses - spouseAnnualSavings;
+  const householdExcess = yourExcess + (partnered ? spouseExcess : 0);
+
   // Scenario base
   const baseScenario = scenarios ? scenarios.find(sc => sc.label === "Base") : null;
 
@@ -396,7 +438,7 @@ export default function Dashboard({
             <>
               <div style={{ fontSize: "var(--step-5)", fontWeight: 700, color: "var(--slate)", marginTop: 12 }}>Not reachable</div>
               <div style={{ fontSize: "var(--step--1)", color: "var(--ink-3)", marginTop: 8 }}>
-                No retirement age draws the portfolio down to {fmt(s.terminalTargetToday)} by age {s.deathAge} while covering all spending.
+                No retirement age leaves {fmt(s.terminalTargetToday)} at age {s.deathAge} while covering all spending.
               </div>
             </>
           )}
@@ -420,10 +462,75 @@ export default function Dashboard({
             sub={`/yr today's $`}
           />
           <MiniStat
-            label="Terminal target"
+            label="Die with"
             value={fmt(s.terminalTargetToday)}
             sub={`at age ${s.deathAge}`}
           />
+        </div>
+      </div>
+
+      {/* ── Panel 2b: Annual excess cash ── */}
+      <div className="dash-panel" style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+          <div>
+            <div className="label-xs">Annual excess cash</div>
+            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 3 }}>
+              Take-home minus spending and planned contributions — this year
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <span className="mono" style={{
+              fontSize: "var(--step-3)",
+              fontWeight: 700,
+              color: householdExcess >= 0 ? "var(--moss-ink)" : "var(--slate-ink)",
+            }}>
+              {fmt(householdExcess)}
+            </span>
+            <span style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>/yr household</span>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 0, borderTop: "1px solid var(--line)" }}>
+          {/* Your column */}
+          <div style={{ flex: 1, paddingTop: 14, paddingRight: 24 }}>
+            <div className="label-xs" style={{ marginBottom: 10 }}>{s.yourName || "You"}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <CashRow label="Take-home" value={yourNetIncome} fmt={fmt} />
+              <CashRow label="Spending (share)" value={-yourAnnualExpenses} fmt={fmt} />
+              <CashRow label="Savings contributions" value={-yourAnnualSavings} fmt={fmt} />
+              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 6, marginTop: 2, display: "flex", justifyContent: "space-between", fontWeight: 600 }}>
+                <span style={{ fontSize: "var(--step--1)", color: "var(--ink)" }}>Excess</span>
+                <span className="mono" style={{
+                  fontSize: "var(--step-1)",
+                  fontWeight: 700,
+                  color: yourExcess >= 0 ? "var(--moss-ink)" : "var(--slate-ink)",
+                }}>{fmt(yourExcess)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Spouse column — only shown if partnered */}
+          {partnered && (
+            <>
+              <div style={{ width: 1, background: "var(--line)", margin: "14px 0 0" }} />
+              <div style={{ flex: 1, paddingTop: 14, paddingLeft: 24 }}>
+                <div className="label-xs" style={{ marginBottom: 10 }}>{s.spouseName || "Spouse"}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <CashRow label="Take-home" value={spouseNetIncome} fmt={fmt} />
+                  <CashRow label="Spending (share)" value={-spouseAnnualExpenses} fmt={fmt} />
+                  <CashRow label="Savings contributions" value={-spouseAnnualSavings} fmt={fmt} />
+                  <div style={{ borderTop: "1px solid var(--line)", paddingTop: 6, marginTop: 2, display: "flex", justifyContent: "space-between", fontWeight: 600 }}>
+                    <span style={{ fontSize: "var(--step--1)", color: "var(--ink)" }}>Excess</span>
+                    <span className="mono" style={{
+                      fontSize: "var(--step-1)",
+                      fontWeight: 700,
+                      color: spouseExcess >= 0 ? "var(--moss-ink)" : "var(--slate-ink)",
+                    }}>{fmt(spouseExcess)}</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
