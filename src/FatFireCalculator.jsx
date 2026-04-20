@@ -1,5 +1,8 @@
 import { useState, useMemo, useRef, useEffect, createContext, useContext, useCallback } from "react";
 import Onboarding, { onboardingToState } from "./Onboarding";
+import Dashboard from "./Dashboard";
+import PlanEditor from "./PlanEditor";
+import Settings from "./Settings";
 
 // Supabase client — falls back to a no-op stub if not configured (e.g. running as artifact)
 let supabase;
@@ -20,7 +23,7 @@ try {
 }
 
 // ---------- privacy context ----------
-const PrivacyContext = createContext(false);
+export const PrivacyContext = createContext(false);
 const MASK = "••••••";
 
 // ---------- helpers ----------
@@ -1016,6 +1019,10 @@ export default function FatFireCalculator() {
     () => !localStorage.getItem(ONBOARDING_KEY)
   );
 
+  // ── Page routing ──────────────────────────────────────────────────────────
+  // "dashboard" | "editor" | "settings"
+  const [page, setPage] = useState("dashboard");
+
   // ── Check URL for ?join=CODE on load ──────────────────────────────────────
   const pendingJoinCode = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1522,1103 +1529,203 @@ export default function FatFireCalculator() {
     );
   }
 
-  return (
-    <PrivacyContext.Provider value={hidden}>
-    <div className="dash-frame">
-      <div className="dash-top">
-        <div>
-          <div className="dash-top__brand">Trailhead</div>
-          <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>
-            Canadian tax-optimized · RRSP meltdown · Today's dollars
+  // ── Modals (shared across all pages) ─────────────────────────────────────
+  const modals = (
+    <>
+      {showResetConfirm && (
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <h2>Start over?</h2>
+            <p>This will clear all your inputs and take you back to the beginning. Any unsaved changes will be lost — this can't be undone.</p>
+            <button onClick={confirmReset} className="btn btn--primary" style={{ width: "100%", marginBottom: 10, background: "oklch(42% 0.14 25)", justifyContent: "center" }}>
+              Yes, clear everything and start over
+            </button>
+            <button onClick={() => setShowResetConfirm(false)} className="btn btn--outline" style={{ width: "100%", justifyContent: "center" }}>
+              Cancel
+            </button>
           </div>
         </div>
-        <div className="dash-top__actions">
+      )}
+      {mergeConflict && (
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <h2>You have unsaved inputs</h2>
+            <p>Your browser has inputs from before you signed in. Your {mergeConflict.planType === "household" ? "household" : "saved"} plan also has data. Which would you like to keep?</p>
+            <button onClick={() => setMergeConflict(null)} className="modal-choice-btn">
+              <span className="modal-choice-btn__icon">💻</span>
+              <div>
+                <div className="modal-choice-btn__title">Keep browser inputs</div>
+                <div className="modal-choice-btn__desc">Use what you just entered — this will overwrite your saved plan</div>
+              </div>
+            </button>
+            <button onClick={() => { setS({ ...publicDefaults, ...mergeConflict.cloudInputs }); localStorage.removeItem(STORAGE_KEY); setMergeConflict(null); }} className="modal-choice-btn">
+              <span className="modal-choice-btn__icon">☁️</span>
+              <div>
+                <div className="modal-choice-btn__title">Load saved plan</div>
+                <div className="modal-choice-btn__desc">Restore your previously saved {mergeConflict.planType === "household" ? "household" : "personal"} plan — browser inputs will be discarded</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+      {showPlanPicker && (
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <h2>Which plan would you like to open?</h2>
+            <p>You have a personal plan and a shared household plan. You can switch between them anytime.</p>
+            <button onClick={() => switchPlan("personal")} className="modal-choice-btn">
+              <span className="modal-choice-btn__icon">👤</span>
+              <div>
+                <div className="modal-choice-btn__title">My Personal Plan</div>
+                <div className="modal-choice-btn__desc">Your private projections — only you can see and edit this</div>
+              </div>
+            </button>
+            <button onClick={() => switchPlan("household")} className="modal-choice-btn">
+              <span className="modal-choice-btn__icon">🏠</span>
+              <div>
+                <div className="modal-choice-btn__title">Household Plan</div>
+                <div className="modal-choice-btn__desc">Shared with {householdMembers.length > 1 ? `${householdMembers.length} members` : "your household"} — changes sync for everyone</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
 
-              {/* Hide toggle — always first */}
+  return (
+    <PrivacyContext.Provider value={hidden}>
+    <div className="dash-frame" style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+
+      {/* ── Top nav ── */}
+      <div className="dash-top">
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div>
+            <div className="dash-top__brand">Trailhead</div>
+          </div>
+          {/* Page tabs */}
+          <nav style={{ display: "flex", gap: 2 }}>
+            {[
+              { id: "dashboard", label: "Dashboard" },
+              { id: "editor", label: "Plan Editor" },
+              { id: "settings", label: "Settings" },
+            ].map(tab => (
               <button
-                onClick={() => setHidden(h => !h)}
-                className={"btn btn--sm btn--outline " + (hidden ? "is-active" : "")}
-                style={hidden ? { background: "var(--sun-soft)", borderColor: "var(--sun)", color: "var(--sun-ink)" } : {}}
+                key={tab.id}
+                onClick={() => setPage(tab.id)}
+                style={{
+                  padding: "5px 14px",
+                  fontSize: "var(--step--1)",
+                  fontWeight: page === tab.id ? 600 : 400,
+                  color: page === tab.id ? "var(--ink)" : "var(--ink-3)",
+                  background: page === tab.id ? "var(--paper-2)" : "none",
+                  border: "1px solid " + (page === tab.id ? "var(--line)" : "transparent"),
+                  borderRadius: "var(--r-2)",
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
               >
-                {hidden ? "🙈 Hidden" : "👁 Hide"}
+                {tab.label}
               </button>
+            ))}
+          </nav>
+        </div>
+        <div className="dash-top__actions">
+          {/* Hide toggle */}
+          <button
+            onClick={() => setHidden(h => !h)}
+            className={"btn btn--sm btn--outline " + (hidden ? "is-active" : "")}
+            style={hidden ? { background: "var(--sun-soft)", borderColor: "var(--sun)", color: "var(--sun-ink)" } : {}}
+          >
+            {hidden ? "🙈 Hidden" : "👁 Hide"}
+          </button>
 
-              {/* Plan tab toggle — shown when user has both a personal plan and a household */}
-              {user && household && personalPlanId && activePlan && (
-                <div className="seg">
-                  <button
-                    onClick={() => switchPlan("personal")}
-                    className={activePlan === "personal" ? "is-active" : ""}
-                  >
-                    My Plan
-                  </button>
-                  <button
-                    onClick={() => switchPlan("household")}
-                    className={activePlan === "household" ? "is-active" : ""}
-                  >
-                    🏠 Household
-                  </button>
-                </div>
+          {/* Auth status */}
+          {authLoading ? null : user ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {user.user_metadata?.avatar_url && (
+                <img src={user.user_metadata.avatar_url} alt="" style={{ width: 26, height: 26, borderRadius: "50%" }} />
               )}
+              <span style={{ fontSize: "var(--step--1)", color: "var(--ink-2)", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</span>
+            </div>
+          ) : (
+            <button onClick={signInWithGoogle} className="btn btn--outline btn--sm" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+              Sign in
+            </button>
+          )}
 
-              {/* Household CTA / dropdown */}
-              {user && activePlan === "personal" && !household && (
-                <button onClick={() => createHousehold(user.id, s)} className="btn btn--outline btn--sm">
-                  {copied ? "✓ Invite link copied!" : "＋ Add to household"}
-                </button>
-              )}
-
-              {household && (() => {
-                const isOwner = user?.id === household.created_by;
-                const hasOthers = householdMembers.length > 1;
-                if (!hasOthers) {
-                  return (
-                    <button onClick={copyShareUrl} className="btn btn--outline btn--sm">
-                      {copied ? "✓ Link copied!" : "＋ Invite to household"}
-                    </button>
-                  );
-                }
-                return (
-                  <div style={{ position: "relative" }} ref={householdPanelRef}>
-                    <button onClick={() => setShowHouseholdPanel(p => !p)} className="btn btn--outline btn--sm">
-                      🏠 Household {showHouseholdPanel ? "▲" : "▼"}
-                    </button>
-                    {showHouseholdPanel && (
-                      <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", background: "var(--paper)", border: "1px solid var(--line)", borderRadius: "var(--r-3)", boxShadow: "var(--shadow-3)", zIndex: 50, width: 272, padding: 14 }}>
-                        <div className="label-xs" style={{ marginBottom: 10 }}>Members</div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-                          {householdMembers.map(m => {
-                            const isThisOwner = m.user_id === household.created_by;
-                            const canRemove = !isThisOwner && (isOwner || m.user_id === user?.id);
-                            return (
-                              <div key={m.user_id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                                  {m.avatar_url
-                                    ? <img src={m.avatar_url} alt="" style={{ width: 24, height: 24, borderRadius: "50%", flexShrink: 0 }} />
-                                    : <div style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--paper-3)", display: "grid", placeItems: "center", fontSize: 11, color: "var(--ink-3)", flexShrink: 0, fontWeight: 500 }}>
-                                        {(m.name || m.email || "?")[0].toUpperCase()}
-                                      </div>
-                                  }
-                                  <div style={{ minWidth: 0 }}>
-                                    <div style={{ fontSize: "var(--step--1)", fontWeight: 500, color: "var(--ink)" }}>
-                                      {m.name || m.email}
-                                      {isThisOwner && <span style={{ color: "var(--ink-3)", fontWeight: 400, marginLeft: 4 }}>(owner)</span>}
-                                    </div>
-                                    {m.name && <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>{m.email}</div>}
-                                  </div>
-                                </div>
-                                {canRemove && (
-                                  <button onClick={() => removeMember(m.user_id)} className="btn--ghost btn--sm" style={{ fontSize: 14, padding: "2px 6px", color: "var(--ink-3)" }} title={m.user_id === user?.id ? "Leave household" : "Remove member"}>✕</button>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
-                          <button onClick={copyShareUrl} className="btn btn--primary btn--sm" style={{ width: "100%" }}>
-                            {copied ? "✓ Link copied!" : "＋ Add to household"}
-                          </button>
-                          <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", textAlign: "center" }}>Copies an invite link to share</div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {user && !household && (
-                <button onClick={() => setShowJoinBox(j => !j)} className="btn btn--ghost btn--sm">Join household</button>
-              )}
-              {!user && pendingJoinCode && (
-                <span style={{ fontSize: "var(--step--1)", color: "var(--sun-ink)", fontWeight: 500 }}>Sign in to join household</span>
-              )}
-
-              {/* Auth */}
-              {authLoading ? null : user ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {user.user_metadata?.avatar_url && (
-                    <img src={user.user_metadata.avatar_url} alt="" style={{ width: 26, height: 26, borderRadius: "50%" }} />
-                  )}
-                  <span style={{ fontSize: "var(--step--1)", color: "var(--ink-2)", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</span>
-                  <button onClick={signOut} className="btn btn--ghost btn--sm">Sign out</button>
-                </div>
-              ) : (
-                <button onClick={signInWithGoogle} className="btn btn--outline btn--sm" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-                  Sign in with Google
-                </button>
-              )}
-
-              <button onClick={resetToDefaults} className="btn btn--ghost btn--sm">Reset</button>
+          {/* Save status */}
+          {activePlan && (
+            <span style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>
+              {saveStatus === "saving" ? "Saving…" : saveStatus === "error" ? "⚠ Error" : "Saved"}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Join box */}
-        {showJoinBox && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 24px", borderTop: "1px solid var(--line)", background: "var(--paper-2)" }}>
-            <input
-              type="text"
-              placeholder="Enter join code"
-              value={joinInput}
-              onChange={e => setJoinInput(e.target.value.toUpperCase())}
-              className="input mono"
-              style={{ width: 140, padding: "6px 10px", letterSpacing: "0.1em" }}
-            />
-            <button onClick={handleJoinSubmit} className="btn btn--primary btn--sm">Join</button>
-            {joinError && <span style={{ fontSize: "var(--step--2)", color: "oklch(42% 0.12 25)" }}>{joinError}</span>}
-          </div>
-        )}
-
-        {/* Pending join code banner */}
-        {!user && pendingJoinCode && (
-          <div className="callout" style={{ margin: "0 24px 12px", borderRadius: "var(--r-2)" }}>
-            You've been invited to join a household. Sign in with Google to accept.
-          </div>
-        )}
-
-        {/* ── Reset confirm modal ── */}
-        {showResetConfirm && (
-          <div className="modal-overlay">
-            <div className="modal-card">
-              <h2>Start over?</h2>
-              <p>This will clear all your inputs and take you back to the beginning. Any unsaved changes will be lost — this can't be undone.</p>
-              <button onClick={confirmReset} className="btn btn--primary" style={{ width: "100%", marginBottom: 10, background: "oklch(42% 0.14 25)", justifyContent: "center" }}>
-                Yes, clear everything and start over
-              </button>
-              <button onClick={() => setShowResetConfirm(false)} className="btn btn--outline" style={{ width: "100%", justifyContent: "center" }}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Merge conflict modal ── */}
-        {mergeConflict && (
-          <div className="modal-overlay">
-            <div className="modal-card">
-              <h2>You have unsaved inputs</h2>
-              <p>Your browser has inputs from before you signed in. Your {mergeConflict.planType === "household" ? "household" : "saved"} plan also has data. Which would you like to keep?</p>
-              <button onClick={() => setMergeConflict(null)} className="modal-choice-btn">
-                <span className="modal-choice-btn__icon">💻</span>
-                <div>
-                  <div className="modal-choice-btn__title">Keep browser inputs</div>
-                  <div className="modal-choice-btn__desc">Use what you just entered — this will overwrite your saved plan</div>
-                </div>
-              </button>
-              <button onClick={() => { setS({ ...publicDefaults, ...mergeConflict.cloudInputs }); localStorage.removeItem(STORAGE_KEY); setMergeConflict(null); }} className="modal-choice-btn">
-                <span className="modal-choice-btn__icon">☁️</span>
-                <div>
-                  <div className="modal-choice-btn__title">Load saved plan</div>
-                  <div className="modal-choice-btn__desc">Restore your previously saved {mergeConflict.planType === "household" ? "household" : "personal"} plan — browser inputs will be discarded</div>
-                </div>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Plan picker modal ── */}
-        {showPlanPicker && (
-          <div className="modal-overlay">
-            <div className="modal-card">
-              <h2>Which plan would you like to open?</h2>
-              <p>You have a personal plan and a shared household plan. You can switch between them anytime.</p>
-              <button onClick={() => switchPlan("personal")} className="modal-choice-btn">
-                <span className="modal-choice-btn__icon">👤</span>
-                <div>
-                  <div className="modal-choice-btn__title">My Personal Plan</div>
-                  <div className="modal-choice-btn__desc">Your private projections — only you can see and edit this</div>
-                </div>
-              </button>
-              <button onClick={() => switchPlan("household")} className="modal-choice-btn">
-                <span className="modal-choice-btn__icon">🏠</span>
-                <div>
-                  <div className="modal-choice-btn__title">Household Plan</div>
-                  <div className="modal-choice-btn__desc">Shared with {householdMembers.length > 1 ? `${householdMembers.length} members` : "your household"} — changes sync for everyone</div>
-                </div>
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="dash-body">
-          {/* ── Inputs panel ── */}
-          <div className="dash-inputs">
-
-            <Section title="Personal">
-              <div className="inp-row">
-                <span>Your name</span>
-                <input type="text" value={s.yourName || ""} placeholder="e.g. Alex" onChange={(e) => update("yourName")(e.target.value)} className="--sm" />
-              </div>
-              {s.partnered !== false && (
-                <div className="inp-row">
-                  <span>Spouse's name</span>
-                  <input type="text" value={s.spouseName || ""} placeholder="e.g. Jamie" onChange={(e) => update("spouseName")(e.target.value)} className="--sm" />
-                </div>
-              )}
-              <NumInput label={`${s.yourName || "You"}'s current age`} value={s.currentAge} onChange={update("currentAge")} small />
-              {s.partnered !== false && (
-                <NumInput label={`${s.spouseName || "Spouse"}'s current age`} value={s.spouseCurrentAge} onChange={update("spouseCurrentAge")} small />
-              )}
-              <NumInput label="End-of-plan age" value={s.deathAge} onChange={update("deathAge")} small />
-            </Section>
-
-            <Section title="Income & tax (working years)">
-              <div className="ob-person-label">{s.yourName || "You"}</div>
-              <NumInput label="Annual base salary" value={s.yourBase} onChange={update("yourBase")} prefix="$" step={1000} />
-              <PctInput label="Performance bonus (% of base)" value={s.yourBonusPct} onChange={update("yourBonusPct")} />
-              <PctInput label="Equity / RSUs / options (% of base)" value={s.yourEquityPct} onChange={update("yourEquityPct")} hint="total variable equity, invested as vested" />
-              <PctInput label="Commission & profit sharing (% of base)" value={s.yourCommissionPct || 0} onChange={update("yourCommissionPct")} />
-
-              {s.partnered !== false && (
-                <>
-                  <div className="ob-person-label" style={{ paddingTop: 8 }}>{s.spouseName || "Spouse"}</div>
-                  <NumInput label="Annual base salary" value={s.spouseBase} onChange={update("spouseBase")} prefix="$" step={1000} />
-                  <PctInput label="Performance bonus (% of base)" value={s.spouseBonusPct} onChange={update("spouseBonusPct")} />
-                  <PctInput label="Equity / RSUs / options (% of base)" value={s.spouseEquityPct} onChange={update("spouseEquityPct")} hint="total variable equity, invested as vested" />
-                  <PctInput label="Commission & profit sharing (% of base)" value={s.spouseCommissionPct || 0} onChange={update("spouseCommissionPct")} />
-                </>
-              )}
-
-              <div className="ob-person-label" style={{ paddingTop: 8 }}>Tax</div>
-              <PctInput label="Blended tax rate" value={s.taxRate} onChange={update("taxRate")} />
-              <PctInput label="Income growth (real)" value={s.incomeGrowth} onChange={update("incomeGrowth")} />
-
-              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 8, marginTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
-                  <span>{s.yourName || "You"}'s total comp</span>
-                  <span className="mono">{fmtMoney(s.yourBase + yourBonusAmt + yourEquityAmt)}</span>
-                </div>
-                {s.partnered !== false && (
-                  <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
-                    <span>{s.spouseName || "Spouse"}'s total comp</span>
-                    <span className="mono">{fmtMoney(s.spouseBase + spouseBonusAmt + spouseEquityAmt)}</span>
-                  </div>
-                )}
-                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, color: "var(--ink)", fontSize: "var(--step--1)", paddingTop: 6, borderTop: "1px solid var(--line)" }}>
-                  <span>{s.partnered !== false ? "Household" : "Total"} gross</span>
-                  <span className="mono">{fmtMoney(householdGross)}</span>
-                </div>
-              </div>
-            </Section>
-
-            <Section title="Expenses (today's $)">
-              <div className="ob-person-label">Housing</div>
-              <ExpenseRow label="Mortgage" value={s.mortgage} onChange={update("mortgage")} freq="monthly" />
-              <div style={{ paddingLeft: 12, borderLeft: "2px solid var(--line)", marginLeft: 4, display: "flex", flexDirection: "column", gap: 2 }}>
-                <NumInput label="Principal remaining" value={s.mortgagePrincipal} onChange={update("mortgagePrincipal")} prefix="$" step={1000} />
-                <PctInput label="Interest rate" value={s.mortgageRate} onChange={update("mortgageRate")} />
-                <NumInput label="Extra payment / mo" value={s.extraMortgagePayment} onChange={update("extraMortgagePayment")} prefix="$" step={100} hint="reduces contributions by same amount" />
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--ink-2)", paddingTop: 4 }}>
-                  <span>Projected payoff</span>
-                  <span className="mono">
-                    {isFinite(mortgagePayoff)
-                      ? `age ${mortgagePayoff} (${Math.round(solved.mortgagePayoffMonths)} mo)`
-                      : "payment doesn't cover interest"}
-                  </span>
-                </div>
-                {yearsSaved > 0 && (
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--accent-deep)", fontWeight: 500 }}>
-                    <span>vs. no extra payment</span>
-                    <span className="mono" style={{ fontWeight: 600 }}>{yearsSaved} yr{yearsSaved !== 1 ? "s" : ""} earlier</span>
-                  </div>
-                )}
-              </div>
-              <ExpenseRow label="Rent" value={s.rent || 0} onChange={update("rent")} freq="monthly" />
-              <ExpenseRow label="Property tax" value={s.propertyTax} onChange={update("propertyTax")} freq="monthly" />
-              <ExpenseRow label="Home insurance" value={s.homeInsurance || 0} onChange={update("homeInsurance")} freq="monthly" />
-              <ExpenseRow label="Maintenance & repairs" value={s.maintenance} onChange={update("maintenance")} freq="monthly" />
-              <ExpenseRow label="Utilities (hydro, gas, water)" value={s.utilities} onChange={update("utilities")} freq="monthly" />
-
-              <div className="ob-person-label" style={{ paddingTop: 8 }}>Essentials</div>
-              <ExpenseRow label="Groceries" value={s.groceries} onChange={update("groceries")} freq="monthly" />
-              <ExpenseRow label="Transport & transit" value={s.transport} onChange={update("transport")} freq="monthly" />
-              <ExpenseRow label="Personal care & health" value={s.personalCare} onChange={update("personalCare")} freq="monthly" step={50} />
-              {s.hasKids !== false && (
-                <ExpenseRow label="Childcare & activities" value={s.childcare} onChange={update("childcare")} freq="monthly" step={100} />
-              )}
-
-              <div className="ob-person-label" style={{ paddingTop: 8 }}>Lifestyle</div>
-              <ExpenseRow label="Dining & takeout" value={s.dining} onChange={update("dining")} freq="monthly" />
-              <ExpenseRow label="Clothing & shopping" value={s.clothing} onChange={update("clothing")} freq="monthly" />
-              <ExpenseRow label="Subscriptions & tech" value={s.subscriptions} onChange={update("subscriptions")} freq="monthly" step={50} />
-              <ExpenseRow label="Entertainment & hobbies" value={s.entertainment || 0} onChange={update("entertainment")} freq="monthly" step={50} />
-
-              <div className="ob-person-label" style={{ paddingTop: 8 }}>Annual</div>
-              <ExpenseRow label="Travel & holidays" value={s.travel} onChange={update("travel")} freq="annual" step={1000} />
-              {s.hasKids !== false && (
-                <ExpenseRow label="RESP contributions" value={s.resp} onChange={update("resp")} freq="annual" step={500} />
-              )}
-              <ExpenseRow label="Other annual expenses" value={s.oneTimeMisc} onChange={update("oneTimeMisc")} freq="annual" step={1000} />
-              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 8, marginTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
-                  <span>Monthly (×12)</span>
-                  <span className="mono">{fmtMoney(inputs.monthlyExpensesTotal * 12)}</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
-                  <span>One-time annual (incl. RESP)</span>
-                  <span className="mono">{fmtMoney(inputs.oneTimeAnnualTotal)}</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, color: "var(--ink)", fontSize: "var(--step--1)", paddingTop: 6, borderTop: "1px solid var(--line)" }}>
-                  <span>Working years total / yr</span>
-                  <span className="mono">{fmtMoney(grandAnnual)}</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
-                  <span>After mortgage payoff</span>
-                  <span className="mono">{fmtMoney(postMortgageAnnual)}</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, color: "var(--moss-ink)", fontSize: "var(--step--1)", paddingTop: 6, borderTop: "1px solid var(--line)" }}>
-                  <span>Retirement spend / yr</span>
-                  <span className="mono">{fmtMoney(grandAnnual + (inputs.retirementSpendDelta || 0))}</span>
-                </div>
-                <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>Retirement spend swaps travel for snowbird budget, adds healthcare, removes RESP.</div>
-              </div>
-            </Section>
-
-            <Section title="Retirement-specific spend" defaultOpen={false}>
-              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 8 }}>These replace or supplement your working-years budget once retired. The model uses these figures during decumulation.</div>
-              <ExpenseRow label="Snowbird / extended travel" value={s.retirementTravel} onChange={update("retirementTravel")} freq="annual" step={1000} />
-              <ExpenseRow label="Private health / dental / vision" value={s.retirementHealthcare} onChange={update("retirementHealthcare")} freq="annual" step={500} />
-              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 8, marginTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
-                  <span>Working-years travel budget</span>
-                  <span className="mono">{fmtMoney(s.travel)}/yr</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
-                  <span>RESP (drops off in retirement)</span>
-                  <span className="mono">−{fmtMoney(s.resp || 0)}/yr</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, paddingTop: 4, borderTop: "1px solid var(--line)", color: (inputs.retirementSpendDelta || 0) > 0 ? "var(--slate)" : "var(--accent-deep)" }}>
-                  <span>Net retirement spend change</span>
-                  <span className="mono">{(inputs.retirementSpendDelta || 0) > 0 ? "+" : ""}{fmtMoney(inputs.retirementSpendDelta || 0)}/yr</span>
-                </div>
-              </div>
-            </Section>
-
-            <Section title="Starting portfolio (by person)">
-              <div className="ob-person-label">{s.yourName || "You"}</div>
-              <NumInput label="RRSP" value={s.yourRrspStart} onChange={update("yourRrspStart")} prefix="$" step={10000} />
-              <NumInput label="TFSA" value={s.yourTfsaStart} onChange={update("yourTfsaStart")} prefix="$" step={10000} />
-              <NumInput label="Non-registered" value={s.yourNrStart} onChange={update("yourNrStart")} prefix="$" step={10000} />
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--ink-3)", paddingBottom: 4 }}>
-                <span>{s.yourName || "You"}'s subtotal</span>
-                <span className="mono">{fmtMoney((s.yourRrspStart||0) + (s.yourTfsaStart||0) + (s.yourNrStart||0))}</span>
-              </div>
-
-              {s.partnered !== false && (
-                <>
-                  <div className="ob-person-label" style={{ paddingTop: 8, borderTop: "1px solid var(--line)", marginTop: 4 }}>{s.spouseName || "Spouse"}</div>
-                  <NumInput label="RRSP" value={s.spouseRrspStart} onChange={update("spouseRrspStart")} prefix="$" step={10000} />
-                  <NumInput label="TFSA" value={s.spouseTfsaStart} onChange={update("spouseTfsaStart")} prefix="$" step={10000} />
-                  <NumInput label="Non-registered" value={s.spouseNrStart} onChange={update("spouseNrStart")} prefix="$" step={10000} />
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--ink-3)", paddingBottom: 4 }}>
-                    <span>{s.spouseName || "Spouse"}'s subtotal</span>
-                    <span className="mono">{fmtMoney((s.spouseRrspStart||0) + (s.spouseTfsaStart||0) + (s.spouseNrStart||0))}</span>
-                  </div>
-                </>
-              )}
-
-              <div style={{ paddingTop: 4, marginTop: 4, borderTop: "1px solid var(--line)", fontSize: "var(--step--1)", color: "var(--ink-2)", display: "flex", justifyContent: "space-between" }}>
-                <span style={{ fontWeight: 600, color: "var(--ink)" }}>{s.partnered !== false ? "Household total" : "Total"}</span>
-                <span className="mono" style={{ fontWeight: 600, color: "var(--ink)" }}>{fmtMoney((s.yourRrspStart||0)+(s.yourTfsaStart||0)+(s.yourNrStart||0)+(s.partnered !== false ? (s.spouseRrspStart||0)+(s.spouseTfsaStart||0)+(s.spouseNrStart||0) : 0))}</span>
-              </div>
-            </Section>
-
-            <Section title="Retirement saving">
-              <div className="ob-person-label">{s.yourName || "You"} — monthly</div>
-              <NumInput label="RRSP" value={s.startingMonthly} onChange={update("startingMonthly")} prefix="$" step={100} />
-              <NumInput label="TFSA" value={s.yourTfsaMonthly || 0} onChange={update("yourTfsaMonthly")} prefix="$" step={100} />
-              <NumInput label="Non-registered" value={s.yourNrMonthly || 0} onChange={update("yourNrMonthly")} prefix="$" step={100} />
-              {s.partnered !== false && (
-                <>
-                  <div className="ob-person-label" style={{ paddingTop: 8 }}>{s.spouseName || "Spouse"} — monthly</div>
-                  <NumInput label="RRSP" value={s.spouseMonthly || 0} onChange={update("spouseMonthly")} prefix="$" step={100} />
-                  <NumInput label="TFSA" value={s.spouseTfsaMonthly || 0} onChange={update("spouseTfsaMonthly")} prefix="$" step={100} />
-                  <NumInput label="Non-registered" value={s.spouseNrMonthly || 0} onChange={update("spouseNrMonthly")} prefix="$" step={100} />
-                </>
-              )}
-              <div className="ob-person-label" style={{ paddingTop: 8 }}>Annual lump-sum top-ups</div>
-              <NumInput label="RRSP" value={s.rrspTopUp || 0} onChange={update("rrspTopUp")} prefix="$" step={1000} hint="e.g. year-end bonus contribution" />
-              <NumInput label="TFSA" value={s.tfsaTopUp || 0} onChange={update("tfsaTopUp")} prefix="$" step={1000} />
-              <NumInput label="Non-registered" value={s.nrTopUp || 0} onChange={update("nrTopUp")} prefix="$" step={1000} />
-              <PctInput label="Monthly contrib growth" value={s.contribGrowth} onChange={update("contribGrowth")} />
-
-              {/* Computed read-only lines */}
-              <div style={{ paddingTop: 8, marginTop: 4, borderTop: "1px solid var(--line)", display: "flex", flexDirection: "column", gap: 3 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
-                  <span>Total monthly contributions</span>
-                  <span className="mono">{fmtMoney(totalMonthlyContrib)}/mo</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
-                  <span>Bonus / yr <span style={{ color: "var(--ink-3)" }}>(after-tax, from yr 1)</span></span>
-                  <span className="mono">{fmtMoney(bonusAfterTax)}</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
-                  <span>Equity / yr <span style={{ color: "var(--ink-3)" }}>(after-tax, from yr 4)</span></span>
-                  <span className="mono">{equityAfterTax > 0 ? fmtMoney(equityAfterTax) : "—"}</span>
-                </div>
-                <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>Bonus & equity grow with income growth rate. Set % in Income section.</div>
-              </div>
-
-              <div style={{ paddingTop: 8, marginTop: 4, borderTop: "1px solid var(--line)", display: "flex", flexDirection: "column", gap: 3 }}>
-                {s.extraMortgagePayment > 0 && (
-                  <div style={{ display: "flex", justifyContent: "space-between", color: "var(--slate)" }}>
-                    <span>Extra mortgage payment / yr</span>
-                    <span className="mono">−{fmtMoney(s.extraMortgagePayment * 12)}</span>
-                  </div>
-                )}
-                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)" }}>
-                  <span>Net annual contribution (yrs 1–3)</span>
-                  <span className="mono" style={{ fontWeight: 600 }}>{fmtMoney(Math.max(0, startingAnnualContrib - s.extraMortgagePayment * 12))}</span>
-                </div>
-                {equityAfterTax > 0 && (
-                  <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, color: "var(--ink)", fontSize: "var(--step--1)" }}>
-                    <span>Net annual contribution (yr 4+)</span>
-                    <span className="mono">{fmtMoney(Math.max(0, fullAnnualContrib - s.extraMortgagePayment * 12))}</span>
-                  </div>
-                )}
-                <div style={{ color: "var(--ink-3)", marginTop: 4, fontSize: "var(--step--2)" }}>Waterfall: TFSA room → RRSP room → Non-reg overflow.</div>
-              </div>
-            </Section>
-
-            <Section title="Contribution room (registered plans)">
-              <div className="ob-person-label">Existing carry-forward room</div>
-              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName || "You"}</div>
-              <NumInput label="RRSP room" value={s.yourRrspRoomExisting} onChange={update("yourRrspRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
-              <NumInput label="TFSA room" value={s.yourTfsaRoomExisting} onChange={update("yourTfsaRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
-              {s.partnered !== false && (
-                <>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 6, marginBottom: 4 }}>{s.spouseName || "Spouse"}</div>
-                  <NumInput label="RRSP room" value={s.spouseRrspRoomExisting} onChange={update("spouseRrspRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
-                  <NumInput label="TFSA room" value={s.spouseTfsaRoomExisting} onChange={update("spouseTfsaRoomExisting")} prefix="$" step={1000} hint="(carry-forward)" />
-                </>
-              )}
-
-              <div style={{ fontSize: "var(--step--2)", fontWeight: 600, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.08em", paddingTop: 8, paddingBottom: 2, borderTop: "1px solid var(--line)", marginTop: 8 }}>Annual new room (today's $)</div>
-              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName || "You"}</div>
-              <NumInput label="RRSP room / yr" value={s.yourRrspRoomAnnual} onChange={update("yourRrspRoomAnnual")} prefix="$" step={500} />
-              <NumInput label="TFSA room / yr" value={s.yourTfsaRoomAnnual} onChange={update("yourTfsaRoomAnnual")} prefix="$" step={500} />
-              {s.partnered !== false && (
-                <>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 6, marginBottom: 4 }}>{s.spouseName || "Spouse"}</div>
-                  <NumInput label="RRSP room / yr" value={s.spouseRrspRoomAnnual} onChange={update("spouseRrspRoomAnnual")} prefix="$" step={500} />
-                  <NumInput label="TFSA room / yr" value={s.spouseTfsaRoomAnnual} onChange={update("spouseTfsaRoomAnnual")} prefix="$" step={500} />
-                </>
-              )}
-
-              <div style={{ paddingTop: 8, marginTop: 8, borderTop: "1px solid var(--line)", display: "flex", flexDirection: "column", gap: 3 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
-                  <span>Total existing RRSP room</span>
-                  <span className="mono">{fmtMoney(s.yourRrspRoomExisting + s.spouseRrspRoomExisting)}</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
-                  <span>Total existing TFSA room</span>
-                  <span className="mono">{fmtMoney(s.yourTfsaRoomExisting + s.spouseTfsaRoomExisting)}</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
-                  <span>Total new RRSP room / yr</span>
-                  <span className="mono">{fmtMoney(s.yourRrspRoomAnnual + s.spouseRrspRoomAnnual)}</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
-                  <span>Total new TFSA room / yr</span>
-                  <span className="mono">{fmtMoney(s.yourTfsaRoomAnnual + s.spouseTfsaRoomAnnual)}</span>
-                </div>
-              </div>
-              <div style={{ paddingTop: 4, marginTop: 4, fontSize: "var(--step--2)", color: "var(--ink-3)" }}>
-                Annual new room inflates with inflation (CRA indexes limits).
-              </div>
-            </Section>
-
-            <Section title="Market assumptions">
-              <PctInput label="Nominal return" value={s.investmentReturn} onChange={update("investmentReturn")} />
-              <PctInput label="Inflation" value={s.inflation} onChange={update("inflation")} />
-              <div style={{ paddingTop: 4, marginTop: 4, borderTop: "1px solid var(--line)" }} />
-              <NumInput label="Terminal target (age 90)" value={s.terminalTargetToday} onChange={update("terminalTargetToday")} prefix="$" step={25000} hint="(today's $)" />
-              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>
-                Solver finds the earliest age where spending is fully covered <em>and</em> portfolio ends at or above this amount. Lower = earlier retirement.
-              </div>
-            </Section>
-
-            <Section title="Retirement income">
-              <div className="ob-person-label">CPP</div>
-              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName || "You"}</div>
-              <NumInput label="Estimated CPP (today's $/yr)" value={s.yourCppAmount || Math.round((s.cppAmountToday || 0) / (s.partnered !== false ? 2 : 1))} onChange={update("yourCppAmount")} prefix="$" step={500} hint="check My Service Canada for your estimate" />
-              {s.partnered !== false && (
-                <>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 6, marginBottom: 4 }}>{s.spouseName || "Spouse"}</div>
-                  <NumInput label="Estimated CPP (today's $/yr)" value={s.spouseCppAmount || Math.round((s.cppAmountToday || 0) / 2)} onChange={update("spouseCppAmount")} prefix="$" step={500} />
-                </>
-              )}
-              <NumInput label="CPP start age" value={s.cppStartAge} onChange={update("cppStartAge")} small hint="(70 = optimal)" />
-              <InfoBox>
-                Delaying CPP to 70 is typically optimal with sufficient assets — it becomes a guaranteed inflation-linked bond and reduces portfolio pressure late in retirement.
-              </InfoBox>
-
-              <div className="ob-person-label" style={{ paddingTop: 8 }}>OAS (Old Age Security)</div>
-              <NumInput label="OAS per person (today's $/yr)" value={s.oasAmountToday} onChange={update("oasAmountToday")} prefix="$" step={100} />
-              <NumInput label="OAS start age" value={s.oasStartAge} onChange={update("oasStartAge")} small hint="(65 or 70)" />
-              <NumInput label="Clawback threshold / person" value={s.oasClawbackThreshold} onChange={update("oasClawbackThreshold")} prefix="$" step={1000} hint="(2026: $95,323)" />
-              <InfoBox>
-                OAS is taxable as ordinary income and subject to a 15% clawback on net income above ~$95,323/person (2026). Deferring to 70 increases OAS by 36% and avoids early clawback if RRIF income is high. The model estimates clawback based on projected RRIF + CPP + pension income.
-              </InfoBox>
-
-              <div className="ob-person-label" style={{ paddingTop: 8 }}>Defined Benefit Pension</div>
-              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName || "You"}</div>
-              <NumInput label="Monthly pension amount" value={s.pensionMonthly} onChange={update("pensionMonthly")} prefix="$" step={100} hint="today's $, leave 0 if none" />
-              <NumInput label="Pension start age" value={s.pensionStartAge} onChange={update("pensionStartAge")} small />
-              {s.pensionMonthly > 0 && (
-                <div style={{ fontSize: "var(--step--2)", color: "var(--ink-2)", display: "flex", justifyContent: "space-between", paddingTop: 2 }}>
-                  <span>Annual pension (today's $)</span>
-                  <span className="mono" style={{ fontWeight: 600 }}>{fmtMoney(s.pensionMonthly * 12)}</span>
-                </div>
-              )}
-              {s.partnered !== false && (
-                <>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 8, marginBottom: 4 }}>{s.spouseName || "Spouse"}</div>
-                  <NumInput label="Monthly pension amount" value={s.spousePensionMonthly || 0} onChange={update("spousePensionMonthly")} prefix="$" step={100} hint="today's $, leave 0 if none" />
-                  <NumInput label="Pension start age" value={s.spousePensionStartAge || s.pensionStartAge} onChange={update("spousePensionStartAge")} small />
-                  {(s.spousePensionMonthly || 0) > 0 && (
-                    <div style={{ fontSize: "var(--step--2)", color: "var(--ink-2)", display: "flex", justifyContent: "space-between", paddingTop: 2 }}>
-                      <span>Annual pension (today's $)</span>
-                      <span className="mono" style={{ fontWeight: 600 }}>{fmtMoney((s.spousePensionMonthly || 0) * 12)}</span>
-                    </div>
-                  )}
-                </>
-              )}
-            </Section>
-
-            <Section title="Windfalls" defaultOpen={false}>
-              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 8 }}>Enter an expected lump sum (inheritance, property sale, RSU cliff, etc.). The model will recommend the optimal allocation to minimize your retirement age.</div>
-              <div className="ob-person-label">{s.yourName || "You"}</div>
-              <NumInput label="Windfall amount" value={s.yourWindfallAmount} onChange={update("yourWindfallAmount")} prefix="$" step={25000} />
-              <NumInput label={`${s.yourName || "You"}'s age at receipt`} value={s.yourWindfallAge} onChange={update("yourWindfallAge")} small />
-              <div className="ob-person-label" style={{ paddingTop: 8 }}>{s.spouseName || "Spouse"}</div>
-              <NumInput label="Windfall amount" value={s.spouseWindfallAmount} onChange={update("spouseWindfallAmount")} prefix="$" step={25000} />
-              <NumInput label={`${s.spouseName || "Spouse"}'s age at receipt`} value={s.spouseWindfallAge} onChange={update("spouseWindfallAge")} small />
-              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 8 }}>Windfall does not alter the main simulation — recommendations appear below.</div>
-            </Section>
-
-            {/* Windfall advisor — inline below inputs */}
-            {(yourWindfallAdvice || spouseWindfallAdvice) && (() => {
-              function WindfallTable({ advice, label, age, amount }) {
-                if (!advice) return null;
-                const { base, alternatives } = advice;
-                const best = alternatives[0];
-                return (
-                  <div>
-                    <div style={{ fontSize: "var(--step--2)", fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>
-                      {label} — {fmtMoney(amount)} at age {age}
-                    </div>
-                    <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 8 }}>
-                      Base (no windfall): retire age <span style={{ fontWeight: 600 }}>{base.age ?? "—"}</span>,
-                      portfolio <span style={{ fontWeight: 600 }}>{fmtMoney(base.portfolioAtRetirement)}</span>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="dd-table">
-                        <thead>
-                          <tr >
-                            <th style={{ textAlign: "left" }}>Allocation</th>
-                            <th >Retire age</th>
-                            <th >vs. base</th>
-                            <th >Portfolio</th>
-                            <th >vs. base</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {alternatives.map((a, i) => {
-                            const isBest = i === 0;
-                            return (
-                              <tr key={a.label} className={"" + (isBest ? "is-active" : "")}>
-                                <td style={{ padding: "6px 8px" }}>
-                                  <div style={{ fontWeight: 600 }}>
-                                    {isBest && <span style={{ color: "var(--accent)", marginRight: 4 }}>★</span>}
-                                    {a.label}
-                                  </div>
-                                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", lineHeight: 1.4 }}>{a.description}</div>
-                                </td>
-                                <td style={{ padding: "6px 8px", textAlign: "right", fontFamily: "var(--font-mono)" }}>{a.age ?? "—"}</td>
-                                <td style={{ padding: "6px 8px", textAlign: "right", fontFamily: "var(--font-mono)" }}>
-                                  {a.ageDiff === null ? "—" : a.ageDiff === 0
-                                    ? <span style={{ color: "var(--ink-3)" }}>—</span>
-                                    : <span style={{ color: a.ageDiff < 0 ? "var(--accent-deep)" : "var(--slate)", fontWeight: a.ageDiff < 0 ? 600 : 400 }}>
-                                        {a.ageDiff > 0 ? "+" : ""}{a.ageDiff}yr
-                                      </span>
-                                  }
-                                </td>
-                                <td style={{ padding: "6px 8px", textAlign: "right", fontFamily: "var(--font-mono)" }}>{fmtMoney(a.portfolioAtRetirement)}</td>
-                                <td style={{ padding: "6px 8px", textAlign: "right", fontFamily: "var(--font-mono)" }}>
-                                  {a.portDiff === null ? "—" : (
-                                    <span style={{ color: a.portDiff >= 0 ? "var(--accent-deep)" : "var(--slate)" }}>
-                                      {a.portDiff >= 0 ? "+" : ""}{fmtMoney(a.portDiff)}
-                                    </span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                    <div style={{ marginTop: 6, fontSize: "var(--step--2)", color: "var(--ink-3)" }}>
-                      ★ Recommended: <span style={{ fontWeight: 600, color: "var(--moss-ink)" }}>{best.label}</span>
-                      {best.ageDiff !== null && best.ageDiff < 0 && (
-                        <span> — retires <span style={{ fontWeight: 600 }}>{Math.abs(best.ageDiff)} yr{Math.abs(best.ageDiff) !== 1 ? "s" : ""} earlier</span></span>
-                      )}
-                      {best.ageDiff === 0 && <span> — same retirement age, largest portfolio</span>}
-                    </div>
-                  </div>
-                );
-              }
-
-              return (
-                <div className="dash-panel">
-                  <div style={{ fontSize: "var(--step-0)", fontWeight: 600, color: "var(--ink)", marginBottom: 6 }}>Windfall Allocation Advisor</div>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 12 }}>
-                    ★ = option that minimises retirement age. Ties broken by largest portfolio. Not included in main simulation.
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                    <WindfallTable advice={yourWindfallAdvice}   label={`${s.yourName || "You"}'s windfall`}   age={s.yourWindfallAge}   amount={s.yourWindfallAmount} />
-                    <WindfallTable advice={spouseWindfallAdvice} label={`${s.spouseName || "Spouse"}'s windfall`} age={s.spouseWindfallAge} amount={s.spouseWindfallAmount} />
-                  </div>
-                </div>
-              );
-            })()}
-
-            <Section title="Withdrawal tax rates">
-              <PctInput label="RRSP/RRIF tax rate" value={s.rrspTaxRate} onChange={update("rrspTaxRate")} hint="(on withdrawals)" />
-              <PctInput label="NR cap-gains effective rate" value={s.nrCapGainsRate} onChange={update("nrCapGainsRate")} hint="(50% inclusion × marginal)" />
-              <PctInput label="CPP + pension tax rate" value={s.retirementIncomeTaxRate} onChange={update("retirementIncomeTaxRate")} hint="(ordinary income)" />
-              <InfoBox>
-                <strong>CPP, OAS &amp; DB pension are fully taxable</strong> as ordinary income. The model deducts this tax before netting against spending — your portfolio covers the remainder. RRSP refunds are automatically reinvested (TFSA first, then non-reg).
-              </InfoBox>
-            </Section>
-          </div>
-
-          {/* ── Results panel ── */}
-          <div className="dash-results">
-
-            {/* ── Hero: FI age ── */}
-            <div className="dash-hero">
-              <div className="dash-hero__moment dot-bg">
-                <div className="label-xs">Your path crosses independence at</div>
-                {solved.age !== null ? (() => {
-                  const retRow = solved.rows.find(r => r.age === solved.age);
-                  const portfolioAtRetirement = retRow ? retRow.endTotal / retRow.infFactor : null;
-                  const yourRetireAge = solved.age;
-                  const spouseRetireAge = solved.age + (s.spouseCurrentAge - s.currentAge);
-                  return (
-                    <>
-                      <div style={{ display: "flex", alignItems: "baseline", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
-                        <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 100, lineHeight: 0.9, letterSpacing: "-0.04em", color: "var(--accent-deep)" }}>
-                          {solved.age}
-                        </div>
-                        <div style={{ fontSize: "var(--step-1)", color: "var(--ink-2)", maxWidth: 220 }}>
-                          <span className="mono">{solved.age - s.currentAge}</span> year{solved.age - s.currentAge === 1 ? "" : "s"} from today.
-                          <div style={{ color: "var(--ink-3)", fontSize: "var(--step--1)", marginTop: 4 }}>
-                            {s.yourName || "You"} age {yourRetireAge} · {s.spouseName || "Spouse"} age {spouseRetireAge}
-                          </div>
-                        </div>
-                      </div>
-                      {portfolioAtRetirement !== null && (
-                        <div style={{ marginTop: 16, display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-                          <span className="label-xs">Portfolio at retirement</span>
-                          <span className="mono" style={{ fontSize: "var(--step-2)", color: "var(--ink)", fontWeight: 500 }}>{fmtMoney(portfolioAtRetirement)}</span>
-                          <span style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>today's $</span>
-                        </div>
-                      )}
-                      <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <span className="chip chip--sun">Fat FIRE</span>
-                        {s.partnered !== false && <span className="chip">Partnered</span>}
-                        <span className="chip">RRSP-first drawdown</span>
-                      </div>
-                    </>
-                  );
-                })() : (
-                  <>
-                    <div style={{ fontSize: "var(--step-5)", fontWeight: 700, color: "var(--slate)", marginTop: 12 }}>Not reachable</div>
-                    <div style={{ fontSize: "var(--step--1)", color: "var(--ink-3)", marginTop: 8 }}>
-                      No retirement age draws the portfolio down to {fmtMoney(s.terminalTargetToday)} (today's $) by age {s.deathAge} while covering all spending.
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="dash-hero__aside">
-                <div className="mini-stat">
-                  <div className="label-xs">Mortgage-free</div>
-                  {isFinite(mortgagePayoff) ? (
-                    <>
-                      <div className="mono" style={{ fontSize: "var(--step-3)", fontWeight: 500, marginTop: 6 }}>age {mortgagePayoff}</div>
-                      <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 4 }}>
-                        {mortgagePayoff - s.currentAge} yrs · {Math.round(solved.mortgagePayoffMonths)} mo
-                        {yearsSaved > 0 && <span style={{ color: "var(--moss-ink)", marginLeft: 6 }}>+${s.extraMortgagePayment.toLocaleString()}/mo saves {yearsSaved}yr</span>}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="mono" style={{ fontSize: "var(--step-2)", fontWeight: 500, marginTop: 6, color: "var(--slate)" }}>Never</div>
-                  )}
-                </div>
-                <div className="mini-stat">
-                  <div className="label-xs">Annual spend in retirement</div>
-                  <div className="mono" style={{ fontSize: "var(--step-3)", fontWeight: 500, marginTop: 6 }}>
-                    {fmtMoney(grandAnnual + (inputs.retirementSpendDelta || 0))}<span style={{ fontSize: "var(--step--1)", color: "var(--ink-3)", fontWeight: 400 }}>/yr</span>
-                  </div>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 4 }}>
-                    drops to {fmtMoney(grandAnnual + (inputs.retirementSpendDelta || 0) - s.mortgage * 12)}/yr after mortgage
-                  </div>
-                </div>
-                <div className="mini-stat">
-                  <div className="label-xs">Terminal portfolio target</div>
-                  <div className="mono" style={{ fontSize: "var(--step-3)", fontWeight: 500, marginTop: 6 }}>{fmtMoney(s.terminalTargetToday)}</div>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 4 }}>at age {s.deathAge} · today's $</div>
-                </div>
-              </div>
-            </div>
-
-            {/* ── Drawdown strategy ── */}
-            <div className="dash-panel">
-              <div className="dash-panel__head">
-                <div>
-                  <div className="label-xs">Canadian tax-optimized</div>
-                  <h3 style={{ fontSize: "var(--step-2)", fontWeight: 600, marginTop: 4 }}>RRSP-first meltdown.</h3>
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16 }}>
-                <div style={{ padding: "14px 16px", background: "var(--sun-soft)", borderRadius: "var(--r-3)", border: "1px solid oklch(88% 0.08 70)" }}>
-                  <div style={{ fontWeight: 600, fontSize: "var(--step--1)", color: "var(--sun-ink)", marginBottom: 8 }}>Phase 1 · FAT FIRE → 65</div>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-2)", lineHeight: 1.7 }}>
-                    ① RRSP first — lowest-tax window<br/>
-                    ② Non-registered — 50% cap gains inclusion<br/>
-                    ③ TFSA last — preserve tax-free shield
-                  </div>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 6, lineHeight: 1.5 }}>Depletes RRSP before forced RRIF withdrawals.</div>
-                </div>
-                <div style={{ padding: "14px 16px", background: "var(--dusk-soft)", borderRadius: "var(--r-3)", border: "1px solid oklch(88% 0.04 235)" }}>
-                  <div style={{ fontWeight: 600, fontSize: "var(--step--1)", color: "var(--dusk-ink)", marginBottom: 8 }}>Phase 2 · 65+ CPP/OAS/Pension</div>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-2)", lineHeight: 1.7 }}>
-                    ① RRSP/RRIF — mandatory minimums at 71+<br/>
-                    ② RRIF surplus → TFSA → Non-reg<br/>
-                    ③ Gap → Non-reg → TFSA (OAS clawback shield)
-                  </div>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 6, lineHeight: 1.5 }}>OAS clawback ~$95k/person (2026).</div>
-                </div>
-              </div>
-              {s.pensionMonthly > 0 && (
-                <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)", fontSize: "var(--step--1)", color: "var(--ink-2)" }}>
-                  <span style={{ fontWeight: 600, color: "var(--moss-ink)" }}>DB Pension:</span>{" "}
-                  {fmtMoney(s.pensionMonthly)}/mo from age {s.pensionStartAge}. Combined with CPP: {fmtMoney(s.pensionMonthly * 12 + s.cppAmountToday)}/yr today's $.
-                </div>
-              )}
-            </div>
-
-            {/* ── Scenario pressure test ── */}
-            {(() => {
-              const base = scenarios.find(sc => sc.label === "Base");
-              return (
-                <div className="dash-panel">
-                  <div className="dash-panel__head">
-                    <div>
-                      <div className="label-xs">Pressure test</div>
-                      <h3 style={{ fontSize: "var(--step-2)", fontWeight: 600, marginTop: 4 }}>What if markets disappoint?</h3>
-                    </div>
-                  </div>
-                  <div className="dash-scenario-grid">
-                    {scenarios.map(sc => {
-                      const ageDiff = base && base.age !== null && sc.age !== null ? sc.age - base.age : null;
-                      const portDiff = base && base.portfolioAtRetirement !== null && sc.portfolioAtRetirement !== null ? sc.portfolioAtRetirement - base.portfolioAtRetirement : null;
-                      const isBase = sc.label === "Base";
-                      return (
-                        <div key={sc.label} className={"scen-card" + (isBase ? " is-active" : "")}>
-                          <div className="label-xs">{sc.label}</div>
-                          <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", margin: "4px 0 8px" }}>{(sc.return * 100).toFixed(1)}% ret · {(sc.inflation * 100).toFixed(1)}% inf</div>
-                          {sc.age !== null ? (
-                            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                              <div className="mono" style={{ fontSize: "var(--step-3)", fontWeight: 500, color: isBase ? "var(--accent)" : "var(--ink)" }}>{sc.age}</div>
-                              {!isBase && ageDiff !== null && (
-                                <div className="mono" style={{ fontSize: "var(--step--1)", color: ageDiff > 0 ? "var(--slate-ink)" : "var(--moss-ink)" }}>
-                                  {ageDiff > 0 ? "+" : ""}{ageDiff}y
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div style={{ fontSize: "var(--step-0)", fontWeight: 600, color: "var(--slate)" }}>—</div>
-                          )}
-                          {sc.portfolioAtRetirement !== null && (
-                            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 4 }}>
-                              {fmtMoney(sc.portfolioAtRetirement)}
-                              {!isBase && portDiff !== null && (
-                                <span style={{ marginLeft: 4, color: portDiff < 0 ? "var(--slate-ink)" : "var(--moss-ink)" }}>
-                                  {portDiff > 0 ? "+" : ""}{fmtMoney(portDiff)}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 12 }}>
-                    All other inputs held constant. Differences relative to Base.
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Mortgage extra-payment sensitivity */}
-            {(() => {
-              const base = mortgageSensitivity[0]; // $0 extra
-              return (
-                <div className="dash-panel">
-                  <div className="dash-panel__head">
-                    <div>
-                      <div className="label-xs">Mortgage accelerator</div>
-                      <h3 style={{ fontSize: "var(--step-2)", fontWeight: 600, marginTop: 4 }}>Extra payment sensitivity.</h3>
-                    </div>
-                  </div>
-                  <p style={{ fontSize: "var(--step--1)", color: "var(--ink-3)", margin: "8px 0 14px", lineHeight: 1.5 }}>
-                    Each extra $/mo accelerates payoff and reduces retirement spend, but also reduces contributions. Net effect on retirement age and portfolio:
-                  </p>
-                  <div style={{ overflowX: "auto" }}>
-                    <table className="dd-table">
-                      <thead>
-                        <tr>
-                          <th style={{ textAlign: "left" }}>Extra / mo</th>
-                          <th style={{ textAlign: "left" }}>Contrib lost</th>
-                          <th style={{ textAlign: "left" }}>Payoff</th>
-                          <th style={{ textAlign: "left" }}>Retire age</th>
-                          <th>vs. $0</th>
-                          <th>Portfolio</th>
-                          <th>vs. $0</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {mortgageSensitivity.map((row, i) => {
-                          const isActive = row.extra === s.extraMortgagePayment;
-                          const ageDiff = base.retirementAge !== null && row.retirementAge !== null ? row.retirementAge - base.retirementAge : null;
-                          const portDiff = base.portfolioAtRetirement !== null && row.portfolioAtRetirement !== null ? row.portfolioAtRetirement - base.portfolioAtRetirement : null;
-                          return (
-                            <tr key={row.extra} className={isActive ? "is-retire" : i % 2 !== 0 ? "is-decum" : ""}>
-                              <td style={{ textAlign: "left", fontFamily: "var(--font-mono)" }}>
-                                {isActive && <span style={{ color: "var(--accent)", marginRight: 4 }}>▶</span>}
-                                ${row.extra.toLocaleString()}
-                              </td>
-                              <td style={{ textAlign: "left", fontFamily: "var(--font-mono)", color: "var(--slate-ink)" }}>
-                                {row.extra > 0 ? `−${fmtMoney(row.extra * 12)}` : "—"}
-                              </td>
-                              <td style={{ textAlign: "left", fontFamily: "var(--font-mono)" }}>
-                                {isFinite(row.payoffAge) ? `age ${row.payoffAge}` : "never"}
-                              </td>
-                              <td style={{ textAlign: "left", fontFamily: "var(--font-mono)" }}>
-                                {row.retirementAge !== null ? row.retirementAge : "—"}
-                              </td>
-                              <td>
-                                {i === 0 ? <span style={{ color: "var(--ink-3)" }}>base</span>
-                                  : ageDiff !== null ? <span style={{ color: ageDiff < 0 ? "var(--moss-ink)" : ageDiff > 0 ? "var(--slate-ink)" : "var(--ink-3)" }}>
-                                    {ageDiff === 0 ? "—" : (ageDiff > 0 ? "+" : "") + ageDiff + "y"}
-                                  </span> : "—"}
-                              </td>
-                              <td>{row.portfolioAtRetirement !== null ? fmtMoney(row.portfolioAtRetirement) : "—"}</td>
-                              <td>
-                                {i === 0 ? <span style={{ color: "var(--ink-3)" }}>base</span>
-                                  : portDiff !== null ? <span style={{ color: portDiff >= 0 ? "var(--moss-ink)" : "var(--slate-ink)" }}>
-                                    {portDiff >= 0 ? "+" : ""}{fmtMoney(portDiff)}
-                                  </span> : "—"}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 8 }}>
-                    Highlighted row = your current setting. Portfolio in today's $.
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* ── Monte Carlo ── */}
-            <div className="dash-panel">
-              <div className="dash-panel__head">
-                <div>
-                  <div className="label-xs">Monte Carlo · 1,000 paths</div>
-                  <h3 style={{ fontSize: "var(--step-2)", fontWeight: 600, marginTop: 4 }}>How sure can we be?</h3>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 2 }}>14% annual volatility · retiring at age {solved.age ?? "—"}</div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--step--1)", color: "var(--ink-2)" }}>
-                    Target
-                    <input
-                      type="number" min={50} max={99} step={5}
-                      value={mcTargetRate}
-                      onChange={(e) => setMcTargetRate(parseFloat(e.target.value) || 80)}
-                      style={{ width: 52, border: "1px solid var(--line)", borderRadius: "var(--r-1)", padding: "4px 6px", fontFamily: "var(--font-mono)", fontSize: "var(--step--1)", textAlign: "right", background: "var(--paper)", color: "var(--ink)" }}
-                    />
-                    <span style={{ color: "var(--ink-3)" }}>%</span>
-                  </label>
-                  <button onClick={runMC} disabled={mcRunning || solved.age === null} className="btn btn--primary btn--sm" style={{ opacity: (mcRunning || solved.age === null) ? 0.4 : 1 }}>
-                    {mcRunning ? "Running…" : mc ? "Re-run" : "Run simulation"}
-                  </button>
-                </div>
-              </div>
-
-              {!mc && !mcRunning && (
-                <p style={{ fontSize: "var(--step--1)", color: "var(--ink-3)", marginTop: 12, lineHeight: 1.6 }}>
-                  Run 1,000 randomised market paths to stress-test your plan. Captures sequence-of-returns risk that the deterministic model misses.
-                </p>
-              )}
-              {mcRunning && <p style={{ fontSize: "var(--step--1)", color: "var(--ink-3)", marginTop: 12 }}>Running 1,000 simulations…</p>}
-
-              {mc && (() => {
-                const pct = Math.round(mc.successRate * 100);
-                const ringColor = pct >= 90 ? "var(--accent)" : pct >= 75 ? "var(--sun)" : "var(--slate)";
-                const labelColor = pct >= 90 ? "var(--moss-ink)" : pct >= 75 ? "var(--sun-ink)" : "var(--slate-ink)";
-                return (
-                  <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
-                    <div className="mc-grid">
-                      <div className="mc-ring-wrap">
-                        <div style={{ width: 140, height: 140, borderRadius: "50%", background: `conic-gradient(${ringColor} ${pct}%, var(--paper-3) 0)`, display: "grid", placeItems: "center", position: "relative" }}>
-                          <div style={{ position: "absolute", inset: 12, background: "var(--paper)", borderRadius: "50%" }} />
-                          <div style={{ position: "relative", zIndex: 1, textAlign: "center" }}>
-                            <div className="mono" style={{ fontSize: "var(--step-4)", fontWeight: 600, color: labelColor, lineHeight: 1 }}>{pct}</div>
-                            <div className="label-xs" style={{ marginTop: 2 }}>% succeed</div>
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                        <div style={{ fontSize: "var(--step--1)", color: "var(--ink-2)", lineHeight: 1.6 }}>
-                          In <span className="mono">{pct}%</span> of simulated lifetimes, your portfolio ends above target at age {s.deathAge}. The other {100 - pct}% run out.
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6 }}>
-                          {[
-                            { l: "P10", v: mc.p10, tone: "slate" },
-                            { l: "P25", v: mc.p25, tone: "ink" },
-                            { l: "P50", v: mc.p50, tone: "ink" },
-                            { l: "P75", v: mc.p75, tone: "moss" },
-                            { l: "P90", v: mc.p90, tone: "moss" },
-                          ].map(p => (
-                            <div key={p.l} className="mc-pct">
-                              <div className="label-xs" style={{ fontSize: 10 }}>{p.l}</div>
-                              <div className="mono" style={{ fontSize: "var(--step--1)", fontWeight: 600, color: p.tone === "slate" ? "var(--slate-ink)" : p.tone === "moss" ? "var(--moss-ink)" : "var(--ink)", marginTop: 3 }}>{fmtMoney(p.v)}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {mcReverse && (
-                      <div style={{ padding: "14px 16px", background: "var(--paper-2)", borderRadius: "var(--r-3)", border: "1px solid var(--line)" }}>
-                        <div className="label-xs" style={{ marginBottom: 6 }}>Minimum portfolio for {mcTargetRate}% success</div>
-                        <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-                          <span className="mono" style={{ fontSize: "var(--step-3)", fontWeight: 600 }}>{fmtMoney(mcReverse.portfolio)}</span>
-                          <span style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>needed at retirement (age {solved.age})</span>
-                        </div>
-                        {(() => {
-                          const retRow = solved.rows && solved.age ? solved.rows.find(r => r.age === solved.age) : null;
-                          const proj = retRow ? retRow.endTotal / retRow.infFactor : null;
-                          if (!proj) return null;
-                          const gap = mcReverse.portfolio - proj;
-                          return (
-                            <div style={{ fontSize: "var(--step--2)", marginTop: 6, fontWeight: 600, color: gap > 0 ? "var(--slate-ink)" : "var(--moss-ink)" }}>
-                              Your projection: {fmtMoney(proj)} → {gap > 0 ? `${fmtMoney(gap)} short` : `${fmtMoney(-gap)} above target ✓`}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-                    <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", lineHeight: 1.5 }}>
-                      Log-normal returns (μ = {(inputs.investmentReturn * 100).toFixed(1)}%, σ = 14%/yr). Inflation, spending, contributions held constant.
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* ── Year-by-year table ── */}
-            <div className="dash-panel" style={{ padding: 0, overflow: "hidden" }}>
-              <div className="dash-panel__head" style={{ padding: "14px 20px" }}>
-                <div>
-                  <div className="label-xs">Year-by-year projection</div>
-                  <h3 style={{ fontSize: "var(--step-1)", fontWeight: 600, marginTop: 4 }}>Every year on the trail.</h3>
-                </div>
-                <span style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>Today's $ · real</span>
-              </div>
-              <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "70vh" }}>
-                <table className="dd-table">
-                  <thead style={{ position: "sticky", top: 0 }}>
-                    <tr>
-                      <th style={{ textAlign: "left" }}>Yr</th>
-                      <th style={{ textAlign: "left" }}>Age</th>
-                      <th style={{ textAlign: "left" }}>Phase</th>
-                      <th>RRSP</th>
-                      <th>TFSA</th>
-                      <th>Non-reg</th>
-                      <th>Total</th>
-                      <th>Contrib</th>
-                      <th>Withdraw</th>
-                      <th>Spend</th>
-                      <th>Guar. Income</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {displayRows.map((r) => {
-                      const isRetYr = r.age === solved.age;
-                      const isDecum = r.phase === "decum";
-                      const combinedIncome = r.cppDisp + r.pensionDisp + (r.oasDisp || 0);
-                      const incomeTooltip = [
-                        r.cppDisp > 0 ? `CPP: ${fmtMoney(r.cppDisp)}` : null,
-                        r.pensionDisp > 0 ? `Pension: ${fmtMoney(r.pensionDisp)}` : null,
-                        r.oasDisp > 0 ? `OAS: ${fmtMoney(r.oasDisp)}${r.oasClawbackDisp > 0 ? ` (clawback: −${fmtMoney(r.oasClawbackDisp)})` : ""}` : null,
-                      ].filter(Boolean).join(" · ");
-                      return (
-                        <tr key={r.t} className={isRetYr ? "is-retire" : isDecum ? "is-decum" : ""}>
-                          <td style={{ textAlign: "left", fontFamily: "var(--font-ui)" }}>{r.year}</td>
-                          <td style={{ textAlign: "left", fontFamily: "var(--font-ui)", whiteSpace: "nowrap" }}>{r.age}/{r.spouseAge}</td>
-                          <td style={{ textAlign: "left", fontFamily: "var(--font-ui)" }}>
-                            {isDecum ? (
-                              <span style={{ color: r.drawdownPhase === "Phase 1" ? "var(--sun-ink)" : "var(--dusk-ink)" }}>
-                                {r.drawdownPhase}
-                              </span>
-                            ) : "—"}
-                          </td>
-                          <td>{fmtMoney(r.rrspDisp)}</td>
-                          <td>{fmtMoney(r.tfsaDisp)}</td>
-                          <td>{fmtMoney(r.nrDisp)}</td>
-                          <td style={{ fontWeight: 600, color: r.endTotal <= 0 ? "var(--slate)" : "var(--ink)" }}>{fmtMoney(r.endDisp)}</td>
-                          <td style={{ color: "var(--moss-ink)" }}>{r.totalContrib > 0 ? fmtMoney(r.contribDisp) : "—"}</td>
-                          <td style={{ color: "var(--slate-ink)" }}>{r.totalWd > 0 ? fmtMoney(r.wdDisp) : "—"}</td>
-                          <td>{fmtMoney(r.spendDisp)}</td>
-                          <td>
-                            {combinedIncome > 0
-                              ? <span title={incomeTooltip} style={{ cursor: "help", borderBottom: "1px dotted var(--line-strong)" }}>{fmtMoney(combinedIncome)}</span>
-                              : "—"}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <div style={{ padding: "10px 20px", borderTop: "1px solid var(--line)", display: "flex", gap: 16, flexWrap: "wrap", fontSize: "var(--step--2)", color: "var(--ink-3)" }}>
-                <span>Highlighted = retirement year.</span>
-                <span style={{ color: "var(--sun-ink)" }}>Phase 1 = RRSP-first (pre-65).</span>
-                <span style={{ color: "var(--dusk-ink)" }}>Phase 2 = CPP/OAS (65+).</span>
-                <span style={{ color: "var(--moss-ink)" }}>Green = contributions.</span>
-                <span style={{ color: "var(--slate-ink)" }}>Muted = withdrawals.</span>
-              </div>
-            </div>
-
-            {/* ── Model notes ── */}
-            <div className="info-box" style={{ lineHeight: 1.65 }}>
-              <div style={{ fontWeight: 600, color: "var(--dusk-ink)", marginBottom: 6 }}>Model notes</div>
-              <div>Working spend {fmtMoney(grandAnnual)}/yr. Retirement spend {fmtMoney(grandAnnual + (inputs.retirementSpendDelta || 0))}/yr. Mortgage drops off at payoff ({s.yourName || "You"} age {isFinite(mortgagePayoff) ? mortgagePayoff : "N/A"}).</div>
-              <div>Bonus {fmtMoney(bonusAfterTax)}/yr after-tax from year 1. Equity {fmtMoney(equityAfterTax)}/yr after-tax from year 4. Both grow with income growth rate.</div>
-              <div>Contributions: TFSA → RRSP → Non-reg. Drawdown Phase 1 (pre-65): RRSP → NR → TFSA. Phase 2 (65+): RRSP/RRIF → NR → TFSA.</div>
-              {s.pensionMonthly > 0 && <div>DB Pension {fmtMoney(s.pensionMonthly)}/mo from age {s.pensionStartAge}, inflation-indexed.</div>}
-              <div>CPP age {s.cppStartAge} · OAS age {s.oasStartAge} · All retirement income taxed at {Math.round(s.retirementIncomeTaxRate * 100)}% · OAS clawback above {fmtMoney(s.oasClawbackThreshold)}/person.</div>
-              <div>RRSP refunds recycled into TFSA (if room) then non-reg. Single deterministic return path.</div>
-            </div>
-          </div>
+      {/* Pending join code banner */}
+      {!user && pendingJoinCode && (
+        <div className="callout" style={{ margin: "0 24px 12px", borderRadius: "var(--r-2)" }}>
+          You've been invited to join a household. Sign in with Google to accept.
         </div>
+      )}
+
+      {modals}
+
+      {/* ── Page content ── */}
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        {page === "dashboard" && (
+          <Dashboard
+            s={s}
+            inputs={inputs}
+            solved={solved}
+            scenarios={scenarios}
+            mc={mc}
+            mcRunning={mcRunning}
+            mcTargetRate={mcTargetRate}
+            mcReverse={mcReverse}
+            setMcTargetRate={setMcTargetRate}
+            runMC={runMC}
+            displayRows={displayRows}
+          />
+        )}
+        {page === "editor" && (
+          <PlanEditor
+            s={s}
+            update={update}
+            solved={solved}
+            inputs={inputs}
+            saveStatus={saveStatus}
+          />
+        )}
+        {page === "settings" && (
+          <Settings
+            user={user}
+            authLoading={authLoading}
+            household={household}
+            householdMembers={householdMembers}
+            householdPanelRef={householdPanelRef}
+            activePlan={activePlan}
+            personalPlanId={personalPlanId}
+            copied={copied}
+            joinInput={joinInput}
+            setJoinInput={setJoinInput}
+            joinError={joinError}
+            signInWithGoogle={signInWithGoogle}
+            signOut={signOut}
+            switchPlan={switchPlan}
+            createHousehold={createHousehold}
+            removeMember={removeMember}
+            copyShareUrl={copyShareUrl}
+            handleJoinSubmit={handleJoinSubmit}
+            resetToDefaults={resetToDefaults}
+            s={s}
+            saveStatus={saveStatus}
+          />
+        )}
+      </div>
+
     </div>
     </PrivacyContext.Provider>
   );

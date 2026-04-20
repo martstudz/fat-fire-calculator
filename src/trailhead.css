@@ -947,3 +947,33 @@ input, select, textarea {
   font-size: var(--step--1);
   color: var(--dusk-ink);
 }
+
+/* ===== PLAN EDITOR ===== */
+.pe-frame {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.pe-head {
+  /* sticky header — styles applied inline */
+}
+.pe-body {
+  display: flex;
+}
+.pe-toc {
+  /* sidebar — styles applied inline */
+}
+.pe-stack {
+  /* main content column — styles applied inline */
+}
+.pe-accordion {
+  border-top: 1px solid var(--line);
+}
+.pe-accordion__head {
+  /* accordion toggle button — styles applied inline */
+}
+.pe-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
