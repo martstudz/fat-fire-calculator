@@ -803,6 +803,14 @@ input, select, textarea {
   box-shadow: 0 0 0 3px oklch(68% 0.14 150 / 0.15);
 }
 
+/* Inside pe-field-wrap, the wrapper handles the border/focus ring */
+.pe-field-wrap input:focus,
+.pe-field-wrap .pe-field-input:focus {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none;
+}
+
 .inp-row input.--sm {
   width: 76px;
 }
@@ -1016,7 +1024,8 @@ input, select, textarea {
 .pe-field-input {
   flex: 1;
   min-width: 0;
-  border: none;
+  border: none !important;
+  box-shadow: none !important;
   background: transparent;
   padding: 5px 6px;
   font-size: var(--step--1);
@@ -1025,6 +1034,7 @@ input, select, textarea {
   text-align: right;
   outline: none;
   appearance: none;
+  width: auto !important;
 }
 
 /* Scroll offset so sticky header doesn't overlap sections */

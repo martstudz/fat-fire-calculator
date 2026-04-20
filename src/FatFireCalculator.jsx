@@ -659,8 +659,8 @@ const publicDefaults = {
   // Contribution room
   yourRrspRoomExisting: 0, spouseRrspRoomExisting: 0,
   yourTfsaRoomExisting: 0, spouseTfsaRoomExisting: 0,
-  yourRrspRoomAnnual: 0, spouseRrspRoomAnnual: 0,
-  yourTfsaRoomAnnual: 0, spouseTfsaRoomAnnual: 0,
+  yourRrspRoomAnnual: 32490, spouseRrspRoomAnnual: 32490,
+  yourTfsaRoomAnnual: 7000, spouseTfsaRoomAnnual: 7000,
   // Windfalls
   yourWindfallAge: 0, yourWindfallAmount: 0,
   spouseWindfallAge: 0, spouseWindfallAmount: 0,

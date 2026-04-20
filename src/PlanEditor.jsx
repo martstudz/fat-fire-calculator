@@ -241,49 +241,56 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
     { id: "household", label: "Household" },
     { id: "income", label: "Income & Tax" },
     { id: "spending", label: "Spending" },
-    { id: "cars", label: "Cars" },
     { id: "savings", label: "Savings & Portfolio" },
+    { id: "windfalls", label: "Windfalls" },
     { id: "goal", label: "Retirement Goal" },
     { id: "assumptions", label: "Assumptions" },
   ];
 
+  // Ref to the scrollable content column — used for IntersectionObserver root
+  const scrollRef = useRef(null);
+
   // Track which section is currently in view
   const [activeSection, setActiveSection] = useState("household");
   useEffect(() => {
+    const root = scrollRef.current;
+    if (!root) return;
     const els = sections.map(sec => document.getElementById(`pe-${sec.id}`)).filter(Boolean);
     const observer = new IntersectionObserver(
       (entries) => {
-        // Pick the topmost visible section
-        const visible = entries.filter(e => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        const visible = entries
+          .filter(e => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
         if (visible.length > 0) {
-          const id = visible[0].target.id.replace("pe-", "");
-          setActiveSection(id);
+          setActiveSection(visible[0].target.id.replace("pe-", ""));
         }
       },
-      { rootMargin: "-20% 0px -60% 0px", threshold: 0 }
+      { root, rootMargin: "-10% 0px -60% 0px", threshold: 0 }
     );
     els.forEach(el => observer.observe(el));
     return () => observer.disconnect();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function scrollToSection(id) {
+    const root = scrollRef.current;
     const el = document.getElementById(`pe-${id}`);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!root || !el) return;
+    // Smooth-scroll within the content column, not window
+    const offset = el.offsetTop - 16; // small breathing room
+    root.scrollTo({ top: offset, behavior: "smooth" });
   }
 
   return (
-    <div className="pe-frame">
+    <div className="pe-frame" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Header */}
-      <div className="pe-head" style={{
+      <div style={{
         padding: "16px 24px",
         borderBottom: "1px solid var(--line)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         background: "var(--paper)",
-        position: "sticky",
-        top: 0,
-        zIndex: 10,
+        flexShrink: 0,
       }}>
         <div>
           <div style={{ fontSize: "var(--step-0)", fontWeight: 600, color: "var(--ink)" }}>Plan Editor</div>
@@ -292,18 +299,17 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
         <SaveIndicator saveStatus={saveStatus} />
       </div>
 
-      <div className="pe-body" style={{ display: "flex", gap: 0 }}>
-        {/* ToC sidebar — sticky within the scroll container */}
-        <div className="pe-toc" style={{
+      {/* Body: ToC + scrollable content side by side, filling remaining height */}
+      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+
+        {/* ToC sidebar — fixed height, never scrolls */}
+        <div style={{
           width: 172,
           flexShrink: 0,
           padding: "24px 12px 24px 20px",
           borderRight: "1px solid var(--line)",
-          position: "sticky",
-          top: 0,
-          alignSelf: "flex-start",
-          height: "calc(100vh - 57px)",
           overflowY: "auto",
+          height: "100%",
         }}>
           <div style={{ fontSize: "var(--step--2)", fontWeight: 600, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Sections</div>
           {sections.map(sec => {
@@ -335,8 +341,9 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
           })}
         </div>
 
-        {/* Main content */}
-        <div className="pe-stack" style={{ flex: 1, padding: "0 32px 60px", maxWidth: 680 }}>
+        {/* Main content — this is the ONLY thing that scrolls */}
+        <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", height: "100%" }}>
+        <div className="pe-stack" style={{ padding: "0 32px 60px", maxWidth: 680 }}>
 
           {/* ── Household ── */}
           <AccSection id="household" title="Household" icon="👥">
@@ -513,49 +520,37 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
               </div>
             </div>
 
-            {/* Retirement-specific spend */}
-            <div className="ob-person-label" style={{ paddingTop: 16 }}>Retirement-specific spend</div>
-            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 8 }}>These replace your working-years budget once retired.</div>
-            <ExpenseRow label="Snowbird / extended travel" value={retirementTravelValue} onChange={update("retirementTravel")} freq="annual" step={1000} />
-            <ExpenseRow label="Private health / dental / vision" value={s.retirementHealthcare != null ? s.retirementHealthcare : 3000} onChange={update("retirementHealthcare")} freq="annual" step={500} />
-            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, paddingTop: 4, borderTop: "1px solid var(--line)", color: (inputs.retirementSpendDelta || 0) > 0 ? "var(--slate)" : "var(--accent-deep)" }}>
-              <span>Net retirement spend change</span>
-              <span className="mono">{(inputs.retirementSpendDelta || 0) > 0 ? "+" : ""}{fmtMoney(inputs.retirementSpendDelta || 0)}/yr</span>
-            </div>
-          </AccSection>
-
-          {/* ── Cars ── */}
-          <AccSection id="cars" title="Cars" icon="🚗" defaultOpen={false}>
-            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 8 }}>
-              Car costs are included in your working-years spending. Add a retirement vehicle budget separately if it differs.
-            </div>
-
-            <div className="ob-person-label">Running costs (monthly)</div>
-            <ExpenseRow label="Car payment / lease" value={s.carPayment || 0} onChange={update("carPayment")} freq="monthly" />
-            <ExpenseRow label="Gas & charging" value={s.carGas || 0} onChange={update("carGas")} freq="monthly" />
-            <ExpenseRow label="Insurance" value={s.carInsurance || 0} onChange={update("carInsurance")} freq="monthly" />
-            <ExpenseRow label="Parking & tolls" value={s.carParking || 0} onChange={update("carParking")} freq="monthly" />
-
-            <div className="ob-person-label" style={{ paddingTop: 8 }}>Annual costs</div>
-            <ExpenseRow label="Maintenance & repairs" value={s.carMaintenance || 0} onChange={update("carMaintenance")} freq="annual" />
-            <ExpenseRow label="Registration & licensing" value={s.carRegistration || 0} onChange={update("carRegistration")} freq="annual" />
-
-            <div className="ob-person-label" style={{ paddingTop: 8 }}>Replacement</div>
-            <NumInput label="Replacement cost (today's $)" value={s.carReplacementCost || 0} onChange={update("carReplacementCost")} prefix="$" step={5000} hint="per vehicle" />
-            <NumInput label="Replace every N years" value={s.carReplaceEvery || 10} onChange={update("carReplaceEvery")} small />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--ink-3)", paddingTop: 4 }}>
-              <span>Implied annual provision</span>
-              <span className="mono">{fmtMoney((s.carReplacementCost || 0) / Math.max(1, s.carReplaceEvery || 10))}/yr</span>
-            </div>
-
-            <div style={{ borderTop: "1px solid var(--line)", paddingTop: 8, marginTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, color: "var(--ink)", fontSize: "var(--step--1)" }}>
-                <span>Total car cost / yr</span>
-                <span className="mono">{fmtMoney(
-                  ((s.carPayment||0) + (s.carGas||0) + (s.carInsurance||0) + (s.carParking||0)) * 12
-                  + (s.carMaintenance||0) + (s.carRegistration||0)
-                )}</span>
+            {/* Cars sub-section */}
+            <div className="label-xs" style={{ padding: "12px 0 4px" }}>Cars</div>
+            <PersonBlock name="Running costs (monthly)" variant="shared">
+              <ExpenseRow label="Car payment / lease" value={s.carPayment || 0} onChange={update("carPayment")} freq="monthly" />
+              <ExpenseRow label="Gas & charging" value={s.carGas || 0} onChange={update("carGas")} freq="monthly" />
+              <ExpenseRow label="Insurance" value={s.carInsurance || 0} onChange={update("carInsurance")} freq="monthly" />
+              <ExpenseRow label="Parking & tolls" value={s.carParking || 0} onChange={update("carParking")} freq="monthly" />
+            </PersonBlock>
+            <PersonBlock name="Annual costs" variant="shared">
+              <ExpenseRow label="Maintenance & repairs" value={s.carMaintenance || 0} onChange={update("carMaintenance")} freq="annual" />
+              <ExpenseRow label="Registration & licensing" value={s.carRegistration || 0} onChange={update("carRegistration")} freq="annual" />
+              <NumInput label="Replacement cost" value={s.carReplacementCost || 0} onChange={update("carReplacementCost")} prefix="$" hint="per vehicle, today's $" />
+              <NumInput label="Replace every N years" value={s.carReplaceEvery || 10} onChange={update("carReplaceEvery")} />
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--ink-3)", paddingTop: 4 }}>
+                <span>Implied annual provision</span>
+                <span className="mono">{fmtMoney((s.carReplacementCost || 0) / Math.max(1, s.carReplaceEvery || 10))}/yr</span>
               </div>
+            </PersonBlock>
+            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, color: "var(--ink)", fontSize: "var(--step--1)", padding: "6px 0 4px", borderTop: "1px solid var(--line)" }}>
+              <span>Total car cost / yr</span>
+              <span className="mono">{fmtMoney(((s.carPayment||0)+(s.carGas||0)+(s.carInsurance||0)+(s.carParking||0))*12+(s.carMaintenance||0)+(s.carRegistration||0))}</span>
+            </div>
+
+            {/* Retirement-specific spend */}
+            <div className="label-xs" style={{ padding: "12px 0 4px" }}>Retirement-specific spend</div>
+            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 8 }}>These replace your working-years budget once retired.</div>
+            <ExpenseRow label="Snowbird / extended travel" value={retirementTravelValue} onChange={update("retirementTravel")} freq="annual" />
+            <ExpenseRow label="Private health / dental / vision" value={s.retirementHealthcare != null ? s.retirementHealthcare : 3000} onChange={update("retirementHealthcare")} freq="annual" />
+            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, paddingTop: 6, borderTop: "1px solid var(--line)", color: (inputs.retirementSpendDelta || 0) > 0 ? "var(--slate)" : "var(--accent-deep)" }}>
+              <span style={{ fontSize: "var(--step--1)" }}>Net retirement spend change</span>
+              <span className="mono" style={{ fontSize: "var(--step--1)" }}>{(inputs.retirementSpendDelta || 0) > 0 ? "+" : ""}{fmtMoney(inputs.retirementSpendDelta || 0)}/yr</span>
             </div>
           </AccSection>
 
@@ -622,15 +617,15 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
 
             <div className="label-xs" style={{ padding: "8px 0 4px" }}>Contribution room</div>
             <PersonBlock name={`${s.yourName || "You"} — carry-forward`} variant="you">
-              <NumInput label="RRSP room" value={s.yourRrspRoomExisting} onChange={update("yourRrspRoomExisting")} prefix="$" hint="check CRA My Account" />
-              <NumInput label="TFSA room" value={s.yourTfsaRoomExisting} onChange={update("yourTfsaRoomExisting")} prefix="$" hint="check CRA My Account" />
+              <NumInput label="RRSP room" value={s.yourRrspRoomExisting} onChange={update("yourRrspRoomExisting")} prefix="$" />
+              <NumInput label="TFSA room" value={s.yourTfsaRoomExisting} onChange={update("yourTfsaRoomExisting")} prefix="$" />
               <NumInput label="RRSP room / yr" value={s.yourRrspRoomAnnual} onChange={update("yourRrspRoomAnnual")} prefix="$" hint="2026 max: $32,490" />
               <NumInput label="TFSA room / yr" value={s.yourTfsaRoomAnnual} onChange={update("yourTfsaRoomAnnual")} prefix="$" hint="2026: $7,000" />
             </PersonBlock>
             {s.partnered !== false && (
               <PersonBlock name={`${s.spouseName || "Spouse"} — carry-forward`} variant="spouse">
-                <NumInput label="RRSP room" value={s.spouseRrspRoomExisting} onChange={update("spouseRrspRoomExisting")} prefix="$" hint="check CRA My Account" />
-                <NumInput label="TFSA room" value={s.spouseTfsaRoomExisting} onChange={update("spouseTfsaRoomExisting")} prefix="$" hint="check CRA My Account" />
+                <NumInput label="RRSP room" value={s.spouseRrspRoomExisting} onChange={update("spouseRrspRoomExisting")} prefix="$" />
+                <NumInput label="TFSA room" value={s.spouseTfsaRoomExisting} onChange={update("spouseTfsaRoomExisting")} prefix="$" />
                 <NumInput label="RRSP room / yr" value={s.spouseRrspRoomAnnual} onChange={update("spouseRrspRoomAnnual")} prefix="$" hint="2026 max: $32,490" />
                 <NumInput label="TFSA room / yr" value={s.spouseTfsaRoomAnnual} onChange={update("spouseTfsaRoomAnnual")} prefix="$" hint="2026: $7,000" />
               </PersonBlock>
@@ -641,11 +636,11 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
           <AccSection id="goal" title="Retirement Goal" icon="🎯">
             <div className="label-xs" style={{ padding: "8px 0 4px" }}>CPP</div>
             <PersonBlock name={s.yourName || "You"} variant="you">
-              <NumInput label="Estimated CPP (today's $/yr)" value={s.yourCppAmount || Math.round((s.cppAmountToday || 0) / (s.partnered !== false ? 2 : 1))} onChange={update("yourCppAmount")} prefix="$" step={500} hint="check My Service Canada" />
+              <NumInput label="Estimated CPP (today's $/yr)" value={s.yourCppAmount || Math.round((s.cppAmountToday || 0) / (s.partnered !== false ? 2 : 1))} onChange={update("yourCppAmount")} prefix="$" step={500} />
             </PersonBlock>
             {s.partnered !== false && (
               <PersonBlock name={s.spouseName || "Spouse"} variant="spouse">
-                <NumInput label="Estimated CPP (today's $/yr)" value={s.spouseCppAmount || Math.round((s.cppAmountToday || 0) / 2)} onChange={update("spouseCppAmount")} prefix="$" step={500} hint="check My Service Canada" />
+                <NumInput label="Estimated CPP (today's $/yr)" value={s.spouseCppAmount || Math.round((s.cppAmountToday || 0) / 2)} onChange={update("spouseCppAmount")} prefix="$" step={500} />
               </PersonBlock>
             )}
             <PersonBlock name="CPP start age" variant="shared">
@@ -688,16 +683,21 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
               </PersonBlock>
             )}
 
-            <div className="label-xs" style={{ padding: "8px 0 4px" }}>Windfalls</div>
-            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>Expected lump sum (inheritance, property sale, RSU cliff, etc.)</div>
+          </AccSection>
+
+          {/* ── Windfalls ── */}
+          <AccSection id="windfalls" title="Windfalls" icon="💰" defaultOpen={false}>
+            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 8 }}>
+              Expected lump sum — inheritance, property sale, RSU cliff, business exit, etc.
+            </div>
             <PersonBlock name={s.yourName || "You"} variant="you">
-              <NumInput label="Windfall amount" value={s.yourWindfallAmount} onChange={update("yourWindfallAmount")} prefix="$" step={25000} />
-              <NumInput label="Age at receipt" value={s.yourWindfallAge} onChange={update("yourWindfallAge")} small />
+              <NumInput label="Windfall amount" value={s.yourWindfallAmount} onChange={update("yourWindfallAmount")} prefix="$" />
+              <NumInput label="Age at receipt" value={s.yourWindfallAge} onChange={update("yourWindfallAge")} />
             </PersonBlock>
             {s.partnered !== false && (
               <PersonBlock name={s.spouseName || "Spouse"} variant="spouse">
-                <NumInput label="Windfall amount" value={s.spouseWindfallAmount} onChange={update("spouseWindfallAmount")} prefix="$" step={25000} />
-                <NumInput label="Age at receipt" value={s.spouseWindfallAge} onChange={update("spouseWindfallAge")} small />
+                <NumInput label="Windfall amount" value={s.spouseWindfallAmount} onChange={update("spouseWindfallAmount")} prefix="$" />
+                <NumInput label="Age at receipt" value={s.spouseWindfallAge} onChange={update("spouseWindfallAge")} />
               </PersonBlock>
             )}
           </AccSection>
@@ -727,7 +727,8 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
           </AccSection>
 
         </div>
-      </div>
-    </div>
+        </div>{/* end scrollable content */}
+      </div>{/* end body */}
+    </div>{/* end pe-frame */}
   );
 }
