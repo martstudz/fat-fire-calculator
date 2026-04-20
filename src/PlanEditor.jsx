@@ -727,8 +727,8 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
           </AccSection>
 
         </div>
-        </div>{/* end scrollable content */}
-      </div>{/* end body */}
-    </div>{/* end pe-frame */}
+        </div>
+      </div>
+    </div>
   );
 }
