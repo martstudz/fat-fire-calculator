@@ -242,8 +242,8 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
     { id: "income", label: "Income & Tax" },
     { id: "spending", label: "Spending" },
     { id: "savings", label: "Savings & Portfolio" },
-    { id: "windfalls", label: "Windfalls" },
     { id: "goal", label: "Retirement Goal" },
+    { id: "windfalls", label: "Windfalls" },
     { id: "assumptions", label: "Assumptions" },
   ];
 
@@ -275,8 +275,11 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
     const root = scrollRef.current;
     const el = document.getElementById(`pe-${id}`);
     if (!root || !el) return;
-    // Smooth-scroll within the content column, not window
-    const offset = el.offsetTop - 16; // small breathing room
+    // Use getBoundingClientRect so position is relative to the scroll viewport,
+    // then add current scrollTop to get the absolute scroll target.
+    const rootRect = root.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const offset = root.scrollTop + (elRect.top - rootRect.top) - 16;
     root.scrollTo({ top: offset, behavior: "smooth" });
   }
 

@@ -1084,7 +1084,7 @@ export function onboardingToState(d, baseDefaults) {
     yourBase,
     spouseBase,
     yourBonusPct:     resolveCompPct(yourBase, d.yourHasBonus, d.yourBonusMode, d.yourBonusPct, d.yourBonusDollar),
-    spouseBonusPct:   partnered ? resolveCompPct(spouseBase, d.spouseHasBonus, d.spouseHasBonus, d.spouseBonusPct, d.spouseBonusDollar) : 0,
+    spouseBonusPct:   partnered ? resolveCompPct(spouseBase, d.spouseHasBonus, d.spouseBonusMode, d.spouseBonusPct, d.spouseBonusDollar) : 0,
     yourEquityPct,
     spouseEquityPct,
     // Commission and profit sharing folded into bonus for calculator compat (additive)
