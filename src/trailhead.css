@@ -966,9 +966,6 @@ input, select, textarea {
 .pe-stack {
   /* main content column — styles applied inline */
 }
-.pe-accordion {
-  border-top: 1px solid var(--line);
-}
 .pe-accordion__head {
   /* accordion toggle button — styles applied inline */
 }
@@ -976,4 +973,132 @@ input, select, textarea {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+/* ── Plan Editor uniform field inputs ── */
+.pe-field-wrap {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r-1);
+  background: var(--paper);
+  overflow: hidden;
+  width: 130px;
+  flex-shrink: 0;
+  transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+}
+
+.pe-field-wrap:focus-within {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px oklch(68% 0.14 150 / 0.15);
+}
+
+.pe-field-adorn {
+  font-size: var(--step--2);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  user-select: none;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.pe-field-adorn--left {
+  padding: 0 0 0 8px;
+  min-width: 14px;
+}
+
+.pe-field-adorn--right {
+  padding: 0 8px 0 0;
+  min-width: 14px;
+  text-align: right;
+}
+
+.pe-field-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 5px 6px;
+  font-size: var(--step--1);
+  font-family: var(--font-mono);
+  color: var(--ink);
+  text-align: right;
+  outline: none;
+  appearance: none;
+}
+
+/* Scroll offset so sticky header doesn't overlap sections */
+.pe-accordion {
+  border-top: 1px solid var(--line);
+  scroll-margin-top: 57px;
+}
+
+/* ── Person blocks ── */
+.pe-person {
+  border-radius: var(--r-3);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  margin: 6px 0 4px;
+}
+
+.pe-person__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  font-size: var(--step--1);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.pe-person__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pe-person__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 4px 14px 10px;
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+}
+
+/* You = accent/green */
+.pe-person--you .pe-person__header {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.pe-person--you .pe-person__dot {
+  background: var(--accent-deep);
+}
+.pe-person--you {
+  border-color: oklch(88% 0.06 150);
+}
+
+/* Spouse = dusk/blue */
+.pe-person--spouse .pe-person__header {
+  background: var(--dusk-soft);
+  color: var(--dusk-ink);
+}
+.pe-person--spouse .pe-person__dot {
+  background: var(--dusk);
+}
+.pe-person--spouse {
+  border-color: oklch(88% 0.04 235);
+}
+
+/* Shared / household section within a block */
+.pe-person--shared .pe-person__header {
+  background: var(--paper-2);
+  color: var(--ink-2);
+}
+.pe-person--shared .pe-person__dot {
+  background: var(--ink-4);
+}
+.pe-person--shared {
+  border-color: var(--line);
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import { PrivacyContext } from "./FatFireCalculator";
 
 // ── Primitives ────────────────────────────────────────────────────────────────
@@ -14,8 +14,20 @@ function formatCommas(n) {
   return Math.round(n).toLocaleString("en-CA");
 }
 
+// ── Uniform field adornment wrapper ─────────────────────────────────────────
+// Every input is the same width. Left slot = "$" or empty. Right slot = "%" or empty.
+function FieldInput({ left, right, children }) {
+  return (
+    <div className="pe-field-wrap">
+      <span className="pe-field-adorn pe-field-adorn--left">{left || ""}</span>
+      {children}
+      <span className="pe-field-adorn pe-field-adorn--right">{right || ""}</span>
+    </div>
+  );
+}
+
 // Comma-formatted number input: shows commas when blurred, raw digits when focused
-function CommaInput({ value, onChange, small, className = "" }) {
+function CommaInput({ value, onChange }) {
   const [focused, setFocused] = useState(false);
   const [raw, setRaw] = useState(value != null ? String(value) : "");
   useEffect(() => {
@@ -26,7 +38,7 @@ function CommaInput({ value, onChange, small, className = "" }) {
     <input
       type="text"
       inputMode="numeric"
-      className={[small ? "--sm" : "", "mono", className].filter(Boolean).join(" ")}
+      className="pe-field-input mono"
       value={display || ""}
       onFocus={() => { setFocused(true); setRaw(value != null ? String(value) : ""); }}
       onChange={(e) => {
@@ -44,14 +56,13 @@ function CommaInput({ value, onChange, small, className = "" }) {
   );
 }
 
-function NumInput({ label, value, onChange, prefix, small, hint }) {
+function NumInput({ label, value, onChange, prefix, hint }) {
   return (
     <div className="inp-row">
       <span>{label}{hint && <span className="inp-hint"> · {hint}</span>}</span>
-      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-        {prefix && <span style={{ color: "var(--ink-3)", fontSize: "var(--step--1)" }}>{prefix}</span>}
-        <CommaInput value={value} onChange={onChange} small={small} />
-      </div>
+      <FieldInput left={prefix || ""}>
+        <CommaInput value={value} onChange={onChange} />
+      </FieldInput>
     </div>
   );
 }
@@ -60,7 +71,6 @@ function NumInput({ label, value, onChange, prefix, small, hint }) {
 function PctInput({ label, value, onChange, hint }) {
   const [focused, setFocused] = useState(false);
   const [raw, setRaw] = useState("");
-  // Show up to 4 sig decimal places, strip trailing zeros
   const toDisplay = (v) => v ? parseFloat((v * 100).toFixed(4)).toString() : "";
   const display = focused ? raw : toDisplay(value);
   useEffect(() => {
@@ -69,18 +79,16 @@ function PctInput({ label, value, onChange, hint }) {
   return (
     <div className="inp-row">
       <span>{label}{hint && <span className="inp-hint"> · {hint}</span>}</span>
-      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+      <FieldInput right="%">
         <input
           type="text"
           inputMode="decimal"
-          className="--sm mono"
+          className="pe-field-input mono"
           value={display}
           onFocus={() => { setFocused(true); setRaw(toDisplay(value)); }}
           onChange={(e) => {
-            // Allow digits, one dot, optional digits after
             const cleaned = e.target.value.replace(/[^0-9.]/g, "").replace(/^(\d*\.?\d*).*$/, "$1");
             setRaw(cleaned);
-            // Only commit if it's a complete number (not just "3." mid-typing)
             if (cleaned !== "" && !cleaned.endsWith(".")) {
               const n = parseFloat(cleaned);
               if (!isNaN(n)) onChange(n / 100);
@@ -99,8 +107,7 @@ function PctInput({ label, value, onChange, hint }) {
             }
           }}
         />
-        <span style={{ color: "var(--ink-3)", fontSize: "var(--step--1)" }}>%</span>
-      </div>
+      </FieldInput>
     </div>
   );
 }
@@ -109,10 +116,9 @@ function ExpenseRow({ label, value, onChange, freq }) {
   return (
     <div className="inp-row">
       <span>{label} <span style={{ color: "var(--ink-3)", fontSize: "var(--step--2)" }}>/{freq === "annual" ? "yr" : "mo"}</span></span>
-      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-        <span style={{ color: "var(--ink-3)", fontSize: "var(--step--1)" }}>$</span>
+      <FieldInput left="$">
         <CommaInput value={value} onChange={onChange} />
-      </div>
+      </FieldInput>
     </div>
   );
 }
@@ -121,6 +127,23 @@ function InfoBox({ children }) {
   return (
     <div className="info-box" style={{ margin: "6px 0" }}>
       <div style={{ fontSize: "var(--step--2)", color: "var(--ink-2)", lineHeight: 1.6 }}>{children}</div>
+    </div>
+  );
+}
+
+// ── PersonBlock ───────────────────────────────────────────────────────────────
+// Wraps a group of fields for one person with a coloured header pill.
+// variant: "you" | "spouse" | "shared"
+function PersonBlock({ name, variant = "you", children }) {
+  return (
+    <div className={`pe-person pe-person--${variant}`}>
+      <div className="pe-person__header">
+        <span className="pe-person__dot" />
+        {name}
+      </div>
+      <div className="pe-person__fields">
+        {children}
+      </div>
     </div>
   );
 }
@@ -141,16 +164,26 @@ function AccSection({ id, title, icon, defaultOpen = true, children }) {
           width: "100%",
           background: "none",
           border: "none",
-          padding: "14px 0",
+          padding: "16px 0",
           cursor: "pointer",
           borderBottom: open ? "none" : "1px solid var(--line)",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {icon && <span style={{ fontSize: "var(--step-0)" }}>{icon}</span>}
-          <span style={{ fontSize: "var(--step-0)", fontWeight: 600, color: "var(--ink)" }}>{title}</span>
+          {icon && <span style={{ fontSize: "var(--step-1)" }}>{icon}</span>}
+          <span style={{ fontSize: "var(--step-1)", fontWeight: 600, color: "var(--ink)" }}>{title}</span>
         </div>
-        <span style={{ color: "var(--ink-3)", fontSize: "var(--step--1)", transition: "transform 0.2s", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+        <svg
+          width="20" height="20" viewBox="0 0 20 20" fill="none"
+          style={{
+            color: "var(--ink-3)",
+            flexShrink: 0,
+            transition: "transform 0.22s cubic-bezier(0.32,0.72,0.24,1)",
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+          }}
+        >
+          <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
       </button>
       {open && (
         <div className="pe-fields" style={{ paddingBottom: 20, borderBottom: "1px solid var(--line)" }}>
@@ -214,6 +247,30 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
     { id: "assumptions", label: "Assumptions" },
   ];
 
+  // Track which section is currently in view
+  const [activeSection, setActiveSection] = useState("household");
+  useEffect(() => {
+    const els = sections.map(sec => document.getElementById(`pe-${sec.id}`)).filter(Boolean);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Pick the topmost visible section
+        const visible = entries.filter(e => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible.length > 0) {
+          const id = visible[0].target.id.replace("pe-", "");
+          setActiveSection(id);
+        }
+      },
+      { rootMargin: "-20% 0px -60% 0px", threshold: 0 }
+    );
+    els.forEach(el => observer.observe(el));
+    return () => observer.disconnect();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function scrollToSection(id) {
+    const el = document.getElementById(`pe-${id}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <div className="pe-frame">
       {/* Header */}
@@ -236,38 +293,46 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
       </div>
 
       <div className="pe-body" style={{ display: "flex", gap: 0 }}>
-        {/* ToC sidebar */}
+        {/* ToC sidebar — sticky within the scroll container */}
         <div className="pe-toc" style={{
-          width: 160,
+          width: 172,
           flexShrink: 0,
-          padding: "24px 16px",
+          padding: "24px 12px 24px 20px",
           borderRight: "1px solid var(--line)",
           position: "sticky",
-          top: 57,
+          top: 0,
           alignSelf: "flex-start",
           height: "calc(100vh - 57px)",
           overflowY: "auto",
         }}>
-          <div style={{ fontSize: "var(--step--2)", fontWeight: 600, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Sections</div>
-          {sections.map(sec => (
-            <a
-              key={sec.id}
-              href={`#pe-${sec.id}`}
-              style={{
-                display: "block",
-                fontSize: "var(--step--1)",
-                color: "var(--ink-2)",
-                padding: "5px 8px",
-                borderRadius: "var(--r-2)",
-                textDecoration: "none",
-                marginBottom: 2,
-              }}
-              onMouseEnter={e => e.target.style.background = "var(--paper-2)"}
-              onMouseLeave={e => e.target.style.background = "none"}
-            >
-              {sec.label}
-            </a>
-          ))}
+          <div style={{ fontSize: "var(--step--2)", fontWeight: 600, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Sections</div>
+          {sections.map(sec => {
+            const isActive = activeSection === sec.id;
+            return (
+              <button
+                key={sec.id}
+                onClick={() => scrollToSection(sec.id)}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  fontSize: "var(--step--1)",
+                  fontWeight: isActive ? 600 : 400,
+                  color: isActive ? "var(--ink)" : "var(--ink-2)",
+                  background: isActive ? "var(--paper-2)" : "none",
+                  border: "none",
+                  borderLeft: isActive ? "2px solid var(--accent-deep)" : "2px solid transparent",
+                  padding: "6px 10px",
+                  borderRadius: "0 var(--r-2) var(--r-2) 0",
+                  cursor: "pointer",
+                  marginBottom: 1,
+                  transition: "all 0.15s",
+                }}
+              >
+                {sec.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Main content */}
@@ -275,86 +340,77 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
 
           {/* ── Household ── */}
           <AccSection id="household" title="Household" icon="👥">
-            <div className="inp-row">
-              <span>Your name</span>
-              <input
-                type="text"
-                value={s.yourName || ""}
-                placeholder="e.g. Alex"
-                onChange={(e) => update("yourName")(e.target.value)}
-                className="--sm"
-              />
-            </div>
-            {s.partnered !== false && (
+            <PersonBlock name={s.yourName || "You"} variant="you">
               <div className="inp-row">
-                <span>Spouse / partner name</span>
+                <span>Name</span>
                 <input
                   type="text"
-                  value={s.spouseName || ""}
-                  placeholder="e.g. Jamie"
-                  onChange={(e) => update("spouseName")(e.target.value)}
+                  value={s.yourName || ""}
+                  placeholder="e.g. Alex"
+                  onChange={(e) => update("yourName")(e.target.value)}
                   className="--sm"
                 />
               </div>
-            )}
-            <NumInput
-              label={`${s.yourName || "Your"} current age`}
-              value={s.currentAge}
-              onChange={update("currentAge")}
-              small
-            />
+              <NumInput label="Current age" value={s.currentAge} onChange={update("currentAge")} small />
+            </PersonBlock>
+
             {s.partnered !== false && (
-              <NumInput
-                label={`${s.spouseName || "Spouse"}'s current age`}
-                value={s.spouseCurrentAge}
-                onChange={update("spouseCurrentAge")}
-                small
-              />
+              <PersonBlock name={s.spouseName || "Spouse"} variant="spouse">
+                <div className="inp-row">
+                  <span>Name</span>
+                  <input
+                    type="text"
+                    value={s.spouseName || ""}
+                    placeholder="e.g. Jamie"
+                    onChange={(e) => update("spouseName")(e.target.value)}
+                    className="--sm"
+                  />
+                </div>
+                <NumInput label="Current age" value={s.spouseCurrentAge} onChange={update("spouseCurrentAge")} small />
+              </PersonBlock>
             )}
-            <NumInput
-              label="End-of-plan age"
-              value={s.deathAge}
-              onChange={update("deathAge")}
-              small
-              hint="horizon for projections"
-            />
-            <div className="inp-row">
-              <span>Have children?</span>
-              <div className="seg">
-                <button onClick={() => update("hasKids")(true)} className={s.hasKids !== false ? "is-active" : ""}>Yes</button>
-                <button onClick={() => update("hasKids")(false)} className={s.hasKids === false ? "is-active" : ""}>No</button>
+
+            <PersonBlock name="Household" variant="shared">
+              <NumInput label="End-of-plan age" value={s.deathAge} onChange={update("deathAge")} small hint="horizon for projections" />
+              <div className="inp-row">
+                <span>Have children?</span>
+                <div className="seg">
+                  <button onClick={() => update("hasKids")(true)} className={s.hasKids !== false ? "is-active" : ""}>Yes</button>
+                  <button onClick={() => update("hasKids")(false)} className={s.hasKids === false ? "is-active" : ""}>No</button>
+                </div>
               </div>
-            </div>
-            <div className="inp-row">
-              <span>Partnered?</span>
-              <div className="seg">
-                <button onClick={() => update("partnered")(true)} className={s.partnered !== false ? "is-active" : ""}>Yes</button>
-                <button onClick={() => update("partnered")(false)} className={s.partnered === false ? "is-active" : ""}>No</button>
+              <div className="inp-row">
+                <span>Partnered?</span>
+                <div className="seg">
+                  <button onClick={() => update("partnered")(true)} className={s.partnered !== false ? "is-active" : ""}>Yes</button>
+                  <button onClick={() => update("partnered")(false)} className={s.partnered === false ? "is-active" : ""}>No</button>
+                </div>
               </div>
-            </div>
+            </PersonBlock>
           </AccSection>
 
           {/* ── Income & Tax ── */}
           <AccSection id="income" title="Income & Tax" icon="💼">
-            <div className="ob-person-label">{s.yourName || "You"}</div>
-            <NumInput label="Annual base salary" value={s.yourBase} onChange={update("yourBase")} prefix="$" step={1000} />
-            <PctInput label="Performance bonus (% of base)" value={s.yourBonusPct} onChange={update("yourBonusPct")} />
-            <PctInput label="Equity / RSUs / options (% of base)" value={s.yourEquityPct} onChange={update("yourEquityPct")} hint="total variable equity, invested as vested" />
-            <PctInput label="Commission & profit sharing (% of base)" value={s.yourCommissionPct || 0} onChange={update("yourCommissionPct")} />
+            <PersonBlock name={s.yourName || "You"} variant="you">
+              <NumInput label="Annual base salary" value={s.yourBase} onChange={update("yourBase")} prefix="$" step={1000} />
+              <PctInput label="Performance bonus (% of base)" value={s.yourBonusPct} onChange={update("yourBonusPct")} />
+              <PctInput label="Equity / RSUs / options (% of base)" value={s.yourEquityPct} onChange={update("yourEquityPct")} hint="total variable equity, invested as vested" />
+              <PctInput label="Commission & profit sharing (% of base)" value={s.yourCommissionPct || 0} onChange={update("yourCommissionPct")} />
+            </PersonBlock>
 
             {s.partnered !== false && (
-              <>
-                <div className="ob-person-label" style={{ paddingTop: 8 }}>{s.spouseName || "Spouse"}</div>
+              <PersonBlock name={s.spouseName || "Spouse"} variant="spouse">
                 <NumInput label="Annual base salary" value={s.spouseBase} onChange={update("spouseBase")} prefix="$" step={1000} />
                 <PctInput label="Performance bonus (% of base)" value={s.spouseBonusPct} onChange={update("spouseBonusPct")} />
                 <PctInput label="Equity / RSUs / options (% of base)" value={s.spouseEquityPct} onChange={update("spouseEquityPct")} hint="total variable equity, invested as vested" />
                 <PctInput label="Commission & profit sharing (% of base)" value={s.spouseCommissionPct || 0} onChange={update("spouseCommissionPct")} />
-              </>
+              </PersonBlock>
             )}
 
-            <div className="ob-person-label" style={{ paddingTop: 8 }}>Tax</div>
-            <PctInput label="Blended tax rate" value={s.taxRate} onChange={update("taxRate")} />
-            <PctInput label="Income growth (real)" value={s.incomeGrowth} onChange={update("incomeGrowth")} />
+            <PersonBlock name="Tax & growth" variant="shared">
+              <PctInput label="Blended tax rate" value={s.taxRate} onChange={update("taxRate")} />
+              <PctInput label="Income growth (real)" value={s.incomeGrowth} onChange={update("incomeGrowth")} />
+            </PersonBlock>
 
             <div style={{ borderTop: "1px solid var(--line)", paddingTop: 8, marginTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
               <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
@@ -505,170 +561,169 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
 
           {/* ── Savings & Portfolio ── */}
           <AccSection id="savings" title="Savings & Portfolio" icon="📊">
-            <div className="ob-person-label">Starting portfolio</div>
-            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 6 }}>{s.yourName || "You"}</div>
-            <NumInput label="RRSP" value={s.yourRrspStart} onChange={update("yourRrspStart")} prefix="$" step={10000} />
-            <NumInput label="TFSA" value={s.yourTfsaStart} onChange={update("yourTfsaStart")} prefix="$" step={10000} />
-            <NumInput label="Non-registered" value={s.yourNrStart} onChange={update("yourNrStart")} prefix="$" step={10000} />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--ink-3)", paddingBottom: 4 }}>
-              <span>{s.yourName || "You"}'s subtotal</span>
-              <span className="mono">{fmtMoney((s.yourRrspStart||0) + (s.yourTfsaStart||0) + (s.yourNrStart||0))}</span>
-            </div>
+            <div className="label-xs" style={{ padding: "8px 0 4px" }}>Starting portfolio</div>
+            <PersonBlock name={s.yourName || "You"} variant="you">
+              <NumInput label="RRSP" value={s.yourRrspStart} onChange={update("yourRrspStart")} prefix="$" step={10000} />
+              <NumInput label="TFSA" value={s.yourTfsaStart} onChange={update("yourTfsaStart")} prefix="$" step={10000} />
+              <NumInput label="Non-registered" value={s.yourNrStart} onChange={update("yourNrStart")} prefix="$" step={10000} />
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--ink-3)", paddingTop: 4, borderTop: "1px solid var(--line)", marginTop: 2 }}>
+                <span>Subtotal</span>
+                <span className="mono">{fmtMoney((s.yourRrspStart||0) + (s.yourTfsaStart||0) + (s.yourNrStart||0))}</span>
+              </div>
+            </PersonBlock>
             {s.partnered !== false && (
-              <>
-                <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 8, marginBottom: 4 }}>{s.spouseName || "Spouse"}</div>
+              <PersonBlock name={s.spouseName || "Spouse"} variant="spouse">
                 <NumInput label="RRSP" value={s.spouseRrspStart} onChange={update("spouseRrspStart")} prefix="$" step={10000} />
                 <NumInput label="TFSA" value={s.spouseTfsaStart} onChange={update("spouseTfsaStart")} prefix="$" step={10000} />
                 <NumInput label="Non-registered" value={s.spouseNrStart} onChange={update("spouseNrStart")} prefix="$" step={10000} />
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--ink-3)", paddingBottom: 4 }}>
-                  <span>{s.spouseName || "Spouse"}'s subtotal</span>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--ink-3)", paddingTop: 4, borderTop: "1px solid var(--line)", marginTop: 2 }}>
+                  <span>Subtotal</span>
                   <span className="mono">{fmtMoney((s.spouseRrspStart||0) + (s.spouseTfsaStart||0) + (s.spouseNrStart||0))}</span>
                 </div>
-              </>
+              </PersonBlock>
             )}
-            <div style={{ paddingTop: 4, marginTop: 4, borderTop: "1px solid var(--line)", fontSize: "var(--step--1)", color: "var(--ink-2)", display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontWeight: 600, color: "var(--ink)" }}>Total portfolio</span>
-              <span className="mono" style={{ fontWeight: 600, color: "var(--ink)" }}>{fmtMoney((s.yourRrspStart||0)+(s.yourTfsaStart||0)+(s.yourNrStart||0)+(s.partnered !== false ? (s.spouseRrspStart||0)+(s.spouseTfsaStart||0)+(s.spouseNrStart||0) : 0))}</span>
+            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, color: "var(--ink)", fontSize: "var(--step--1)", padding: "6px 0 8px", borderTop: "1px solid var(--line)" }}>
+              <span>Total portfolio</span>
+              <span className="mono">{fmtMoney((s.yourRrspStart||0)+(s.yourTfsaStart||0)+(s.yourNrStart||0)+(s.partnered !== false ? (s.spouseRrspStart||0)+(s.spouseTfsaStart||0)+(s.spouseNrStart||0) : 0))}</span>
             </div>
 
-            <div className="ob-person-label" style={{ paddingTop: 16 }}>Monthly contributions</div>
-            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 6 }}>{s.yourName || "You"}</div>
-            <NumInput label="RRSP" value={s.startingMonthly} onChange={update("startingMonthly")} prefix="$" step={100} />
-            <NumInput label="TFSA" value={s.yourTfsaMonthly || 0} onChange={update("yourTfsaMonthly")} prefix="$" step={100} />
-            <NumInput label="Non-registered" value={s.yourNrMonthly || 0} onChange={update("yourNrMonthly")} prefix="$" step={100} />
+            <div className="label-xs" style={{ padding: "8px 0 4px" }}>Monthly contributions</div>
+            <PersonBlock name={s.yourName || "You"} variant="you">
+              <NumInput label="RRSP" value={s.startingMonthly} onChange={update("startingMonthly")} prefix="$" step={100} />
+              <NumInput label="TFSA" value={s.yourTfsaMonthly || 0} onChange={update("yourTfsaMonthly")} prefix="$" step={100} />
+              <NumInput label="Non-registered" value={s.yourNrMonthly || 0} onChange={update("yourNrMonthly")} prefix="$" step={100} />
+            </PersonBlock>
             {s.partnered !== false && (
-              <>
-                <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 8, marginBottom: 4 }}>{s.spouseName || "Spouse"}</div>
+              <PersonBlock name={s.spouseName || "Spouse"} variant="spouse">
                 <NumInput label="RRSP" value={s.spouseMonthly || 0} onChange={update("spouseMonthly")} prefix="$" step={100} />
                 <NumInput label="TFSA" value={s.spouseTfsaMonthly || 0} onChange={update("spouseTfsaMonthly")} prefix="$" step={100} />
                 <NumInput label="Non-registered" value={s.spouseNrMonthly || 0} onChange={update("spouseNrMonthly")} prefix="$" step={100} />
-              </>
+              </PersonBlock>
             )}
 
-            <div className="ob-person-label" style={{ paddingTop: 8 }}>Annual lump-sum top-ups</div>
-            <NumInput label="RRSP" value={s.rrspTopUp || 0} onChange={update("rrspTopUp")} prefix="$" step={1000} hint="e.g. year-end bonus contribution" />
-            <NumInput label="TFSA" value={s.tfsaTopUp || 0} onChange={update("tfsaTopUp")} prefix="$" step={1000} />
-            <NumInput label="Non-registered" value={s.nrTopUp || 0} onChange={update("nrTopUp")} prefix="$" step={1000} />
-            <PctInput label="Monthly contrib growth" value={s.contribGrowth} onChange={update("contribGrowth")} />
+            <PersonBlock name="Annual lump-sum top-ups" variant="shared">
+              <NumInput label="RRSP" value={s.rrspTopUp || 0} onChange={update("rrspTopUp")} prefix="$" step={1000} hint="e.g. year-end bonus contribution" />
+              <NumInput label="TFSA" value={s.tfsaTopUp || 0} onChange={update("tfsaTopUp")} prefix="$" step={1000} />
+              <NumInput label="Non-registered" value={s.nrTopUp || 0} onChange={update("nrTopUp")} prefix="$" step={1000} />
+              <PctInput label="Monthly contrib growth" value={s.contribGrowth} onChange={update("contribGrowth")} />
+            </PersonBlock>
 
-            <div style={{ paddingTop: 8, marginTop: 4, borderTop: "1px solid var(--line)", display: "flex", flexDirection: "column", gap: 3 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3, padding: "6px 0 8px", borderTop: "1px solid var(--line)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
                 <span>Total monthly contributions</span>
                 <span className="mono">{fmtMoney(totalMonthlyContrib)}/mo</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
                 <span>Net annual contribution (yrs 1–3)</span>
-                <span className="mono" style={{ fontWeight: 600 }}>{fmtMoney(Math.max(0, startingAnnualContrib - s.extraMortgagePayment * 12))}</span>
+                <span className="mono" style={{ fontWeight: 600 }}>{fmtMoney(Math.max(0, startingAnnualContrib - (s.extraMortgagePayment || 0) * 12))}</span>
               </div>
-              <div style={{ color: "var(--ink-3)", marginTop: 4, fontSize: "var(--step--2)" }}>Waterfall: TFSA room → RRSP room → Non-reg overflow.</div>
+              <div style={{ color: "var(--ink-3)", marginTop: 2, fontSize: "var(--step--2)" }}>Waterfall: TFSA room → RRSP room → Non-reg overflow.</div>
             </div>
 
-            <div className="ob-person-label" style={{ paddingTop: 16 }}>Contribution room (registered plans)</div>
-            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 6 }}>{s.yourName || "You"} — carry-forward</div>
-            <NumInput label="RRSP room" value={s.yourRrspRoomExisting} onChange={update("yourRrspRoomExisting")} prefix="$" step={1000} />
-            <NumInput label="TFSA room" value={s.yourTfsaRoomExisting} onChange={update("yourTfsaRoomExisting")} prefix="$" step={1000} />
+            <div className="label-xs" style={{ padding: "8px 0 4px" }}>Contribution room</div>
+            <PersonBlock name={`${s.yourName || "You"} — carry-forward`} variant="you">
+              <NumInput label="RRSP room" value={s.yourRrspRoomExisting} onChange={update("yourRrspRoomExisting")} prefix="$" hint="check CRA My Account" />
+              <NumInput label="TFSA room" value={s.yourTfsaRoomExisting} onChange={update("yourTfsaRoomExisting")} prefix="$" hint="check CRA My Account" />
+              <NumInput label="RRSP room / yr" value={s.yourRrspRoomAnnual} onChange={update("yourRrspRoomAnnual")} prefix="$" hint="2026 max: $32,490" />
+              <NumInput label="TFSA room / yr" value={s.yourTfsaRoomAnnual} onChange={update("yourTfsaRoomAnnual")} prefix="$" hint="2026: $7,000" />
+            </PersonBlock>
             {s.partnered !== false && (
-              <>
-                <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 8, marginBottom: 4 }}>{s.spouseName || "Spouse"} — carry-forward</div>
-                <NumInput label="RRSP room" value={s.spouseRrspRoomExisting} onChange={update("spouseRrspRoomExisting")} prefix="$" step={1000} />
-                <NumInput label="TFSA room" value={s.spouseTfsaRoomExisting} onChange={update("spouseTfsaRoomExisting")} prefix="$" step={1000} />
-              </>
-            )}
-
-            <div style={{ fontSize: "var(--step--2)", fontWeight: 600, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.08em", paddingTop: 8, paddingBottom: 4, borderTop: "1px solid var(--line)", marginTop: 8 }}>Annual new room (today's $)</div>
-            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName || "You"}</div>
-            <NumInput label="RRSP room / yr" value={s.yourRrspRoomAnnual} onChange={update("yourRrspRoomAnnual")} prefix="$" step={500} />
-            <NumInput label="TFSA room / yr" value={s.yourTfsaRoomAnnual} onChange={update("yourTfsaRoomAnnual")} prefix="$" step={500} />
-            {s.partnered !== false && (
-              <>
-                <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 8, marginBottom: 4 }}>{s.spouseName || "Spouse"}</div>
-                <NumInput label="RRSP room / yr" value={s.spouseRrspRoomAnnual} onChange={update("spouseRrspRoomAnnual")} prefix="$" step={500} />
-                <NumInput label="TFSA room / yr" value={s.spouseTfsaRoomAnnual} onChange={update("spouseTfsaRoomAnnual")} prefix="$" step={500} />
-              </>
+              <PersonBlock name={`${s.spouseName || "Spouse"} — carry-forward`} variant="spouse">
+                <NumInput label="RRSP room" value={s.spouseRrspRoomExisting} onChange={update("spouseRrspRoomExisting")} prefix="$" hint="check CRA My Account" />
+                <NumInput label="TFSA room" value={s.spouseTfsaRoomExisting} onChange={update("spouseTfsaRoomExisting")} prefix="$" hint="check CRA My Account" />
+                <NumInput label="RRSP room / yr" value={s.spouseRrspRoomAnnual} onChange={update("spouseRrspRoomAnnual")} prefix="$" hint="2026 max: $32,490" />
+                <NumInput label="TFSA room / yr" value={s.spouseTfsaRoomAnnual} onChange={update("spouseTfsaRoomAnnual")} prefix="$" hint="2026: $7,000" />
+              </PersonBlock>
             )}
           </AccSection>
 
           {/* ── Retirement Goal ── */}
           <AccSection id="goal" title="Retirement Goal" icon="🎯">
-            <div className="ob-person-label">CPP</div>
-            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName || "You"}</div>
-            <NumInput label="Estimated CPP (today's $/yr)" value={s.yourCppAmount || Math.round((s.cppAmountToday || 0) / (s.partnered !== false ? 2 : 1))} onChange={update("yourCppAmount")} prefix="$" step={500} hint="check My Service Canada for your estimate" />
+            <div className="label-xs" style={{ padding: "8px 0 4px" }}>CPP</div>
+            <PersonBlock name={s.yourName || "You"} variant="you">
+              <NumInput label="Estimated CPP (today's $/yr)" value={s.yourCppAmount || Math.round((s.cppAmountToday || 0) / (s.partnered !== false ? 2 : 1))} onChange={update("yourCppAmount")} prefix="$" step={500} hint="check My Service Canada" />
+            </PersonBlock>
             {s.partnered !== false && (
-              <>
-                <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 6, marginBottom: 4 }}>{s.spouseName || "Spouse"}</div>
-                <NumInput label="Estimated CPP (today's $/yr)" value={s.spouseCppAmount || Math.round((s.cppAmountToday || 0) / 2)} onChange={update("spouseCppAmount")} prefix="$" step={500} />
-              </>
+              <PersonBlock name={s.spouseName || "Spouse"} variant="spouse">
+                <NumInput label="Estimated CPP (today's $/yr)" value={s.spouseCppAmount || Math.round((s.cppAmountToday || 0) / 2)} onChange={update("spouseCppAmount")} prefix="$" step={500} hint="check My Service Canada" />
+              </PersonBlock>
             )}
-            <NumInput label="CPP start age" value={s.cppStartAge} onChange={update("cppStartAge")} small hint={suggestedCppAge === 70 ? "70 recommended based on your income" : "65–70"} />
-            {s.cppStartAge < suggestedCppAge && (
-              <InfoBox>
-                Based on your income level, delaying CPP to {suggestedCppAge} is typically optimal — it acts as a guaranteed inflation-linked annuity and reduces portfolio pressure in late retirement.
-                <span
-                  style={{ display: "inline-block", marginLeft: 8, color: "var(--accent-deep)", cursor: "pointer", textDecoration: "underline" }}
-                  onClick={() => update("cppStartAge")(suggestedCppAge)}
-                >Set to {suggestedCppAge}</span>
-              </InfoBox>
-            )}
+            <PersonBlock name="CPP start age" variant="shared">
+              <NumInput label="Start age" value={s.cppStartAge} onChange={update("cppStartAge")} small hint={suggestedCppAge === 70 ? "70 recommended based on your income" : "65–70"} />
+              {s.cppStartAge < suggestedCppAge && (
+                <InfoBox>
+                  Based on your income level, delaying CPP to {suggestedCppAge} is typically optimal — it acts as a guaranteed inflation-linked annuity and reduces portfolio pressure in late retirement.
+                  <span
+                    style={{ display: "inline-block", marginLeft: 8, color: "var(--accent-deep)", cursor: "pointer", textDecoration: "underline" }}
+                    onClick={() => update("cppStartAge")(suggestedCppAge)}
+                  >Set to {suggestedCppAge}</span>
+                </InfoBox>
+              )}
+            </PersonBlock>
 
-            <div className="ob-person-label" style={{ paddingTop: 8 }}>OAS (Old Age Security)</div>
-            <NumInput label="OAS per person (today's $/yr)" value={s.oasAmountToday} onChange={update("oasAmountToday")} prefix="$" step={100} />
-            <NumInput label="OAS start age" value={s.oasStartAge} onChange={update("oasStartAge")} small hint={suggestedOasAge === 70 ? "70 recommended based on your income" : "65 or 70"} />
-            {s.oasStartAge < suggestedOasAge && (
-              <InfoBox>
-                Delaying OAS to {suggestedOasAge} increases payments by 36% permanently — worth it if your portfolio can cover the gap.
-                <span
-                  style={{ display: "inline-block", marginLeft: 8, color: "var(--accent-deep)", cursor: "pointer", textDecoration: "underline" }}
-                  onClick={() => update("oasStartAge")(suggestedOasAge)}
-                >Set to {suggestedOasAge}</span>
-              </InfoBox>
-            )}
-            <NumInput label="Clawback threshold / person" value={s.oasClawbackThreshold} onChange={update("oasClawbackThreshold")} prefix="$" step={1000} hint="2026: $95,323" />
+            <PersonBlock name="OAS (Old Age Security)" variant="shared">
+              <NumInput label="OAS per person (today's $/yr)" value={s.oasAmountToday} onChange={update("oasAmountToday")} prefix="$" step={100} />
+              <NumInput label="OAS start age" value={s.oasStartAge} onChange={update("oasStartAge")} small hint={suggestedOasAge === 70 ? "70 recommended based on your income" : "65 or 70"} />
+              {s.oasStartAge < suggestedOasAge && (
+                <InfoBox>
+                  Delaying OAS to {suggestedOasAge} increases payments by 36% permanently — worth it if your portfolio can cover the gap.
+                  <span
+                    style={{ display: "inline-block", marginLeft: 8, color: "var(--accent-deep)", cursor: "pointer", textDecoration: "underline" }}
+                    onClick={() => update("oasStartAge")(suggestedOasAge)}
+                  >Set to {suggestedOasAge}</span>
+                </InfoBox>
+              )}
+              <NumInput label="Clawback threshold / person" value={s.oasClawbackThreshold} onChange={update("oasClawbackThreshold")} prefix="$" step={1000} hint="2026: $95,323" />
+            </PersonBlock>
 
-            <div className="ob-person-label" style={{ paddingTop: 8 }}>Defined Benefit Pension</div>
-            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName || "You"}</div>
-            <NumInput label="Monthly pension amount" value={s.pensionMonthly} onChange={update("pensionMonthly")} prefix="$" step={100} hint="today's $" />
-            <NumInput label="Pension start age" value={s.pensionStartAge} onChange={update("pensionStartAge")} small />
+            <div className="label-xs" style={{ padding: "8px 0 4px" }}>Defined Benefit Pension</div>
+            <PersonBlock name={s.yourName || "You"} variant="you">
+              <NumInput label="Monthly pension amount" value={s.pensionMonthly} onChange={update("pensionMonthly")} prefix="$" step={100} hint="today's $" />
+              <NumInput label="Pension start age" value={s.pensionStartAge} onChange={update("pensionStartAge")} small />
+            </PersonBlock>
             {s.partnered !== false && (
-              <>
-                <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 8, marginBottom: 4 }}>{s.spouseName || "Spouse"}</div>
+              <PersonBlock name={s.spouseName || "Spouse"} variant="spouse">
                 <NumInput label="Monthly pension amount" value={s.spousePensionMonthly || 0} onChange={update("spousePensionMonthly")} prefix="$" step={100} hint="today's $" />
                 <NumInput label="Pension start age" value={s.spousePensionStartAge || s.pensionStartAge} onChange={update("spousePensionStartAge")} small />
-              </>
+              </PersonBlock>
             )}
 
-            <div className="ob-person-label" style={{ paddingTop: 8 }}>Windfalls</div>
-            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 8 }}>Enter an expected lump sum (inheritance, property sale, RSU cliff, etc.).</div>
-            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName || "You"}</div>
-            <NumInput label="Windfall amount" value={s.yourWindfallAmount} onChange={update("yourWindfallAmount")} prefix="$" step={25000} />
-            <NumInput label={`Age at receipt`} value={s.yourWindfallAge} onChange={update("yourWindfallAge")} small />
+            <div className="label-xs" style={{ padding: "8px 0 4px" }}>Windfalls</div>
+            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>Expected lump sum (inheritance, property sale, RSU cliff, etc.)</div>
+            <PersonBlock name={s.yourName || "You"} variant="you">
+              <NumInput label="Windfall amount" value={s.yourWindfallAmount} onChange={update("yourWindfallAmount")} prefix="$" step={25000} />
+              <NumInput label="Age at receipt" value={s.yourWindfallAge} onChange={update("yourWindfallAge")} small />
+            </PersonBlock>
             {s.partnered !== false && (
-              <>
-                <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 8, marginBottom: 4 }}>{s.spouseName || "Spouse"}</div>
+              <PersonBlock name={s.spouseName || "Spouse"} variant="spouse">
                 <NumInput label="Windfall amount" value={s.spouseWindfallAmount} onChange={update("spouseWindfallAmount")} prefix="$" step={25000} />
-                <NumInput label={`Age at receipt`} value={s.spouseWindfallAge} onChange={update("spouseWindfallAge")} small />
-              </>
+                <NumInput label="Age at receipt" value={s.spouseWindfallAge} onChange={update("spouseWindfallAge")} small />
+              </PersonBlock>
             )}
           </AccSection>
 
           {/* ── Assumptions ── */}
           <AccSection id="assumptions" title="Assumptions" icon="⚙️">
-            <div className="ob-person-label">Market</div>
-            <PctInput label="Market return (nominal)" value={s.investmentReturn != null ? s.investmentReturn : 0.07} onChange={update("investmentReturn")} hint="long-run nominal; 7% = ~4% real + 3% inflation" />
-            <PctInput label="Inflation" value={s.inflation != null ? s.inflation : 0.03} onChange={update("inflation")} hint="3% = Bank of Canada target" />
+            <PersonBlock name="Market" variant="shared">
+              <PctInput label="Market return (nominal)" value={s.investmentReturn != null ? s.investmentReturn : 0.07} onChange={update("investmentReturn")} hint="long-run nominal; 7% = ~4% real + 3% inflation" />
+              <PctInput label="Inflation" value={s.inflation != null ? s.inflation : 0.03} onChange={update("inflation")} hint="3% = Bank of Canada target" />
+            </PersonBlock>
 
-            <div className="ob-person-label" style={{ paddingTop: 8 }}>Die with</div>
-            <NumInput label="Die with (today's $)" value={s.terminalTargetToday} onChange={update("terminalTargetToday")} prefix="$" step={25000} hint="today's $" />
-            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>
-              Solver finds the earliest age where spending is fully covered and portfolio ends at or above this amount.
-            </div>
+            <PersonBlock name="Die with" variant="shared">
+              <NumInput label="Die with (today's $)" value={s.terminalTargetToday} onChange={update("terminalTargetToday")} prefix="$" step={25000} />
+              <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", paddingTop: 2 }}>
+                Solver finds the earliest age where spending is fully covered and portfolio ends at or above this amount.
+              </div>
+            </PersonBlock>
 
-            <div className="ob-person-label" style={{ paddingTop: 8 }}>Withdrawal tax rates</div>
-            <PctInput label="RRSP/RRIF withdrawal rate" value={s.rrspTaxRate != null ? s.rrspTaxRate : 0.37} onChange={update("rrspTaxRate")} hint="marginal rate in retirement" />
-            <PctInput label="Non-reg cap-gains rate" value={s.nrCapGainsRate != null ? s.nrCapGainsRate : 0.21} onChange={update("nrCapGainsRate")} hint="50% inclusion × marginal rate" />
-            <PctInput label="CPP + pension + OAS rate" value={s.retirementIncomeTaxRate != null ? s.retirementIncomeTaxRate : 0.25} onChange={update("retirementIncomeTaxRate")} hint="ordinary income in retirement" />
-            <InfoBox>
-              <strong>CPP, OAS &amp; DB pension are fully taxable</strong> as ordinary income. The model deducts this tax before netting against spending — your portfolio covers the remainder. RRSP refunds are automatically reinvested (TFSA first, then non-reg).
-            </InfoBox>
+            <PersonBlock name="Withdrawal tax rates" variant="shared">
+              <PctInput label="RRSP/RRIF withdrawal rate" value={s.rrspTaxRate != null ? s.rrspTaxRate : 0.37} onChange={update("rrspTaxRate")} hint="marginal rate in retirement" />
+              <PctInput label="Non-reg cap-gains rate" value={s.nrCapGainsRate != null ? s.nrCapGainsRate : 0.21} onChange={update("nrCapGainsRate")} hint="50% inclusion × marginal rate" />
+              <PctInput label="CPP + pension + OAS rate" value={s.retirementIncomeTaxRate != null ? s.retirementIncomeTaxRate : 0.25} onChange={update("retirementIncomeTaxRate")} hint="ordinary income in retirement" />
+              <InfoBox>
+                <strong>CPP, OAS &amp; DB pension are fully taxable</strong> as ordinary income. The model deducts this tax before netting against spending — your portfolio covers the remainder. RRSP refunds are automatically reinvested (TFSA first, then non-reg).
+              </InfoBox>
+            </PersonBlock>
           </AccSection>
 
         </div>
