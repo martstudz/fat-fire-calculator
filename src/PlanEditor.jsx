@@ -56,12 +56,15 @@ function NumInput({ label, value, onChange, prefix, small, hint }) {
   );
 }
 
+// PctInput supports up to 4 decimal places (e.g. 3.85% or 0.25%)
 function PctInput({ label, value, onChange, hint }) {
   const [focused, setFocused] = useState(false);
   const [raw, setRaw] = useState("");
-  const display = focused ? raw : (value ? parseFloat((value * 100).toFixed(2)).toString() : "");
+  // Show up to 4 sig decimal places, strip trailing zeros
+  const toDisplay = (v) => v ? parseFloat((v * 100).toFixed(4)).toString() : "";
+  const display = focused ? raw : toDisplay(value);
   useEffect(() => {
-    if (!focused) setRaw(value ? parseFloat((value * 100).toFixed(2)).toString() : "");
+    if (!focused) setRaw(toDisplay(value));
   }, [value, focused]);
   return (
     <div className="inp-row">
@@ -72,18 +75,28 @@ function PctInput({ label, value, onChange, hint }) {
           inputMode="decimal"
           className="--sm mono"
           value={display}
-          onFocus={() => { setFocused(true); setRaw(value ? parseFloat((value * 100).toFixed(2)).toString() : ""); }}
+          onFocus={() => { setFocused(true); setRaw(toDisplay(value)); }}
           onChange={(e) => {
-            const cleaned = e.target.value.replace(/[^0-9.]/g, "");
+            // Allow digits, one dot, optional digits after
+            const cleaned = e.target.value.replace(/[^0-9.]/g, "").replace(/^(\d*\.?\d*).*$/, "$1");
             setRaw(cleaned);
-            const n = parseFloat(cleaned);
-            if (!isNaN(n)) onChange(n / 100);
-            else if (cleaned === "") onChange(0);
+            // Only commit if it's a complete number (not just "3." mid-typing)
+            if (cleaned !== "" && !cleaned.endsWith(".")) {
+              const n = parseFloat(cleaned);
+              if (!isNaN(n)) onChange(n / 100);
+            } else if (cleaned === "") {
+              onChange(0);
+            }
           }}
           onBlur={() => {
             setFocused(false);
             const n = parseFloat(raw);
-            setRaw(isNaN(n) ? "" : parseFloat(n.toFixed(2)).toString());
+            if (!isNaN(n)) {
+              onChange(n / 100);
+              setRaw(parseFloat(n.toFixed(4)).toString());
+            } else {
+              setRaw("");
+            }
           }}
         />
         <span style={{ color: "var(--ink-3)", fontSize: "var(--step--1)" }}>%</span>
@@ -156,11 +169,21 @@ function SaveIndicator({ saveStatus }) {
   return <span style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>Auto-saved</span>;
 }
 
+// ── Housing type toggle ───────────────────────────────────────────────────────
+
 // ── Main PlanEditor ───────────────────────────────────────────────────────────
 
 export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
   const hidden = useContext(PrivacyContext);
   const fmtMoney = (n) => fmt$(n, hidden);
+
+  // Housing type: "mortgage" or "rent"
+  const housingType = s.housingType || (s.mortgage > 0 ? "mortgage" : "rent");
+
+  // Derive sensible CPP / OAS start age defaults from income
+  // CPP: if household gross > ~150k, suggest 70; else 65
+  const suggestedCppAge = s.yourBase + (s.spouseBase || 0) > 150000 ? 70 : 65;
+  const suggestedOasAge = s.yourBase + (s.spouseBase || 0) > 150000 ? 70 : 65;
 
   // Derived values
   const yourBonusAmt = s.yourBase * s.yourBonusPct;
@@ -178,10 +201,14 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
   const grandAnnual = inputs.monthlyExpensesTotal * 12 + inputs.oneTimeAnnualTotal;
   const mortgagePayoff = solved.mortgagePayoffAge;
 
+  // Default snowbird to travel value if not yet set
+  const retirementTravelValue = s.retirementTravel != null ? s.retirementTravel : (s.travel || 0);
+
   const sections = [
     { id: "household", label: "Household" },
     { id: "income", label: "Income & Tax" },
     { id: "spending", label: "Spending" },
+    { id: "cars", label: "Cars" },
     { id: "savings", label: "Savings & Portfolio" },
     { id: "goal", label: "Retirement Goal" },
     { id: "assumptions", label: "Assumptions" },
@@ -350,24 +377,48 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
           {/* ── Spending ── */}
           <AccSection id="spending" title="Spending" icon="🛒">
             <div className="ob-person-label">Housing</div>
-            <ExpenseRow label="Mortgage" value={s.mortgage} onChange={update("mortgage")} freq="monthly" />
-            <div style={{ paddingLeft: 12, borderLeft: "2px solid var(--line)", marginLeft: 4, display: "flex", flexDirection: "column", gap: 2 }}>
-              <NumInput label="Principal remaining" value={s.mortgagePrincipal} onChange={update("mortgagePrincipal")} prefix="$" step={1000} />
-              <PctInput label="Interest rate" value={s.mortgageRate} onChange={update("mortgageRate")} />
-              <NumInput label="Extra payment / mo" value={s.extraMortgagePayment} onChange={update("extraMortgagePayment")} prefix="$" step={100} hint="reduces contributions by same amount" />
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--ink-2)", paddingTop: 4 }}>
-                <span>Projected payoff</span>
-                <span className="mono">
-                  {isFinite(mortgagePayoff)
-                    ? `age ${mortgagePayoff} (${Math.round(solved.mortgagePayoffMonths)} mo)`
-                    : "payment doesn't cover interest"}
-                </span>
+
+            {/* Mortgage / Rent toggle */}
+            <div className="inp-row">
+              <span>Housing type</span>
+              <div className="seg">
+                <button
+                  onClick={() => update("housingType")("mortgage")}
+                  className={housingType === "mortgage" ? "is-active" : ""}
+                >Mortgage</button>
+                <button
+                  onClick={() => update("housingType")("rent")}
+                  className={housingType === "rent" ? "is-active" : ""}
+                >Rent</button>
               </div>
             </div>
-            <ExpenseRow label="Rent" value={s.rent || 0} onChange={update("rent")} freq="monthly" />
-            <ExpenseRow label="Property tax" value={s.propertyTax} onChange={update("propertyTax")} freq="monthly" />
-            <ExpenseRow label="Home insurance" value={s.homeInsurance || 0} onChange={update("homeInsurance")} freq="monthly" />
-            <ExpenseRow label="Maintenance & repairs" value={s.maintenance} onChange={update("maintenance")} freq="monthly" />
+
+            {housingType === "mortgage" ? (
+              <>
+                <ExpenseRow label="Mortgage payment" value={s.mortgage} onChange={update("mortgage")} freq="monthly" />
+                <div style={{ paddingLeft: 12, borderLeft: "2px solid var(--line)", marginLeft: 4, display: "flex", flexDirection: "column", gap: 2 }}>
+                  <NumInput label="Principal remaining" value={s.mortgagePrincipal} onChange={update("mortgagePrincipal")} prefix="$" step={1000} />
+                  <PctInput label="Interest rate" value={s.mortgageRate} onChange={update("mortgageRate")} />
+                  <NumInput label="Extra payment / mo" value={s.extraMortgagePayment} onChange={update("extraMortgagePayment")} prefix="$" step={100} hint="reduces contributions by same amount" />
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--ink-2)", paddingTop: 4 }}>
+                    <span>Projected payoff</span>
+                    <span className="mono">
+                      {isFinite(mortgagePayoff)
+                        ? `age ${mortgagePayoff} (${Math.round(solved.mortgagePayoffMonths)} mo)`
+                        : "payment doesn't cover interest"}
+                    </span>
+                  </div>
+                </div>
+                <ExpenseRow label="Property tax" value={s.propertyTax} onChange={update("propertyTax")} freq="monthly" />
+                <ExpenseRow label="Home insurance" value={s.homeInsurance || 0} onChange={update("homeInsurance")} freq="monthly" />
+                <ExpenseRow label="Maintenance & repairs" value={s.maintenance} onChange={update("maintenance")} freq="monthly" />
+              </>
+            ) : (
+              <>
+                <ExpenseRow label="Rent" value={s.rent || 0} onChange={update("rent")} freq="monthly" />
+                <ExpenseRow label="Tenant insurance" value={s.homeInsurance || 0} onChange={update("homeInsurance")} freq="monthly" />
+              </>
+            )}
             <ExpenseRow label="Utilities (hydro, gas, water)" value={s.utilities} onChange={update("utilities")} freq="monthly" />
 
             <div className="ob-person-label" style={{ paddingTop: 8 }}>Essentials</div>
@@ -409,11 +460,46 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
             {/* Retirement-specific spend */}
             <div className="ob-person-label" style={{ paddingTop: 16 }}>Retirement-specific spend</div>
             <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 8 }}>These replace your working-years budget once retired.</div>
-            <ExpenseRow label="Snowbird / extended travel" value={s.retirementTravel} onChange={update("retirementTravel")} freq="annual" step={1000} />
-            <ExpenseRow label="Private health / dental / vision" value={s.retirementHealthcare} onChange={update("retirementHealthcare")} freq="annual" step={500} />
+            <ExpenseRow label="Snowbird / extended travel" value={retirementTravelValue} onChange={update("retirementTravel")} freq="annual" step={1000} />
+            <ExpenseRow label="Private health / dental / vision" value={s.retirementHealthcare != null ? s.retirementHealthcare : 3000} onChange={update("retirementHealthcare")} freq="annual" step={500} />
             <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, paddingTop: 4, borderTop: "1px solid var(--line)", color: (inputs.retirementSpendDelta || 0) > 0 ? "var(--slate)" : "var(--accent-deep)" }}>
               <span>Net retirement spend change</span>
               <span className="mono">{(inputs.retirementSpendDelta || 0) > 0 ? "+" : ""}{fmtMoney(inputs.retirementSpendDelta || 0)}/yr</span>
+            </div>
+          </AccSection>
+
+          {/* ── Cars ── */}
+          <AccSection id="cars" title="Cars" icon="🚗" defaultOpen={false}>
+            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 8 }}>
+              Car costs are included in your working-years spending. Add a retirement vehicle budget separately if it differs.
+            </div>
+
+            <div className="ob-person-label">Running costs (monthly)</div>
+            <ExpenseRow label="Car payment / lease" value={s.carPayment || 0} onChange={update("carPayment")} freq="monthly" />
+            <ExpenseRow label="Gas & charging" value={s.carGas || 0} onChange={update("carGas")} freq="monthly" />
+            <ExpenseRow label="Insurance" value={s.carInsurance || 0} onChange={update("carInsurance")} freq="monthly" />
+            <ExpenseRow label="Parking & tolls" value={s.carParking || 0} onChange={update("carParking")} freq="monthly" />
+
+            <div className="ob-person-label" style={{ paddingTop: 8 }}>Annual costs</div>
+            <ExpenseRow label="Maintenance & repairs" value={s.carMaintenance || 0} onChange={update("carMaintenance")} freq="annual" />
+            <ExpenseRow label="Registration & licensing" value={s.carRegistration || 0} onChange={update("carRegistration")} freq="annual" />
+
+            <div className="ob-person-label" style={{ paddingTop: 8 }}>Replacement</div>
+            <NumInput label="Replacement cost (today's $)" value={s.carReplacementCost || 0} onChange={update("carReplacementCost")} prefix="$" step={5000} hint="per vehicle" />
+            <NumInput label="Replace every N years" value={s.carReplaceEvery || 10} onChange={update("carReplaceEvery")} small />
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--ink-3)", paddingTop: 4 }}>
+              <span>Implied annual provision</span>
+              <span className="mono">{fmtMoney((s.carReplacementCost || 0) / Math.max(1, s.carReplaceEvery || 10))}/yr</span>
+            </div>
+
+            <div style={{ borderTop: "1px solid var(--line)", paddingTop: 8, marginTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, color: "var(--ink)", fontSize: "var(--step--1)" }}>
+                <span>Total car cost / yr</span>
+                <span className="mono">{fmtMoney(
+                  ((s.carPayment||0) + (s.carGas||0) + (s.carInsurance||0) + (s.carParking||0)) * 12
+                  + (s.carMaintenance||0) + (s.carRegistration||0)
+                )}</span>
+              </div>
             </div>
           </AccSection>
 
@@ -513,24 +599,39 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
                 <NumInput label="Estimated CPP (today's $/yr)" value={s.spouseCppAmount || Math.round((s.cppAmountToday || 0) / 2)} onChange={update("spouseCppAmount")} prefix="$" step={500} />
               </>
             )}
-            <NumInput label="CPP start age" value={s.cppStartAge} onChange={update("cppStartAge")} small hint="70 = optimal" />
-            <InfoBox>
-              Delaying CPP to 70 is typically optimal with sufficient assets — it becomes a guaranteed inflation-linked bond and reduces portfolio pressure late in retirement.
-            </InfoBox>
+            <NumInput label="CPP start age" value={s.cppStartAge} onChange={update("cppStartAge")} small hint={suggestedCppAge === 70 ? "70 recommended based on your income" : "65–70"} />
+            {s.cppStartAge < suggestedCppAge && (
+              <InfoBox>
+                Based on your income level, delaying CPP to {suggestedCppAge} is typically optimal — it acts as a guaranteed inflation-linked annuity and reduces portfolio pressure in late retirement.
+                <span
+                  style={{ display: "inline-block", marginLeft: 8, color: "var(--accent-deep)", cursor: "pointer", textDecoration: "underline" }}
+                  onClick={() => update("cppStartAge")(suggestedCppAge)}
+                >Set to {suggestedCppAge}</span>
+              </InfoBox>
+            )}
 
             <div className="ob-person-label" style={{ paddingTop: 8 }}>OAS (Old Age Security)</div>
             <NumInput label="OAS per person (today's $/yr)" value={s.oasAmountToday} onChange={update("oasAmountToday")} prefix="$" step={100} />
-            <NumInput label="OAS start age" value={s.oasStartAge} onChange={update("oasStartAge")} small hint="65 or 70" />
+            <NumInput label="OAS start age" value={s.oasStartAge} onChange={update("oasStartAge")} small hint={suggestedOasAge === 70 ? "70 recommended based on your income" : "65 or 70"} />
+            {s.oasStartAge < suggestedOasAge && (
+              <InfoBox>
+                Delaying OAS to {suggestedOasAge} increases payments by 36% permanently — worth it if your portfolio can cover the gap.
+                <span
+                  style={{ display: "inline-block", marginLeft: 8, color: "var(--accent-deep)", cursor: "pointer", textDecoration: "underline" }}
+                  onClick={() => update("oasStartAge")(suggestedOasAge)}
+                >Set to {suggestedOasAge}</span>
+              </InfoBox>
+            )}
             <NumInput label="Clawback threshold / person" value={s.oasClawbackThreshold} onChange={update("oasClawbackThreshold")} prefix="$" step={1000} hint="2026: $95,323" />
 
             <div className="ob-person-label" style={{ paddingTop: 8 }}>Defined Benefit Pension</div>
             <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginBottom: 4 }}>{s.yourName || "You"}</div>
-            <NumInput label="Monthly pension amount" value={s.pensionMonthly} onChange={update("pensionMonthly")} prefix="$" step={100} hint="today's $, leave 0 if none" />
+            <NumInput label="Monthly pension amount" value={s.pensionMonthly} onChange={update("pensionMonthly")} prefix="$" step={100} hint="today's $" />
             <NumInput label="Pension start age" value={s.pensionStartAge} onChange={update("pensionStartAge")} small />
             {s.partnered !== false && (
               <>
                 <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 8, marginBottom: 4 }}>{s.spouseName || "Spouse"}</div>
-                <NumInput label="Monthly pension amount" value={s.spousePensionMonthly || 0} onChange={update("spousePensionMonthly")} prefix="$" step={100} hint="today's $, leave 0 if none" />
+                <NumInput label="Monthly pension amount" value={s.spousePensionMonthly || 0} onChange={update("spousePensionMonthly")} prefix="$" step={100} hint="today's $" />
                 <NumInput label="Pension start age" value={s.spousePensionStartAge || s.pensionStartAge} onChange={update("spousePensionStartAge")} small />
               </>
             )}
@@ -552,8 +653,8 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
           {/* ── Assumptions ── */}
           <AccSection id="assumptions" title="Assumptions" icon="⚙️">
             <div className="ob-person-label">Market</div>
-            <PctInput label="Nominal return" value={s.investmentReturn} onChange={update("investmentReturn")} />
-            <PctInput label="Inflation" value={s.inflation} onChange={update("inflation")} />
+            <PctInput label="Market return (nominal)" value={s.investmentReturn != null ? s.investmentReturn : 0.07} onChange={update("investmentReturn")} hint="long-run nominal; 7% = ~4% real + 3% inflation" />
+            <PctInput label="Inflation" value={s.inflation != null ? s.inflation : 0.03} onChange={update("inflation")} hint="3% = Bank of Canada target" />
 
             <div className="ob-person-label" style={{ paddingTop: 8 }}>Target</div>
             <NumInput label="Terminal target (age 90)" value={s.terminalTargetToday} onChange={update("terminalTargetToday")} prefix="$" step={25000} hint="today's $" />
@@ -562,9 +663,9 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
             </div>
 
             <div className="ob-person-label" style={{ paddingTop: 8 }}>Withdrawal tax rates</div>
-            <PctInput label="RRSP/RRIF tax rate" value={s.rrspTaxRate} onChange={update("rrspTaxRate")} hint="on withdrawals" />
-            <PctInput label="NR cap-gains effective rate" value={s.nrCapGainsRate} onChange={update("nrCapGainsRate")} hint="50% inclusion × marginal" />
-            <PctInput label="CPP + pension tax rate" value={s.retirementIncomeTaxRate} onChange={update("retirementIncomeTaxRate")} hint="ordinary income" />
+            <PctInput label="RRSP/RRIF withdrawal rate" value={s.rrspTaxRate != null ? s.rrspTaxRate : 0.37} onChange={update("rrspTaxRate")} hint="marginal rate in retirement" />
+            <PctInput label="Non-reg cap-gains rate" value={s.nrCapGainsRate != null ? s.nrCapGainsRate : 0.21} onChange={update("nrCapGainsRate")} hint="50% inclusion × marginal rate" />
+            <PctInput label="CPP + pension + OAS rate" value={s.retirementIncomeTaxRate != null ? s.retirementIncomeTaxRate : 0.25} onChange={update("retirementIncomeTaxRate")} hint="ordinary income in retirement" />
             <InfoBox>
               <strong>CPP, OAS &amp; DB pension are fully taxable</strong> as ordinary income. The model deducts this tax before netting against spending — your portfolio covers the remainder. RRSP refunds are automatically reinvested (TFSA first, then non-reg).
             </InfoBox>

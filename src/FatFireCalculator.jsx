@@ -699,7 +699,7 @@ const defaults = {
   travel: 20000, oneTimeMisc: 20000,
   resp: 5000,
   // Retirement-specific spend
-  retirementTravel: 40000, retirementHealthcare: 8000,
+  retirementTravel: null, retirementHealthcare: 3000,
   // Mortgage amortization
   mortgagePrincipal: 872000, mortgageRate: 0.0385,
   extraMortgagePayment: 800,
@@ -723,12 +723,12 @@ const defaults = {
   // Market assumptions
   investmentReturn: 0.07, inflation: 0.03,
   // Retirement income / taxes
-  cppAmountToday: 36000, cppStartAge: 65, yourCppAmount: 18000, spouseCppAmount: 18000,
-  pensionMonthly: 650, pensionStartAge: 60,
-  oasAmountToday: 8500, oasStartAge: 65,
+  cppAmountToday: 36000, cppStartAge: 70, yourCppAmount: 18000, spouseCppAmount: 18000,
+  pensionMonthly: 0, pensionStartAge: 60,
+  oasAmountToday: 8500, oasStartAge: 70,
   oasClawbackThreshold: 95323,
   rrspTaxRate: 0.37, nrCapGainsRate: 0.21,
-  retirementIncomeTaxRate: 0.37,
+  retirementIncomeTaxRate: 0.25,
 };
 
 function buildInputs(s) {
@@ -744,11 +744,14 @@ function buildInputs(s) {
       (s.mortgage || 0) + (s.rent || 0) + (s.maintenance || 0) + (s.propertyTax || 0) +
       (s.utilities || 0) + (s.homeInsurance || 0) +
       (s.transport || 0) + (s.groceries || 0) + (s.dining || 0) + (s.clothing || 0) +
-      (s.entertainment || 0) + (s.childcare || 0) + (s.subscriptions || 0) + (s.personalCare || 0),
-    oneTimeAnnualTotal: (s.travel || 0) + (s.oneTimeMisc || 0) + (s.resp || 0),
+      (s.entertainment || 0) + (s.childcare || 0) + (s.subscriptions || 0) + (s.personalCare || 0) +
+      (s.carPayment || 0) + (s.carGas || 0) + (s.carInsurance || 0) + (s.carParking || 0),
+    oneTimeAnnualTotal: (s.travel || 0) + (s.oneTimeMisc || 0) + (s.resp || 0) +
+      (s.carMaintenance || 0) + (s.carRegistration || 0),
     // Retirement-specific: swap travel for retirementTravel, add healthcare
     retirementMonthlyExtra: 0,
-    retirementSpendDelta: (s.retirementTravel || 0) - (s.travel || 0) + (s.retirementHealthcare || 0) - (s.resp || 0),
+    retirementSpendDelta: ((s.retirementTravel != null ? s.retirementTravel : (s.travel || 0)) - (s.travel || 0)) +
+      (s.retirementHealthcare != null ? s.retirementHealthcare : 3000) - (s.resp || 0),
     mortgagePayment: s.mortgage,
     // Combine per-person balances for the engine
     rrspStart: (s.yourRrspStart || 0) + (s.spouseRrspStart || 0),
@@ -1021,7 +1024,10 @@ export default function FatFireCalculator() {
 
   // ── Page routing ──────────────────────────────────────────────────────────
   // "dashboard" | "editor" | "settings"
-  const [page, setPage] = useState("dashboard");
+  const [page, setPage] = useState(() => {
+    const saved = localStorage.getItem("trailhead_page");
+    return ["dashboard", "editor", "settings"].includes(saved) ? saved : "dashboard";
+  });
 
   // ── Check URL for ?join=CODE on load ──────────────────────────────────────
   const pendingJoinCode = useMemo(() => {
@@ -1347,6 +1353,7 @@ export default function FatFireCalculator() {
     localStorage.setItem(ONBOARDING_KEY, "1");
     setShowOnboarding(false);
     setPage("dashboard");
+    localStorage.setItem("trailhead_page", "dashboard");
   }
 
   function handleOnboardingSignIn() {
@@ -1613,7 +1620,7 @@ export default function FatFireCalculator() {
             ].map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setPage(tab.id)}
+                onClick={() => { setPage(tab.id); localStorage.setItem("trailhead_page", tab.id); }}
                 style={{
                   padding: "5px 14px",
                   fontSize: "var(--step--1)",

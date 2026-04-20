@@ -364,15 +364,15 @@ export default function Dashboard({
       {/* ── Panel 1: FI Hero ── */}
       <div className="dash-hero" style={{ marginBottom: 24 }}>
         <div className="dash-hero__moment dot-bg">
-          <div className="label-xs">Your path crosses independence at</div>
+          <div className="label-xs">Years until financial independence</div>
           {retireAge !== null ? (
             <>
               <div style={{ display: "flex", alignItems: "baseline", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
                 <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 100, lineHeight: 0.9, letterSpacing: "-0.04em", color: "var(--accent-deep)" }}>
-                  {retireAge}
+                  {yearsToRetirement}
                 </div>
                 <div style={{ fontSize: "var(--step-1)", color: "var(--ink-2)", maxWidth: 240 }}>
-                  <span className="mono">{yearsToRetirement}</span> year{yearsToRetirement === 1 ? "" : "s"} from today.
+                  year{yearsToRetirement === 1 ? "" : "s"} from today.
                   <div style={{ color: "var(--ink-3)", fontSize: "var(--step--1)", marginTop: 4 }}>
                     {s.yourName || "You"} age {retireAge}
                     {s.partnered !== false && ` · ${s.spouseName || "Spouse"} age ${retireAge + (s.spouseCurrentAge - s.currentAge)}`}
@@ -404,6 +404,11 @@ export default function Dashboard({
 
         {/* ── Panel 2: Mini-stat rail ── */}
         <div className="dash-hero__aside">
+          <MiniStat
+            label="FI age"
+            value={retireAge !== null ? `age ${retireAge}` : "—"}
+            sub={retireAge !== null ? `${new Date().getFullYear() + yearsToRetirement}` : undefined}
+          />
           <MiniStat
             label="Mortgage-free"
             value={isFinite(mortgagePayoff) ? `age ${mortgagePayoff}` : "Never"}
