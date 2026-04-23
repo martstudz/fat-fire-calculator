@@ -1077,9 +1077,26 @@ input, select, textarea {
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 4px 14px 10px;
+  padding: 4px 14px 12px;
   background: var(--paper);
   border-top: 1px solid var(--line);
+}
+
+/* SectionLabel inside a PersonBlock — first one has no top border */
+.pe-person__fields .ob-section-label:first-child {
+  border-top: none;
+  padding-top: 6px;
+}
+
+.ob-section-label {
+  font-size: var(--step--2);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink-3);
+  padding: 14px 0 6px;
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
 }
 
 /* You = accent/green */

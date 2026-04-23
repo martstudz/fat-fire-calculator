@@ -124,15 +124,7 @@ function PersonBlock({ name, variant = "you", children }) {
 
 // Section divider — matches Plan Editor AccSection header weight
 function SectionLabel({ children }) {
-  return (
-    <div style={{
-      fontSize: "var(--step--2)", letterSpacing: "0.07em", textTransform: "uppercase",
-      fontWeight: 600, color: "var(--ink-3)", padding: "14px 0 8px",
-      borderTop: "1px solid var(--line)", marginTop: 4,
-    }}>
-      {children}
-    </div>
-  );
+  return <div className="ob-section-label">{children}</div>;
 }
 
 function formatWithCommas(n) {
@@ -599,7 +591,7 @@ function CompRow({ label, hint, hasKey, modeKey, pctKey, dollarKey, data, onChan
 function PersonIncome({ prefix, personName, data, onChange }) {
   return (
     <div>
-      <Field label="Annual base salary">
+      <Field label="Annual base salary" row>
         <DollarInput value={data[`${prefix}Base`]} onChange={(v) => onChange(`${prefix}Base`, v)} />
       </Field>
       <CompRow label={`Does ${personName} get a performance bonus?`} hint="Typical annual bonus"
@@ -644,14 +636,14 @@ function CardIncome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false
       </h2>
       <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>Start with base salary — we'll layer in the rest.</p>
 
-      <div className="ob-person-label">{name}</div>
-      <PersonIncome prefix="your" personName="you" data={data} onChange={onChange} />
+      <PersonBlock name={name} variant="you">
+        <PersonIncome prefix="your" personName="you" data={data} onChange={onChange} />
+      </PersonBlock>
 
       {showSpouse && (
-        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 20, marginTop: 8 }}>
-          <div className="ob-person-label">{spouseName}</div>
+        <PersonBlock name={spouseName} variant="spouse">
           <PersonIncome prefix="spouse" personName={spouseName} data={data} onChange={onChange} />
-        </div>
+        </PersonBlock>
       )}
       {partnered && hideSpouse && (
         <div className="ob-notice" style={{ marginTop: 12 }}>
@@ -674,29 +666,27 @@ function CardIncome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false
 function PersonContributions({ monthlyRrspKey, monthlyTfsaKey, monthlyNrKey, annualRrspKey, annualTfsaKey, annualNrKey, data, onChange }) {
   return (
     <div>
-      <div className="label-xs" style={{ marginBottom: 10 }}>Monthly</div>
-      <Field label="RRSP">
-        <DollarInput value={data[monthlyRrspKey]} onChange={(v) => onChange(monthlyRrspKey, v)} placeholder="e.g. 2,000" />
+      <SectionLabel>Monthly contributions</SectionLabel>
+      <Field label="RRSP" row>
+        <DollarInput value={data[monthlyRrspKey]} onChange={(v) => onChange(monthlyRrspKey, v)} placeholder="0" />
       </Field>
-      <Field label="TFSA">
-        <DollarInput value={data[monthlyTfsaKey]} onChange={(v) => onChange(monthlyTfsaKey, v)} placeholder="e.g. 500" />
+      <Field label="TFSA" row>
+        <DollarInput value={data[monthlyTfsaKey]} onChange={(v) => onChange(monthlyTfsaKey, v)} placeholder="0" />
       </Field>
-      <Field label="Non-registered">
+      <Field label="Non-registered" row>
         <DollarInput value={data[monthlyNrKey]} onChange={(v) => onChange(monthlyNrKey, v)} placeholder="0" />
       </Field>
-      <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 4 }}>
-        <div className="label-xs" style={{ marginBottom: 4 }}>Annual lump-sum top-ups</div>
-        <p className="ob-hint" style={{ marginBottom: 10 }}>The model will suggest top-ups based on available cash — enter any you already plan to make.</p>
-        <Field label="RRSP">
-          <DollarInput value={data[annualRrspKey]} onChange={(v) => onChange(annualRrspKey, v)} placeholder="0" />
-        </Field>
-        <Field label="TFSA">
-          <DollarInput value={data[annualTfsaKey]} onChange={(v) => onChange(annualTfsaKey, v)} placeholder="0" />
-        </Field>
-        <Field label="Non-registered">
-          <DollarInput value={data[annualNrKey]} onChange={(v) => onChange(annualNrKey, v)} placeholder="0" />
-        </Field>
-      </div>
+      <SectionLabel>Annual lump-sum top-ups</SectionLabel>
+      <p className="ob-hint" style={{ marginBottom: 8 }}>Enter any you already plan to make — the model will suggest more based on available cash.</p>
+      <Field label="RRSP" row>
+        <DollarInput value={data[annualRrspKey]} onChange={(v) => onChange(annualRrspKey, v)} placeholder="0" />
+      </Field>
+      <Field label="TFSA" row>
+        <DollarInput value={data[annualTfsaKey]} onChange={(v) => onChange(annualTfsaKey, v)} placeholder="0" />
+      </Field>
+      <Field label="Non-registered" row>
+        <DollarInput value={data[annualNrKey]} onChange={(v) => onChange(annualNrKey, v)} placeholder="0" />
+      </Field>
     </div>
   );
 }
@@ -721,31 +711,30 @@ function CardContributions({ data, onChange, onNext, onSkip, onBack, hideSpouse 
           : "How much are you putting toward retirement — monthly and as annual lump sums?"}
       </p>
 
-      <div className="ob-person-label">{name}</div>
-      <PersonContributions
-        monthlyRrspKey="startingMonthly" monthlyTfsaKey="yourTfsaMonthly" monthlyNrKey="yourNrMonthly"
-        annualRrspKey="rrspTopUp" annualTfsaKey="tfsaTopUp" annualNrKey="nrTopUp"
-        data={data} onChange={onChange}
-      />
+      <PersonBlock name={name} variant="you">
+        <PersonContributions
+          monthlyRrspKey="startingMonthly" monthlyTfsaKey="yourTfsaMonthly" monthlyNrKey="yourNrMonthly"
+          annualRrspKey="rrspTopUp" annualTfsaKey="tfsaTopUp" annualNrKey="nrTopUp"
+          data={data} onChange={onChange}
+        />
+      </PersonBlock>
 
       {showSpouse && (
-        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 20, marginTop: 8 }}>
-          <div className="ob-person-label">{spouseName}</div>
+        <PersonBlock name={spouseName} variant="spouse">
           <PersonContributions
             monthlyRrspKey="spouseMonthly" monthlyTfsaKey="spouseTfsaMonthly" monthlyNrKey="spouseNrMonthly"
             annualRrspKey="spouseRrspTopUp" annualTfsaKey="spouseTfsaTopUp" annualNrKey="spouseNrTopUp"
             data={data} onChange={onChange}
           />
-        </div>
+        </PersonBlock>
       )}
 
       {hasKids && (
-        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 16, marginTop: 8 }}>
-          <div className="ob-person-label">Children</div>
-          <Field label="Annual RESP contributions" hint="Per year, across all children">
-            <DollarInput value={data.resp} onChange={(v) => onChange("resp", v)} placeholder="e.g. 2,500" />
+        <PersonBlock name="Children" variant="shared">
+          <Field label="Annual RESP contributions" hint="Per year, across all children" row>
+            <DollarInput value={data.resp} onChange={(v) => onChange("resp", v)} placeholder="0" />
           </Field>
-        </div>
+        </PersonBlock>
       )}
       {partnered && hideSpouse && (
         <div className="ob-notice" style={{ marginTop: 12 }}>
@@ -776,30 +765,30 @@ function CardSavings({ data, onChange, onNext, onSkip, onBack, hideSpouse = fals
           : `Current balances across your accounts. A round number is fine — you can refine later.`}
       </p>
 
-      <div className="ob-person-label">{name}</div>
-      <Field label="RRSP balance">
-        <DollarInput value={data.yourRrspStart} onChange={(v) => onChange("yourRrspStart", v)} />
-      </Field>
-      <Field label="TFSA balance">
-        <DollarInput value={data.yourTfsaStart} onChange={(v) => onChange("yourTfsaStart", v)} />
-      </Field>
-      <Field label="Non-registered investments">
-        <DollarInput value={data.yourNrStart} onChange={(v) => onChange("yourNrStart", v)} placeholder="0" />
-      </Field>
+      <PersonBlock name={name} variant="you">
+        <Field label="RRSP" row>
+          <DollarInput value={data.yourRrspStart} onChange={(v) => onChange("yourRrspStart", v)} />
+        </Field>
+        <Field label="TFSA" row>
+          <DollarInput value={data.yourTfsaStart} onChange={(v) => onChange("yourTfsaStart", v)} />
+        </Field>
+        <Field label="Non-registered" row>
+          <DollarInput value={data.yourNrStart} onChange={(v) => onChange("yourNrStart", v)} placeholder="0" />
+        </Field>
+      </PersonBlock>
 
       {showSpouse && (
-        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 20, marginTop: 8 }}>
-          <div className="ob-person-label">{spouseName}</div>
-          <Field label="RRSP balance">
+        <PersonBlock name={spouseName} variant="spouse">
+          <Field label="RRSP" row>
             <DollarInput value={data.spouseRrspStart} onChange={(v) => onChange("spouseRrspStart", v)} />
           </Field>
-          <Field label="TFSA balance">
+          <Field label="TFSA" row>
             <DollarInput value={data.spouseTfsaStart} onChange={(v) => onChange("spouseTfsaStart", v)} />
           </Field>
-          <Field label="Non-registered investments">
+          <Field label="Non-registered" row>
             <DollarInput value={data.spouseNrStart} onChange={(v) => onChange("spouseNrStart", v)} placeholder="0" />
           </Field>
-        </div>
+        </PersonBlock>
       )}
       {partnered && hideSpouse && (
         <div className="ob-notice" style={{ marginTop: 12 }}>
@@ -830,44 +819,48 @@ function CardPension({ data, onChange, onNext, onSkip, onBack, hideSpouse = fals
         A DB pension pays a guaranteed monthly amount in retirement — government, teachers, or union plans.
       </p>
 
-      <div className="ob-person-label">{name}</div>
-      <Field label="Do you have a defined-benefit pension?">
-        <BtnPair value={data.yourHasPension} onChange={(v) => onChange("yourHasPension", v)}
-          options={[{ label: "Yes", val: true }, { label: "No", val: false }]} />
-      </Field>
-      {yourHasPension && (
-        <>
-          <Field label="Expected monthly pension at retirement">
-            <DollarInput value={data.pensionMonthly} onChange={(v) => onChange("pensionMonthly", v)} placeholder="e.g. 3,000" />
-          </Field>
-          <Field label="Pension start age" hint="Usually 60–65">
-            <input className="input mono" type="number" placeholder="65" min={50} max={75} style={{ maxWidth: 140 }}
-              value={data.pensionStartAge || ""}
-              onChange={(e) => onChange("pensionStartAge", parseInt(e.target.value) || 0)} />
-          </Field>
-        </>
-      )}
+      <PersonBlock name={name} variant="you">
+        <Field label="Defined-benefit pension?">
+          <BtnPair value={data.yourHasPension} onChange={(v) => onChange("yourHasPension", v)}
+            options={[{ label: "Yes", val: true }, { label: "No", val: false }]} />
+        </Field>
+        {yourHasPension && (
+          <>
+            <Field label="Monthly pension at retirement" row>
+              <DollarInput value={data.pensionMonthly} onChange={(v) => onChange("pensionMonthly", v)} placeholder="0" />
+            </Field>
+            <Field label="Pension start age" hint="60–65" row>
+              <div className="pe-field-wrap">
+                <input className="pe-field-input" type="number" placeholder="65" min={50} max={75}
+                  value={data.pensionStartAge || ""}
+                  onChange={(e) => onChange("pensionStartAge", parseInt(e.target.value) || 0)} />
+              </div>
+            </Field>
+          </>
+        )}
+      </PersonBlock>
 
       {showSpouse && (
-        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 20, marginTop: 8 }}>
-          <div className="ob-person-label">{spouseName}</div>
-          <Field label={`Does ${spouseName} have a defined-benefit pension?`}>
+        <PersonBlock name={spouseName} variant="spouse">
+          <Field label="Defined-benefit pension?">
             <BtnPair value={data.spouseHasPension} onChange={(v) => onChange("spouseHasPension", v)}
               options={[{ label: "Yes", val: true }, { label: "No", val: false }]} />
           </Field>
           {spouseHasPension && (
             <>
-              <Field label={`${spouseName}'s expected monthly pension`}>
-                <DollarInput value={data.spousePensionMonthly} onChange={(v) => onChange("spousePensionMonthly", v)} placeholder="e.g. 3,000" />
+              <Field label="Monthly pension at retirement" row>
+                <DollarInput value={data.spousePensionMonthly} onChange={(v) => onChange("spousePensionMonthly", v)} placeholder="0" />
               </Field>
-              <Field label="Pension start age" hint="Usually 60–65">
-                <input className="input mono" type="number" placeholder="65" min={50} max={75} style={{ maxWidth: 140 }}
-                  value={data.spousePensionStartAge || ""}
-                  onChange={(e) => onChange("spousePensionStartAge", parseInt(e.target.value) || 0)} />
+              <Field label="Pension start age" hint="60–65" row>
+                <div className="pe-field-wrap">
+                  <input className="pe-field-input" type="number" placeholder="65" min={50} max={75}
+                    value={data.spousePensionStartAge || ""}
+                    onChange={(e) => onChange("spousePensionStartAge", parseInt(e.target.value) || 0)} />
+                </div>
               </Field>
             </>
           )}
-        </div>
+        </PersonBlock>
       )}
       {partnered && hideSpouse && (
         <div className="ob-notice" style={{ marginTop: 12 }}>
@@ -910,43 +903,41 @@ function CardHome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }
 
       {ownsHome && (
         <>
-          <Field label="Mortgage balance remaining">
+          <Field label="Mortgage balance remaining" row>
             <DollarInput value={data.mortgagePrincipal} onChange={(v) => onChange("mortgagePrincipal", v)} />
           </Field>
-          <Field label="Monthly mortgage payment">
+          <Field label="Monthly payment" row>
             <DollarInput value={data.mortgage} onChange={(v) => onChange("mortgage", v)} />
           </Field>
-          <Field label="Interest rate" hint="e.g. 3.85 for 3.85%">
+          <Field label="Interest rate" hint="e.g. 3.85%" row>
             <PctInput value={data.mortgageRate} onChange={(v) => onChange("mortgageRate", v)} />
           </Field>
-          <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 4 }}>
-            <div className="label-xs" style={{ marginBottom: 10 }}>Monthly housing costs (separate from mortgage)</div>
-            <Field label="Property tax" hint="Per month">
-              <DollarInput value={data.propertyTax} onChange={(v) => onChange("propertyTax", v)} placeholder="e.g. 500" />
-            </Field>
-            <Field label="Home insurance" hint="Per month">
-              <DollarInput value={data.homeInsurance} onChange={(v) => onChange("homeInsurance", v)} placeholder="e.g. 150" />
-            </Field>
-            <Field label="Maintenance & repairs" hint="Per month — typically 1% of home value/yr">
-              <DollarInput value={data.maintenance} onChange={(v) => onChange("maintenance", v)} placeholder="e.g. 400" />
-            </Field>
-            <Field label="Utilities (hydro, gas, water)" hint="Per month">
-              <DollarInput value={data.utilities} onChange={(v) => onChange("utilities", v)} placeholder="e.g. 300" />
-            </Field>
-          </div>
+          <SectionLabel>Monthly housing costs</SectionLabel>
+          <Field label="Property tax" row>
+            <DollarInput value={data.propertyTax} onChange={(v) => onChange("propertyTax", v)} placeholder="0" />
+          </Field>
+          <Field label="Home insurance" row>
+            <DollarInput value={data.homeInsurance} onChange={(v) => onChange("homeInsurance", v)} placeholder="0" />
+          </Field>
+          <Field label="Maintenance & repairs" hint="~1% of home value/yr" row>
+            <DollarInput value={data.maintenance} onChange={(v) => onChange("maintenance", v)} placeholder="0" />
+          </Field>
+          <Field label="Utilities" row>
+            <DollarInput value={data.utilities} onChange={(v) => onChange("utilities", v)} placeholder="0" />
+          </Field>
         </>
       )}
 
       {rents && (
         <>
-          <Field label="Monthly rent">
-            <DollarInput value={data.rent} onChange={(v) => onChange("rent", v)} placeholder="e.g. 3,000" />
+          <Field label="Monthly rent" row>
+            <DollarInput value={data.rent} onChange={(v) => onChange("rent", v)} placeholder="0" />
           </Field>
-          <Field label="Utilities (hydro, gas, internet)" hint="Per month">
-            <DollarInput value={data.utilities} onChange={(v) => onChange("utilities", v)} placeholder="e.g. 200" />
+          <Field label="Utilities" row>
+            <DollarInput value={data.utilities} onChange={(v) => onChange("utilities", v)} placeholder="0" />
           </Field>
-          <Field label="Tenant insurance" hint="Per month">
-            <DollarInput value={data.homeInsurance} onChange={(v) => onChange("homeInsurance", v)} placeholder="e.g. 30" />
+          <Field label="Tenant insurance" row>
+            <DollarInput value={data.homeInsurance} onChange={(v) => onChange("homeInsurance", v)} placeholder="0" />
           </Field>
         </>
       )}
@@ -1079,48 +1070,44 @@ function CardSpending({ data, onChange, onNext, onSkip, onBack, hideSpouse = fal
         </div>
       )}
 
-      <div className="label-xs" style={{ marginBottom: 10 }}>Essentials (monthly)</div>
+      <SectionLabel>Essentials — monthly</SectionLabel>
       {essentialRows.map(c => (
-        <Field key={c.key} label={c.label}>
+        <Field key={c.key} label={c.label} row>
           <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
         </Field>
       ))}
 
-      <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 4 }}>
-        <div className="label-xs" style={{ marginBottom: 10 }}>Lifestyle (monthly)</div>
-        {lifestyleRows.map(c => (
-          <Field key={c.key} label={c.label}>
-            <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
-          </Field>
-        ))}
-      </div>
+      <SectionLabel>Lifestyle — monthly</SectionLabel>
+      {lifestyleRows.map(c => (
+        <Field key={c.key} label={c.label} row>
+          <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
+        </Field>
+      ))}
 
       {/* Cars — opt-in toggle */}
-      <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 4 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: showCars ? 12 : 0 }}>
-          <span className="label-xs">Cars</span>
-          <button
-            onClick={() => toggleCars(!showCars)}
-            style={{
-              fontSize: 12, fontWeight: 500, color: showCars ? "var(--accent-deep)" : "var(--ink-3)",
-              background: showCars ? "var(--accent-soft)" : "var(--paper-2)",
-              border: "1px solid " + (showCars ? "var(--accent-mid)" : "var(--line)"),
-              borderRadius: 20, padding: "3px 12px", cursor: "pointer", transition: "all 0.15s",
-            }}
-          >
-            {showCars ? "Remove" : "+ Add car expenses"}
-          </button>
-        </div>
-        {showCars && (
-          <>
-            {carMonthlyRows.map(c => (
-              <Field key={c.key} label={c.label}>
-                <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
-              </Field>
-            ))}
-          </>
-        )}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0 0", borderTop: "1px solid var(--line)", marginTop: 4 }}>
+        <span style={{ fontSize: "var(--step--2)", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 600, color: "var(--ink-3)" }}>Cars — monthly</span>
+        <button
+          onClick={() => toggleCars(!showCars)}
+          style={{
+            fontSize: 12, fontWeight: 500, color: showCars ? "var(--accent-deep)" : "var(--ink-3)",
+            background: showCars ? "var(--accent-soft)" : "var(--paper-2)",
+            border: "1px solid " + (showCars ? "oklch(80% 0.07 150)" : "var(--line)"),
+            borderRadius: 20, padding: "3px 12px", cursor: "pointer", transition: "all 0.15s",
+          }}
+        >
+          {showCars ? "Remove" : "+ Add"}
+        </button>
       </div>
+      {showCars && (
+        <div style={{ paddingTop: 8 }}>
+          {carMonthlyRows.map(c => (
+            <Field key={c.key} label={c.label} row>
+              <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
+            </Field>
+          ))}
+        </div>
+      )}
 
       {totalMonthly > 0 && (
         <div className="ob-summary">
@@ -1131,19 +1118,17 @@ function CardSpending({ data, onChange, onNext, onSkip, onBack, hideSpouse = fal
         </div>
       )}
 
-      <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 4 }}>
-        <div className="label-xs" style={{ marginBottom: 10 }}>Annual commitments</div>
-        {annualRows.map(c => (
-          <Field key={c.key} label={c.label} hint={c.hint}>
-            <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
-          </Field>
-        ))}
-        {showCars && carAnnualRows.map(c => (
-          <Field key={c.key} label={c.label}>
-            <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
-          </Field>
-        ))}
-      </div>
+      <SectionLabel>Annual commitments</SectionLabel>
+      {annualRows.map(c => (
+        <Field key={c.key} label={c.label} hint={c.hint} row>
+          <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
+        </Field>
+      ))}
+      {showCars && carAnnualRows.map(c => (
+        <Field key={c.key} label={c.label} row>
+          <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
+        </Field>
+      ))}
 
       {grandTotal > 0 && (
         <div className="ob-summary">
@@ -1181,11 +1166,11 @@ function CardRetirement({ data, onChange, onNext, onSkip, onBack, hideSpouse = f
           ? `Last thing — ${name} and ${spouseName}'s CPP estimates. We've pre-filled the Canadian average.`
           : `Last thing — ${name}'s CPP estimate. We've pre-filled the Canadian average.`}
       </p>
-      <Field label={`${name}'s estimated CPP (annual)`} hint="Adjust if you have a My Service Canada estimate">
+      <Field label={`${name}'s CPP (annual)`} hint="My Service Canada estimate" row>
         <DollarInput value={data.cppAmountToday ?? 9300} onChange={(v) => onChange("cppAmountToday", v)} placeholder="9300" />
       </Field>
       {showSpouse && (
-        <Field label={`${spouseName}'s estimated CPP (annual)`}>
+        <Field label={`${spouseName}'s CPP (annual)`} row>
           <DollarInput value={data.spouseCppAmountToday ?? 9300} onChange={(v) => onChange("spouseCppAmountToday", v)} placeholder="9300" />
         </Field>
       )}
