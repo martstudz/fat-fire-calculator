@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 
 // ---------- province data ----------
 const PROVINCES = [
@@ -84,7 +84,20 @@ function classifyFire(retirementAge, lifestyleSpend, workLevel) {
   return                                       { label: "Traditional Retirement",emoji: "🏡", desc: "A well-funded retirement at a traditional age." };
 }
 
-function Field({ label, children, hint }) {
+// Field: row=true → label left, input right (matches Plan Editor inp-row)
+//        row=false (default) → label above, input below (for selects, text, btn pairs)
+function Field({ label, children, hint, row = false }) {
+  if (row) {
+    return (
+      <div className="inp-row" style={{ padding: "6px 0" }}>
+        <span style={{ color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
+          {label}
+          {hint && <span style={{ color: "var(--ink-4)", fontSize: "var(--step--2)" }}> · {hint}</span>}
+        </span>
+        {children}
+      </div>
+    );
+  }
   return (
     <div className="ob-field">
       {label && <label className="label-xs">{label}</label>}
@@ -94,11 +107,40 @@ function Field({ label, children, hint }) {
   );
 }
 
+// Person block matching Plan Editor's coloured-header pill
+function PersonBlock({ name, variant = "you", children }) {
+  return (
+    <div className={`pe-person pe-person--${variant}`} style={{ marginBottom: 12 }}>
+      <div className="pe-person__header">
+        <span className="pe-person__dot" />
+        {name}
+      </div>
+      <div className="pe-person__fields">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Section divider — matches Plan Editor AccSection header weight
+function SectionLabel({ children }) {
+  return (
+    <div style={{
+      fontSize: "var(--step--2)", letterSpacing: "0.07em", textTransform: "uppercase",
+      fontWeight: 600, color: "var(--ink-3)", padding: "14px 0 8px",
+      borderTop: "1px solid var(--line)", marginTop: 4,
+    }}>
+      {children}
+    </div>
+  );
+}
+
 function formatWithCommas(n) {
   if (!isFinite(n) || n === "" || n == null) return "";
   return Math.round(n).toLocaleString("en-CA");
 }
 
+// Matches pe-field-wrap + pe-field-adorn exactly as in PlanEditor
 function DollarInput({ value, onChange, placeholder = "0" }) {
   const [focused, setFocused] = useState(false);
   const [raw, setRaw] = useState(value ? String(value) : "");
@@ -107,13 +149,12 @@ function DollarInput({ value, onChange, placeholder = "0" }) {
   }, [value, focused]);
   const display = focused ? raw : (value ? formatWithCommas(value) : "");
   return (
-    <div className="input-group">
-      <span className="adornment --left">$</span>
+    <div className="pe-field-wrap">
+      <span className="pe-field-adorn pe-field-adorn--left">$</span>
       <input
-        data-dollar="true"
         type="text"
         inputMode="numeric"
-        className="input mono"
+        className="pe-field-input"
         placeholder={placeholder}
         value={display}
         onFocus={() => { setFocused(true); setRaw(value ? String(value) : ""); }}
@@ -141,11 +182,11 @@ function PctInput({ value, onChange, placeholder = "0" }) {
     if (!focused) setRaw(value ? parseFloat((value * 100).toFixed(2)).toString() : "");
   }, [value, focused]);
   return (
-    <div className="input-group">
+    <div className="pe-field-wrap">
       <input
         type="text"
         inputMode="decimal"
-        className="input mono --suffix"
+        className="pe-field-input"
         placeholder={placeholder}
         value={focused ? raw : (value ? parseFloat((value * 100).toFixed(2)).toString() : "")}
         onFocus={() => { setFocused(true); setRaw(value ? parseFloat((value * 100).toFixed(2)).toString() : ""); }}
@@ -162,7 +203,7 @@ function PctInput({ value, onChange, placeholder = "0" }) {
           setRaw(isNaN(n) ? "" : parseFloat(n.toFixed(2)).toString());
         }}
       />
-      <span className="adornment --right">%</span>
+      <span className="pe-field-adorn pe-field-adorn--right">%</span>
     </div>
   );
 }
@@ -174,16 +215,19 @@ function Card({ children, step, totalSteps, onSkip, canExit, onExit, onBack }) {
     <div className="ob-scene">
       <div className="ob-card" style={{ maxWidth: 480 }}>
         <div className="ob-card__topnav">
-          {onBack ? (
-            <button onClick={onBack} className="btn btn--ghost btn--sm">← Back</button>
-          ) : (
-            <span />
-          )}
-          {canExit ? (
-            <button onClick={onExit} className="btn btn--ghost btn--sm">Skip to the dashboard →</button>
-          ) : (
-            <button onClick={onSkip} className="btn btn--ghost btn--sm">Skip for now →</button>
-          )}
+          <TrailheadMark size={22} />
+          <div style={{ display: "flex", gap: 4 }}>
+            {onBack ? (
+              <button onClick={onBack} className="btn btn--ghost btn--sm">← Back</button>
+            ) : (
+              <span />
+            )}
+            {canExit ? (
+              <button onClick={onExit} className="btn btn--ghost btn--sm">Skip to dashboard →</button>
+            ) : (
+              <button onClick={onSkip} className="btn btn--ghost btn--sm">Skip to dashboard →</button>
+            )}
+          </div>
         </div>
         <div className="ob-card__body">
           <div className="progress">
@@ -197,22 +241,44 @@ function Card({ children, step, totalSteps, onSkip, canExit, onExit, onBack }) {
 }
 
 // ---------- Card: Welcome ----------
+function TrailheadMark({ size = 28 }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 9, justifyContent: "center" }}>
+      <div style={{
+        width: size, height: size, borderRadius: size * 0.29,
+        background: "var(--accent-deep)",
+        display: "grid", placeItems: "center",
+        flexShrink: 0,
+      }}>
+        <svg width={size * 0.57} height={size * 0.57} viewBox="0 0 16 16" fill="none">
+          <path d="M3 12 L8 4 L13 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M5.5 8.5 L10.5 8.5" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+      </div>
+      <span style={{ fontWeight: 600, fontSize: size * 0.64, letterSpacing: "-0.02em", color: "var(--ink)" }}>Trailhead</span>
+    </div>
+  );
+}
+
 function CardWelcome({ onNext, onSignIn }) {
   return (
     <div className="ob-scene">
       <div className="ob-card">
-        <div className="ob-card__body" style={{ textAlign: "center", padding: "56px 48px" }}>
+        <div className="ob-card__body" style={{ textAlign: "center", padding: "48px 48px 56px" }}>
+          <div style={{ marginBottom: 32 }}>
+            <TrailheadMark size={36} />
+          </div>
           <h1 style={{
             fontFamily: "var(--font-display)", fontWeight: 600,
             fontSize: 42, lineHeight: 1.05, letterSpacing: "-0.03em"
           }}>
-            Let's find the day<br />you can stop working.
+            Let's find the day<br />you can stop working 🔥
           </h1>
           <p style={{
             color: "var(--ink-2)", fontSize: 15, lineHeight: 1.55,
             marginTop: 20, maxWidth: 360, marginLeft: "auto", marginRight: "auto"
           }}>
-            A few quick questions. We'll handle the Canadian tax math — RRSP, TFSA, CPP,
+            Answer a few quick questions. We'll handle the Canadian tax math — RRSP, TFSA, CPP,
             provincial brackets — and show you the exact age when the numbers work.
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 32, maxWidth: 320, marginLeft: "auto", marginRight: "auto" }}>
@@ -240,11 +306,13 @@ function CardAboutYou({ data, onChange, onNext, onSkip, onBack }) {
           value={data.yourName || ""}
           onChange={(e) => onChange("yourName", e.target.value)} />
       </Field>
-      <Field label={name ? `How old are you, ${name}?` : "Your current age"}>
-        <input className="input mono" type="number" placeholder="e.g. 35"
-          min={18} max={80} style={{ maxWidth: 140 }}
-          value={data.currentAge || ""}
-          onChange={(e) => onChange("currentAge", parseInt(e.target.value) || 0)} />
+      <Field label={name ? `How old are you, ${name}?` : "Your current age"} row>
+        <div className="pe-field-wrap">
+          <input className="pe-field-input" type="number" placeholder="35"
+            min={18} max={80}
+            value={data.currentAge || ""}
+            onChange={(e) => onChange("currentAge", parseInt(e.target.value) || 0)} />
+        </div>
       </Field>
       <Field label="Province" hint="We'll use this for tax brackets, health premiums, and provincial credits.">
         <select className="input" value={data.province || "ON"}
@@ -310,11 +378,13 @@ function CardHousehold({ data, onChange, onNext, onSkip, onBack }) {
               value={data.spouseName || ""}
               onChange={(e) => onChange("spouseName", e.target.value)} />
           </Field>
-          <Field label={`${spouseName ? spouseName + "'s" : "Their"} current age`}>
-            <input className="input mono" type="number" placeholder="e.g. 33"
-              min={18} max={80} style={{ maxWidth: 140 }}
-              value={data.spouseCurrentAge || ""}
-              onChange={(e) => onChange("spouseCurrentAge", parseInt(e.target.value) || 0)} />
+          <Field label={`${spouseName ? spouseName + "'s" : "Their"} current age`} row>
+            <div className="pe-field-wrap">
+              <input className="pe-field-input" type="number" placeholder="33"
+                min={18} max={80}
+                value={data.spouseCurrentAge || ""}
+                onChange={(e) => onChange("spouseCurrentAge", parseInt(e.target.value) || 0)} />
+            </div>
           </Field>
           <Field label={`Will ${spouseName || "your partner"} fill in their own details?`}>
             <p className="ob-hint" style={{ marginBottom: 8 }}>Their income, savings, and pension — you can fill it in for them, or send them a link to do it themselves after you sign in.</p>
@@ -890,50 +960,166 @@ function CardHome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }
 function CardSpending({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }) {
   const name = data.yourName?.trim() || "You";
   const spouseName = data.spouseName?.trim() || "Spouse";
-  const canExit = !!(data.yourName?.trim());
   const partnered = data.partnered === true;
   const showSpouse = partnered && !hideSpouse;
   const hasKids = data.hasKids === true;
 
-  const nonDiscMonthly = [
-    { key: "groceries",    label: "Groceries" },
-    { key: "transport",    label: "Transport & transit" },
-    { key: "childcare",    label: "Childcare", kidsOnly: true },
-    { key: "personalCare", label: "Personal care & health" },
-  ].filter((c) => !c.kidsOnly || hasKids);
+  // Car toggle — hidden by default, shown if any car field already has a value
+  const CAR_KEYS = ["carPayment","carGas","carInsurance","carParking","carMaintenance","carRegistration"];
+  const [showCars, setShowCars] = useState(() => CAR_KEYS.some(k => data[k] > 0));
 
-  const discMonthly = [
+  function toggleCars(on) {
+    setShowCars(on);
+    if (!on) {
+      // Clear car values when hiding
+      CAR_KEYS.forEach(k => onChange(k, 0));
+    }
+  }
+
+  // Pre-fill from retirement vision spend if fields are all empty
+  const lifestyleVal = data.visionLifestyleVal ?? 50;
+  const retirementAnnual = lifestyleSliderToSpend(lifestyleVal);
+
+  // Budget allocation:
+  // Monthly essentials + lifestyle = 60% of annual retirement target (housing ~25% + cars ~15% excluded)
+  // Annual commitments = 20% of annual retirement target
+  // Total pre-fill ≈ 80% of target, leaving room for housing already captured
+  const MONTHLY_POOL = retirementAnnual * 0.60; // distributed across monthly rows
+  const ANNUAL_POOL  = retirementAnnual * 0.20; // distributed across annual rows
+
+  // Monthly split weights (must sum to 1.0 — these share MONTHLY_POOL, not childcare-adjusted)
+  const MONTHLY_WEIGHTS = {
+    groceries:    0.26,
+    utilities:    0.08,
+    transport:    0.10,
+    personalCare: 0.07,
+    childcare:    hasKids ? 0.10 : 0,
+    dining:       0.17,
+    clothing:     0.08,
+    subscriptions:0.06,
+    entertainment:0.10,
+    carGas:       0.08,
+  };
+  const ANNUAL_WEIGHTS = {
+    travel:      0.60,
+    resp:        hasKids ? 0.15 : 0,
+    oneTimeMisc: 0.25,
+  };
+
+  const monthlyKeys = Object.keys(MONTHLY_WEIGHTS).filter(k => MONTHLY_WEIGHTS[k] > 0);
+  const annualKeys  = Object.keys(ANNUAL_WEIGHTS).filter(k => ANNUAL_WEIGHTS[k] > 0);
+  const allEmpty = [...monthlyKeys, ...annualKeys].every(k => !data[k]);
+
+  const mWeightTotal = Object.values(MONTHLY_WEIGHTS).reduce((a, b) => a + b, 0);
+  const aWeightTotal = Object.values(ANNUAL_WEIGHTS).reduce((a, b) => a + b, 0);
+
+  useEffect(() => {
+    if (!allEmpty) return;
+    monthlyKeys.forEach(k => {
+      const v = Math.round((MONTHLY_WEIGHTS[k] / mWeightTotal) * MONTHLY_POOL / 12 / 50) * 50;
+      if (v > 0) onChange(k, v);
+    });
+    annualKeys.forEach(k => {
+      const v = Math.round((ANNUAL_WEIGHTS[k] / aWeightTotal) * ANNUAL_POOL / 100) * 100;
+      if (v > 0) onChange(k, v);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const essentialRows = [
+    { key: "groceries",    label: "Groceries" },
+    { key: "utilities",    label: "Utilities (hydro, gas, water)" },
+    { key: "transport",    label: "Transport & transit" },
+    { key: "personalCare", label: "Personal care & health" },
+    { key: "childcare",    label: "Childcare & activities", kidsOnly: true },
+  ].filter(c => !c.kidsOnly || hasKids);
+
+  const lifestyleRows = [
     { key: "dining",        label: "Dining & takeout" },
     { key: "clothing",      label: "Clothing & shopping" },
     { key: "subscriptions", label: "Subscriptions & tech" },
     { key: "entertainment", label: "Entertainment & hobbies" },
   ];
 
-  const totalMonthly = [...nonDiscMonthly, ...discMonthly].reduce((s, c) => s + (data[c.key] || 0), 0);
+  const carMonthlyRows = [
+    { key: "carPayment",   label: "Car payment / lease" },
+    { key: "carGas",       label: "Gas & charging" },
+    { key: "carInsurance", label: "Car insurance" },
+    { key: "carParking",   label: "Parking & tolls" },
+  ];
+
+  const annualRows = [
+    { key: "travel",      label: "Travel & holidays" },
+    { key: "resp",        label: "RESP contributions", kidsOnly: true },
+    { key: "oneTimeMisc", label: "Other annual expenses", hint: "Gifts, insurance premiums, etc." },
+  ].filter(c => !c.kidsOnly || hasKids);
+
+  const carAnnualRows = [
+    { key: "carMaintenance",  label: "Car maintenance & repairs" },
+    { key: "carRegistration", label: "Car registration & licensing" },
+  ];
+
+  const baseMonthlyRows = [...essentialRows, ...lifestyleRows];
+  const allMonthlyRows  = showCars ? [...baseMonthlyRows, ...carMonthlyRows] : baseMonthlyRows;
+  const totalMonthly = allMonthlyRows.reduce((s, c) => s + (data[c.key] || 0), 0);
+  const allAnnualRows = showCars ? [...annualRows, ...carAnnualRows] : annualRows;
+  const totalAnnual  = allAnnualRows.reduce((s, c) => s + (data[c.key] || 0), 0);
+  const grandTotal   = totalMonthly * 12 + totalAnnual;
 
   return (
     <Card step={9} totalSteps={9} onSkip={onSkip} canExit={false} onExit={onSkip} onBack={onBack}>
       <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
         {showSpouse ? `How do ${name} & ${spouseName} spend today?` : `How does ${name} spend today?`}
       </h2>
-      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
+      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 8 }}>
         Monthly figures in today's dollars — housing excluded (already captured).
       </p>
+      {!allEmpty && (
+        <div style={{ fontSize: 12, color: "var(--accent-ink)", background: "var(--accent-soft)", borderRadius: 8, padding: "8px 12px", marginBottom: 16 }}>
+          Pre-filled from your {fmtSpend(retirementAnnual)}/yr retirement target — adjust to match today's spending.
+        </div>
+      )}
 
       <div className="label-xs" style={{ marginBottom: 10 }}>Essentials (monthly)</div>
-      {nonDiscMonthly.map((c) => (
+      {essentialRows.map(c => (
         <Field key={c.key} label={c.label}>
-          <DollarInput value={data[c.key]} onChange={(v) => onChange(c.key, v)} placeholder="0" />
+          <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
         </Field>
       ))}
 
       <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 4 }}>
         <div className="label-xs" style={{ marginBottom: 10 }}>Lifestyle (monthly)</div>
-        {discMonthly.map((c) => (
+        {lifestyleRows.map(c => (
           <Field key={c.key} label={c.label}>
-            <DollarInput value={data[c.key]} onChange={(v) => onChange(c.key, v)} placeholder="0" />
+            <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
           </Field>
         ))}
+      </div>
+
+      {/* Cars — opt-in toggle */}
+      <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: showCars ? 12 : 0 }}>
+          <span className="label-xs">Cars</span>
+          <button
+            onClick={() => toggleCars(!showCars)}
+            style={{
+              fontSize: 12, fontWeight: 500, color: showCars ? "var(--accent-deep)" : "var(--ink-3)",
+              background: showCars ? "var(--accent-soft)" : "var(--paper-2)",
+              border: "1px solid " + (showCars ? "var(--accent-mid)" : "var(--line)"),
+              borderRadius: 20, padding: "3px 12px", cursor: "pointer", transition: "all 0.15s",
+            }}
+          >
+            {showCars ? "Remove" : "+ Add car expenses"}
+          </button>
+        </div>
+        {showCars && (
+          <>
+            {carMonthlyRows.map(c => (
+              <Field key={c.key} label={c.label}>
+                <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
+              </Field>
+            ))}
+          </>
+        )}
       </div>
 
       {totalMonthly > 0 && (
@@ -945,15 +1131,32 @@ function CardSpending({ data, onChange, onNext, onSkip, onBack, hideSpouse = fal
         </div>
       )}
 
-      <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: totalMonthly > 0 ? 0 : 4 }}>
+      <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 4 }}>
         <div className="label-xs" style={{ marginBottom: 10 }}>Annual commitments</div>
-        <Field label="Travel & holidays" hint="Annual budget">
-          <DollarInput value={data.travel} onChange={(v) => onChange("travel", v)} placeholder="e.g. 10,000" />
-        </Field>
-        <Field label="Other annual expenses" hint="Insurance premiums, gifts, subscriptions billed annually, etc.">
-          <DollarInput value={data.otherAnnual} onChange={(v) => onChange("otherAnnual", v)} placeholder="0" />
-        </Field>
+        {annualRows.map(c => (
+          <Field key={c.key} label={c.label} hint={c.hint}>
+            <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
+          </Field>
+        ))}
+        {showCars && carAnnualRows.map(c => (
+          <Field key={c.key} label={c.label}>
+            <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
+          </Field>
+        ))}
       </div>
+
+      {grandTotal > 0 && (
+        <div className="ob-summary">
+          <div className="ob-summary-row">
+            <span className="label-xs">Est. annual total (ex. housing)</span>
+            <span className="mono" style={{ fontSize: 14 }}>${Math.round(grandTotal).toLocaleString()}/yr</span>
+          </div>
+          <div className="ob-summary-row" style={{ marginTop: 4 }}>
+            <span className="label-xs" style={{ color: "var(--ink-4)" }}>Retirement target</span>
+            <span className="mono" style={{ fontSize: 12, color: "var(--ink-3)" }}>{fmtSpend(retirementAnnual)}/yr</span>
+          </div>
+        </div>
+      )}
 
       <button onClick={onNext} className="btn btn--accent" style={{ width: "100%", marginTop: 20 }}>Build my plan →</button>
     </Card>
@@ -1063,6 +1266,14 @@ export function onboardingToState(d, baseDefaults) {
     propertyTax:   d.propertyTax   || 0,
     maintenance:   d.maintenance   || 0,
     utilities:     d.utilities     || 0,
+    // Cars — monthly
+    carPayment:    d.carPayment    || 0,
+    carGas:        d.carGas        || 0,
+    carInsurance:  d.carInsurance  || 0,
+    carParking:    d.carParking    || 0,
+    // Cars — annual
+    carMaintenance:  d.carMaintenance  || 0,
+    carRegistration: d.carRegistration || 0,
   };
 
   // Annual lump-sum additions into oneTimeMisc / separate fields
@@ -1117,7 +1328,7 @@ export function onboardingToState(d, baseDefaults) {
     travel:            d.travel || 0,
     resp:              d.resp   || 0,
     otherAnnual:       (d.otherAnnual || 0) + annualTopUps,
-    oneTimeMisc:       baseDefaults.oneTimeMisc || 0,
+    oneTimeMisc:       d.oneTimeMisc || baseDefaults.oneTimeMisc || 0,
     // Retirement
     retirementTravel,
     retirementHealthcare,

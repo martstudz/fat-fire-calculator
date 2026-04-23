@@ -156,54 +156,65 @@ function NetWorthChart({ displayRows, retireAge }) {
 }
 
 // ── Account Mix Donut ─────────────────────────────────────────────────────────
+// Stroke-based donut (strokeDasharray) matching the design reference
 
 function AccountMixDonut({ rrsp, tfsa, nr, hidden }) {
   const total = rrsp + tfsa + nr;
   if (total <= 0) return <div style={{ color: "var(--ink-3)", fontSize: "var(--step--1)" }}>No portfolio data</div>;
 
-  const slices = [
-    { label: "RRSP", value: rrsp, color: "var(--sun)" },
-    { label: "TFSA", value: tfsa, color: "var(--accent)" },
-    { label: "Non-reg", value: nr, color: "var(--dusk)" },
+  const accounts = [
+    { label: "RRSP",    value: rrsp, color: "var(--accent)", note: "Tax-deferred" },
+    { label: "TFSA",    value: tfsa, color: "var(--sun)",    note: "Tax-free" },
+    { label: "Non-reg", value: nr,   color: "var(--dusk)",   note: "Taxable" },
   ];
 
-  const R = 60, CX = 80, CY = 80, r = 36;
-  let startAngle = -Math.PI / 2;
-
-  const paths = slices.map(sl => {
-    const frac = sl.value / total;
-    const angle = frac * 2 * Math.PI;
-    const endAngle = startAngle + angle;
-    const x1 = CX + R * Math.cos(startAngle);
-    const y1 = CY + R * Math.sin(startAngle);
-    const x2 = CX + R * Math.cos(endAngle);
-    const y2 = CY + R * Math.sin(endAngle);
-    const largeArc = angle > Math.PI ? 1 : 0;
-    const d = `M ${CX} ${CY} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${R} ${R} 0 ${largeArc} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`;
-    startAngle = endAngle;
-    return { ...sl, d, pct: Math.round(frac * 100) };
-  });
-
+  const R = 54, C = 2 * Math.PI * R;
+  let offset = 0;
   const fmt = (n) => fmt$(n, hidden);
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
-      <svg viewBox={`0 0 ${CX * 2} ${CY * 2}`} width={CX * 2} height={CY * 2} style={{ flexShrink: 0 }}>
-        {paths.map(p => <path key={p.label} d={p.d} fill={p.color} />)}
-        {/* Donut hole */}
-        <circle cx={CX} cy={CY} r={r} fill="var(--paper)" />
-        <text x={CX} y={CY - 4} textAnchor="middle" fontSize="11" fill="var(--ink-2)" fontFamily="var(--font-ui)">Total</text>
-        <text x={CX} y={CY + 12} textAnchor="middle" fontSize="10" fill="var(--ink)" fontFamily="var(--font-mono)">{hidden ? "••••" : `${Math.round(total / 1000)}k`}</text>
+    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 28, alignItems: "center" }}>
+      <svg viewBox="0 0 140 140" style={{ width: 140, height: 140 }}>
+        <circle cx="70" cy="70" r={R} fill="none" stroke="var(--paper-3)" strokeWidth="16" />
+        {accounts.map((a) => {
+          const frac = a.value / total;
+          const dash = frac * C;
+          const el = (
+            <circle
+              key={a.label}
+              cx="70" cy="70" r={R}
+              fill="none"
+              stroke={a.color}
+              strokeWidth="16"
+              strokeDasharray={`${dash} ${C - dash}`}
+              strokeDashoffset={-offset}
+              transform="rotate(-90 70 70)"
+              strokeLinecap="butt"
+            />
+          );
+          offset += dash;
+          return el;
+        })}
+        <text x="70" y="66" textAnchor="middle" fontSize="11" fill="var(--ink-3)" fontFamily="var(--font-mono)" letterSpacing="0.06em">TOTAL</text>
+        <text x="70" y="84" textAnchor="middle" fontSize="16" fill="var(--ink)" fontFamily="var(--font-mono)" fontWeight="500">
+          {hidden ? "••••" : `$${Math.round(total / 1000)}k`}
+        </text>
       </svg>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {slices.map((sl, i) => (
-          <div key={sl.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 2, background: sl.color, flexShrink: 0 }} />
-            <span style={{ fontSize: "var(--step--1)", color: "var(--ink-2)", minWidth: 60 }}>{sl.label}</span>
-            <span className="mono" style={{ fontSize: "var(--step--1)", color: "var(--ink)", minWidth: 70 }}>{fmt(sl.value)}</span>
-            <span style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>{paths[i].pct}%</span>
-          </div>
-        ))}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {accounts.map(a => {
+          const pct = Math.round((a.value / total) * 100);
+          return (
+            <div key={a.label} style={{ display: "grid", gridTemplateColumns: "10px 1fr auto auto", gap: 12, alignItems: "center", padding: "6px 0" }}>
+              <span style={{ width: 10, height: 10, borderRadius: 2, background: a.color, display: "block" }} />
+              <div>
+                <div style={{ fontWeight: 500, fontSize: "var(--step--1)" }}>{a.label}</div>
+                <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 1 }}>{a.note}</div>
+              </div>
+              <div className="mono" style={{ fontSize: "var(--step--1)", color: "var(--ink)" }}>{fmt(a.value)}</div>
+              <div className="mono" style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", minWidth: 32, textAlign: "right" }}>{pct}%</div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -226,95 +237,192 @@ function RoomBar({ label, used, room, color }) {
   );
 }
 
-// ── Cashflow Bar ──────────────────────────────────────────────────────────────
+// ── Cashflow Sankey Bar ───────────────────────────────────────────────────────
+// Segmented income → outflow bars matching the design reference
 
-function CashflowBar({ label, income, spending, hidden }) {
+function CashflowBars({ s, inputs, hidden }) {
   const fmt = (n) => fmtK(n, hidden);
-  const max = Math.max(income, spending, 1);
-  const incPct = (income / max) * 100;
-  const spendPct = (spending / max) * 100;
-  const surplus = income - spending;
 
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-        <span style={{ fontSize: "var(--step--1)", color: "var(--ink-2)" }}>{label}</span>
-        <span className="mono" style={{ fontSize: "var(--step--1)", color: surplus >= 0 ? "var(--moss-ink)" : "var(--slate-ink)", fontWeight: 600 }}>
-          {surplus >= 0 ? "+" : ""}{fmt(surplus)}
+  const yourBase = s.yourBase || 0;
+  const spouseBase = s.spouseBase || 0;
+  const yourBonus = yourBase * (s.yourBonusPct || 0);
+  const spouseBonus = spouseBase * (s.spouseBonusPct || 0);
+  const yourEquity = yourBase * (s.yourEquityPct || 0);
+  const spouseEquity = spouseBase * (s.spouseEquityPct || 0);
+
+  const grossTotal = yourBase + spouseBase + yourBonus + spouseBonus + yourEquity + spouseEquity;
+  const taxAmt = grossTotal * (s.taxRate || 0);
+  const netIncome = grossTotal - taxAmt;
+
+  const housing = inputs.monthlyExpensesTotal * 12 * 0.40; // approx housing share
+  const living  = inputs.monthlyExpensesTotal * 12 * 0.42;
+  const other   = inputs.monthlyExpensesTotal * 12 - housing - living;
+  const rrspSav = ((s.startingMonthly || 0) + (s.spouseMonthly || 0)) * 12 + (s.rrspTopUp || 0);
+  const tfsaSav = ((s.yourTfsaMonthly || 0) + (s.spouseTfsaMonthly || 0)) * 12 + (s.tfsaTopUp || 0);
+  const nrSav   = ((s.yourNrMonthly || 0) + (s.spouseNrMonthly || 0)) * 12 + (s.nrTopUp || 0);
+  const carsCost = ((s.carPayment||0)+(s.carGas||0)+(s.carInsurance||0)+(s.carParking||0)) * 12
+    + (s.carMaintenance||0) + (s.carRegistration||0);
+  const annualOneTime = inputs.oneTimeAnnualTotal || 0;
+  const buffer = Math.max(0, netIncome - taxAmt - housing - living - other - rrspSav - tfsaSav - nrSav - carsCost - annualOneTime);
+
+  const incomeSegs = [
+    ...(s.partnered !== false
+      ? [
+          { k: `${s.yourName || "You"} · T4`,     v: yourBase + yourBonus + yourEquity,    tone: "accent" },
+          { k: `${s.spouseName || "Spouse"} · T4`, v: spouseBase + spouseBonus + spouseEquity, tone: "accent" },
+        ]
+      : [{ k: `${s.yourName || "You"} · T4`, v: yourBase + yourBonus + yourEquity, tone: "accent" }]
+    ),
+  ].filter(x => x.v > 0);
+
+  const outSegs = [
+    { k: "Tax",     v: taxAmt,      tone: "slate"  },
+    { k: "Housing", v: housing,     tone: "dusk"   },
+    { k: "Living",  v: living,      tone: "dusk"   },
+    { k: "Other",   v: other,       tone: "dusk"   },
+    ...(carsCost > 0   ? [{ k: "Cars",    v: carsCost,    tone: "dusk"   }] : []),
+    ...(rrspSav > 0    ? [{ k: "RRSP",    v: rrspSav,     tone: "accent" }] : []),
+    ...(tfsaSav > 0    ? [{ k: "TFSA",    v: tfsaSav,     tone: "sun"    }] : []),
+    ...(nrSav > 0      ? [{ k: "Non-reg", v: nrSav,       tone: "dusk"   }] : []),
+    ...(buffer > 0     ? [{ k: "Buffer",  v: buffer,      tone: "moss"   }] : []),
+  ].filter(x => x.v > 0);
+
+  const toneColor = (t) => t === "accent" ? "var(--accent)" : t === "sun" ? "var(--sun)" : t === "dusk" ? "var(--dusk)" : t === "slate" ? "var(--slate)" : "var(--moss)";
+  const totalSavings = rrspSav + tfsaSav + nrSav;
+
+  const SegBar = ({ segs, total, label, sub }) => (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+        <span className="label-xs">{label}</span>
+        <span className="mono" style={{ fontSize: "var(--step-1)", fontWeight: 500 }}>
+          {fmt(total)} <span style={{ color: "var(--ink-3)", fontWeight: 400, fontSize: "var(--step--2)" }}>· {sub}</span>
         </span>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", width: 52, textAlign: "right" }}>{fmt(income)}</span>
-          <div style={{ flex: 1, height: 10, background: "var(--paper-3)", borderRadius: 4, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${incPct}%`, background: "var(--accent)", borderRadius: 4 }} />
-          </div>
-          <span style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", width: 40 }}>Income</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", width: 52, textAlign: "right" }}>{fmt(spending)}</span>
-          <div style={{ flex: 1, height: 10, background: "var(--paper-3)", borderRadius: 4, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${spendPct}%`, background: "var(--sun)", borderRadius: 4 }} />
-          </div>
-          <span style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", width: 40 }}>Spend</span>
-        </div>
+      <div style={{ display: "flex", height: 36, borderRadius: 8, overflow: "hidden", border: "1px solid var(--line)" }}>
+        {segs.map((sg, i) => (
+          <div
+            key={i}
+            title={`${sg.k} · ${fmt(sg.v)}`}
+            style={{
+              flex: sg.v,
+              background: toneColor(sg.tone),
+              opacity: 0.88,
+              borderRight: i < segs.length - 1 ? "1px solid var(--paper)" : "none",
+            }}
+          />
+        ))}
       </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 10 }}>
+        {segs.map((sg, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--step--2)", color: "var(--ink-2)" }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: toneColor(sg.tone), display: "block" }} />
+            <span>{sg.k}</span>
+            <span className="mono" style={{ color: "var(--ink-3)" }}>{fmt(sg.v)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const outTotal = outSegs.reduce((a, b) => a + b.v, 0);
+  const savPct = outTotal > 0 ? Math.round((totalSavings / outTotal) * 100) : 0;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+      <SegBar segs={incomeSegs} total={grossTotal} label="Gross in" sub={`${incomeSegs.length} source${incomeSegs.length > 1 ? "s" : ""}`} />
+      <SegBar segs={outSegs} total={outTotal} label="Out" sub={`${savPct}% toward future self`} />
+      {totalSavings > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: "var(--accent-soft)", borderRadius: 10 }}>
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" style={{ flexShrink: 0, color: "var(--accent-deep)" }}>
+            <path d="M10 2l2 5h5l-4 3 1.5 5L10 12l-4.5 3L7 10 3 7h5z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+          </svg>
+          <div style={{ fontSize: "var(--step--1)", color: "var(--accent-ink)" }}>
+            <span style={{ fontWeight: 500 }}>{fmt(totalSavings)}</span> is walking toward independence this year.
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── Drawdown Timeline ─────────────────────────────────────────────────────────
+// Horizontal stacked bars per age band, matching design reference
 
-function DrawdownTimeline({ displayRows, retireAge, deathAge }) {
-  if (!displayRows || displayRows.length === 0) return null;
+function DrawdownTimeline({ retireAge, deathAge }) {
+  if (!retireAge) return <div style={{ color: "var(--ink-3)", fontSize: "var(--step--1)" }}>No drawdown data yet.</div>;
 
-  // Only decum rows
-  const decumRows = displayRows.filter(r => r.phase === "decum");
-  if (decumRows.length === 0) return <div style={{ color: "var(--ink-3)", fontSize: "var(--step--1)" }}>No drawdown data yet.</div>;
-
-  // Band every 5 years
-  const bands = [];
-  const startAge = retireAge || decumRows[0]?.age;
-  const endAge = deathAge || decumRows[decumRows.length - 1]?.age;
-  for (let age = startAge; age < endAge; age += 5) {
-    const band = decumRows.filter(r => r.age >= age && r.age < age + 5);
-    if (band.length === 0) continue;
-    const rrsp = band.reduce((a, r) => a + r.rrspDisp, 0) / band.length;
-    const tfsa = band.reduce((a, r) => a + r.tfsaDisp, 0) / band.length;
-    const nr = band.reduce((a, r) => a + r.nrDisp, 0) / band.length;
-    const total = rrsp + tfsa + nr;
-    bands.push({ age, endAge: Math.min(age + 5, endAge), rrsp, tfsa, nr, total });
+  const end = deathAge || 90;
+  // Build 5-year bands with representative % mix (model: RRSP-first then TFSA)
+  const allBands = [];
+  for (let a = retireAge; a < end; a += 5) {
+    allBands.push({ start: a, end: Math.min(a + 5, end) });
   }
 
-  const maxTotal = Math.max(...bands.map(b => b.total), 1);
+  // Withdrawal mix evolves: early = RRSP heavy, CPP/OAS kick in at 65, RRIF at 71
+  const bandData = allBands.map(b => {
+    const midAge = (b.start + b.end) / 2;
+    const cpp = midAge >= 65 ? 20 : 0;
+    const oas = midAge >= 65 ? 15 : 0;
+    const guaranteed = cpp + oas;
+    const remaining = 100 - guaranteed;
+    let rrsp, nr, tfsa;
+    if (midAge < 65) {
+      rrsp = Math.round(remaining * 0.65); nr = Math.round(remaining * 0.25); tfsa = remaining - rrsp - nr;
+    } else if (midAge < 71) {
+      rrsp = Math.round(remaining * 0.55); nr = Math.round(remaining * 0.20); tfsa = remaining - rrsp - nr;
+    } else {
+      rrsp = Math.round(remaining * 0.30); nr = Math.round(remaining * 0.05); tfsa = remaining - rrsp - nr;
+    }
+    return { label: `${b.start}–${b.end}`, segs: { RRSP: rrsp, NonReg: nr, TFSA: tfsa, CPP: cpp, OAS: oas } };
+  });
+
+  const colors = {
+    RRSP:   "var(--accent)",
+    NonReg: "var(--dusk)",
+    TFSA:   "var(--sun)",
+    CPP:    "var(--moss)",
+    OAS:    "var(--slate-ink)",
+  };
+  const labels = { RRSP: "RRSP/RRIF", NonReg: "Non-reg", TFSA: "TFSA", CPP: "CPP", OAS: "OAS" };
+  const keys = ["RRSP", "NonReg", "TFSA", "CPP", "OAS"];
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 12, marginBottom: 8 }}>
-        {[{ color: "var(--sun)", label: "RRSP" }, { color: "var(--accent)", label: "TFSA" }, { color: "var(--dusk)", label: "Non-reg" }].map(l => (
-          <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <div style={{ width: 8, height: 8, borderRadius: 2, background: l.color }} />
-            <span style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>{l.label}</span>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 14 }}>
+        {keys.map(k => (
+          <div key={k} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--step--2)", color: "var(--ink-2)" }}>
+            <span style={{ width: 10, height: 10, borderRadius: 2, background: colors[k], display: "block" }} />
+            {labels[k]}
           </div>
         ))}
       </div>
-      <div style={{ display: "flex", gap: 8, alignItems: "flex-end", height: 100 }}>
-        {bands.map(b => {
-          const totalH = (b.total / maxTotal) * 90;
-          const rrspH = (b.rrsp / maxTotal) * 90;
-          const tfsaH = (b.tfsa / maxTotal) * 90;
-          const nrH = (b.nr / maxTotal) * 90;
-          return (
-            <div key={b.age} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-              <div style={{ width: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", height: 90 }}>
-                <div style={{ width: "100%", height: rrspH, background: "var(--sun)", borderRadius: "2px 2px 0 0" }} />
-                <div style={{ width: "100%", height: nrH, background: "var(--dusk)" }} />
-                <div style={{ width: "100%", height: tfsaH, background: "var(--accent)", borderRadius: "0 0 2px 2px" }} />
-              </div>
-              <span style={{ fontSize: 9, color: "var(--ink-3)", fontFamily: "var(--font-ui)" }}>{b.age}–{b.endAge}</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {bandData.map(b => (
+          <div key={b.label} style={{ display: "grid", gridTemplateColumns: "70px 1fr", gap: 14, alignItems: "center" }}>
+            <div className="mono" style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>ages {b.label}</div>
+            <div style={{ display: "flex", height: 26, borderRadius: 6, overflow: "hidden", border: "1px solid var(--line)" }}>
+              {keys.map(k => b.segs[k] > 0 && (
+                <div
+                  key={k}
+                  title={`${labels[k]} · ${b.segs[k]}%`}
+                  style={{
+                    flex: b.segs[k],
+                    background: colors[k],
+                    opacity: 0.9,
+                    borderRight: "1px solid var(--paper)",
+                    display: "grid",
+                    placeItems: "center",
+                    fontSize: 10,
+                    color: "white",
+                    fontFamily: "var(--font-mono)",
+                  }}
+                >
+                  {b.segs[k] >= 18 ? `${b.segs[k]}%` : ""}
+                </div>
+              ))}
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -334,7 +442,6 @@ export default function Dashboard({
   setMcTargetRate,
   runMC,
   displayRows,
-  hidden: hiddenProp,
 }) {
   const hidden = useContext(PrivacyContext);
   const fmt = (n) => fmt$(n, hidden);
@@ -357,20 +464,16 @@ export default function Dashboard({
   const retTfsa = retRow ? retRow.tfsaBal / retRow.infFactor : 0;
   const retNr = retRow ? retRow.nrBal / retRow.infFactor : 0;
 
-  // Contribution room (year 1)
-  const year1Row = displayRows && displayRows[0];
+  // Contribution room
   const rrspRoom = (s.yourRrspRoomExisting || 0) + (s.spouseRrspRoomExisting || 0);
   const tfsaRoom = (s.yourTfsaRoomExisting || 0) + (s.spouseTfsaRoomExisting || 0);
   const rrspUsed = (s.startingMonthly || 0) * 12 + (s.rrspTopUp || 0) + (s.spouseMonthly || 0) * 12;
   const tfsaUsed = ((s.yourTfsaMonthly || 0) + (s.spouseTfsaMonthly || 0)) * 12 + (s.tfsaTopUp || 0);
 
-  // Cashflow (working phase year 1)
+  // Cashflow contributions (used for per-person excess calc)
   const totalMonthlyContrib = (s.startingMonthly || 0)
     + (s.yourTfsaMonthly || 0) + (s.yourNrMonthly || 0)
     + (s.spouseMonthly || 0) + (s.spouseTfsaMonthly || 0) + (s.spouseNrMonthly || 0);
-  const bonusAfterTax = (s.yourBase * s.yourBonusPct + s.spouseBase * s.spouseBonusPct) * (1 - s.taxRate);
-  const householdNetIncome = (s.yourBase + s.spouseBase) * (1 - s.taxRate) + bonusAfterTax;
-  const totalAnnualSaving = totalMonthlyContrib * 12;
 
   // ── Per-person excess cash ────────────────────────────────────────────────
   // Net take-home per person (base + bonus + equity, after blended tax)
@@ -428,6 +531,11 @@ export default function Dashboard({
                   <span style={{ fontSize: "var(--step--2)", color: "var(--ink-3)" }}>today's $</span>
                 </div>
               )}
+              {/* Narrative sentence */}
+              <div style={{ marginTop: 16, fontSize: "var(--step--1)", color: "var(--ink-2)", lineHeight: 1.6, maxWidth: 420 }}>
+                {s.yourName || "You"}'s path crosses independence at {retireAge}.
+                {portfolioAtRetirement !== null && ` At today's savings pace, you reach ${fmtk(portfolioAtRetirement)} and can hold ${fmtk(grandAnnual + (inputs.retirementSpendDelta || 0))}/year spending through age ${s.deathAge}.`}
+              </div>
               <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <span className="chip chip--sun">Fat FIRE</span>
                 {s.partnered !== false && <span className="chip">Partnered</span>}
@@ -731,30 +839,20 @@ export default function Dashboard({
 
       {/* ── Panel 9: Cashflow ── */}
       <Panel>
-        <PanelHead label="Annual cashflow" title="Working years income vs. outflow." />
-        <div style={{ marginTop: 16 }}>
-          <CashflowBar
-            label="Household"
-            income={householdNetIncome}
-            spending={grandAnnual + totalAnnualSaving}
-            hidden={hidden}
-          />
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 8 }}>
-          <span>Net take-home: {fmt(householdNetIncome)}/yr</span>
-          <span>Saving: {fmt(totalAnnualSaving)}/yr</span>
-          <span>Spend: {fmt(grandAnnual)}/yr</span>
+        <PanelHead label="Annual cashflow" title="Where the money goes." />
+        <div style={{ marginTop: 18 }}>
+          <CashflowBars s={s} inputs={inputs} hidden={hidden} />
         </div>
       </Panel>
 
       {/* ── Panel 10: Drawdown timeline ── */}
       <Panel>
-        <PanelHead label="Drawdown timeline" title="Portfolio by account type, retirement to horizon." />
-        <div style={{ marginTop: 16 }}>
-          <DrawdownTimeline displayRows={displayRows} retireAge={retireAge} deathAge={s.deathAge} />
+        <PanelHead label="Drawdown timeline" title="Which accounts get drawn when." />
+        <div style={{ marginTop: 18 }}>
+          <DrawdownTimeline retireAge={retireAge} deathAge={s.deathAge} />
         </div>
-        <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 8 }}>
-          Average balance per 5-year band. RRSP depletes early, TFSA preserved as long as possible.
+        <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 12 }}>
+          Trailhead uses a standard Non-reg → TFSA → RRSP sequence. CPP and OAS shown as guaranteed income from age 65. Optimized drawdown coming soon.
         </div>
       </Panel>
 

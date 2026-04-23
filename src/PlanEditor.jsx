@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import { PrivacyContext } from "./FatFireCalculator";
 
 // ── Primitives ────────────────────────────────────────────────────────────────
@@ -247,9 +247,13 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
     { id: "assumptions", label: "Assumptions" },
   ];
 
-  // Track which section is currently in view (observes against the viewport/window)
+  const scrollRef = useRef(null);
+
+  // Track which section is currently in view — observe within our own scroll container
   const [activeSection, setActiveSection] = useState("household");
   useEffect(() => {
+    const root = scrollRef.current;
+    if (!root) return;
     const els = sections.map(sec => document.getElementById(`pe-${sec.id}`)).filter(Boolean);
     const observer = new IntersectionObserver(
       (entries) => {
@@ -260,21 +264,24 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
           setActiveSection(visible[0].target.id.replace("pe-", ""));
         }
       },
-      { root: null, rootMargin: "-10% 0px -60% 0px", threshold: 0 }
+      { root, rootMargin: "-10% 0px -60% 0px", threshold: 0 }
     );
     els.forEach(el => observer.observe(el));
     return () => observer.disconnect();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function scrollToSection(id) {
+    const root = scrollRef.current;
     const el = document.getElementById(`pe-${id}`);
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!root || !el) return;
+    const rootRect = root.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    root.scrollTo({ top: root.scrollTop + (elRect.top - rootRect.top) - 16, behavior: "smooth" });
   }
 
   return (
-    <div className="pe-frame">
-      {/* Header */}
+    <div className="pe-frame" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* Header — not scrollable */}
       <div style={{
         padding: "16px 24px",
         borderBottom: "1px solid var(--line)",
@@ -282,9 +289,7 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
         alignItems: "center",
         justifyContent: "space-between",
         background: "var(--paper)",
-        position: "sticky",
-        top: 0,
-        zIndex: 10,
+        flexShrink: 0,
       }}>
         <div>
           <div style={{ fontSize: "var(--step-0)", fontWeight: 600, color: "var(--ink)" }}>Plan Editor</div>
@@ -293,18 +298,15 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
         <SaveIndicator saveStatus={saveStatus} />
       </div>
 
-      {/* Body: ToC sidebar + content, natural document flow */}
-      <div style={{ display: "flex", alignItems: "flex-start" }}>
+      {/* Body: ToC (static) + content (scrolls). minHeight:0 lets flex children shrink. */}
+      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
 
-        {/* ToC sidebar — sticky, scrolls with page but sticks in viewport */}
+        {/* ToC sidebar — never scrolls, always visible */}
         <div style={{
           width: 172,
           flexShrink: 0,
           padding: "24px 12px 24px 20px",
           borderRight: "1px solid var(--line)",
-          position: "sticky",
-          top: 57,
-          maxHeight: "calc(100vh - 57px)",
           overflowY: "auto",
         }}>
           <div style={{ fontSize: "var(--step--2)", fontWeight: 600, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Sections</div>
@@ -337,8 +339,8 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
           })}
         </div>
 
-        {/* Main content — natural document flow, outer shell scrolls */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Main content — this is the ONLY thing that scrolls */}
+        <div ref={scrollRef} style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>
         <div className="pe-stack" style={{ padding: "0 32px 60px", maxWidth: 680 }}>
 
           {/* ── Household ── */}

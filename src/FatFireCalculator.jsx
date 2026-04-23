@@ -1603,16 +1603,29 @@ export default function FatFireCalculator() {
 
   return (
     <PrivacyContext.Provider value={hidden}>
-    <div className="dash-frame" style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+    <div className="dash-frame" style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
 
       {/* ── Top nav ── */}
       <div className="dash-top">
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          {/* Wordmark */}
+          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: 8,
+              background: "var(--accent-deep)",
+              display: "grid", placeItems: "center",
+              flexShrink: 0,
+            }}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M3 12 L8 4 L13 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M5.5 8.5 L10.5 8.5" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </div>
             <div className="dash-top__brand">Trailhead</div>
           </div>
+
           {/* Page tabs */}
-          <nav style={{ display: "flex", gap: 2 }}>
+          <nav style={{ display: "flex", gap: 0, borderLeft: "1px solid var(--line)", paddingLeft: 20 }}>
             {[
               { id: "dashboard", label: "Dashboard" },
               { id: "editor", label: "Plan Editor" },
@@ -1625,12 +1638,14 @@ export default function FatFireCalculator() {
                   padding: "5px 14px",
                   fontSize: "var(--step--1)",
                   fontWeight: page === tab.id ? 600 : 400,
-                  color: page === tab.id ? "var(--ink)" : "var(--ink-3)",
-                  background: page === tab.id ? "var(--paper-2)" : "none",
-                  border: "1px solid " + (page === tab.id ? "var(--line)" : "transparent"),
-                  borderRadius: "var(--r-2)",
+                  color: page === tab.id ? "var(--accent-deep)" : "var(--ink-3)",
+                  background: "none",
+                  border: "none",
+                  borderBottom: page === tab.id ? "2px solid var(--accent-deep)" : "2px solid transparent",
+                  borderRadius: 0,
                   cursor: "pointer",
                   transition: "all 0.15s",
+                  marginBottom: -1,
                 }}
               >
                 {tab.label}
@@ -1682,7 +1697,19 @@ export default function FatFireCalculator() {
       {modals}
 
       {/* ── Page content ── */}
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      {/* Editor gets its own scroll context so the ToC sidebar can be sticky */}
+      {page === "editor" && (
+        <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          <PlanEditor
+            s={s}
+            update={update}
+            solved={solved}
+            inputs={inputs}
+            saveStatus={saveStatus}
+          />
+        </div>
+      )}
+      <div style={{ flex: 1, overflowY: "auto", display: page === "editor" ? "none" : "block" }}>
         {page === "dashboard" && (
           <Dashboard
             s={s}
@@ -1696,15 +1723,6 @@ export default function FatFireCalculator() {
             setMcTargetRate={setMcTargetRate}
             runMC={runMC}
             displayRows={displayRows}
-          />
-        )}
-        {page === "editor" && (
-          <PlanEditor
-            s={s}
-            update={update}
-            solved={solved}
-            inputs={inputs}
-            saveStatus={saveStatus}
           />
         )}
         {page === "settings" && (
