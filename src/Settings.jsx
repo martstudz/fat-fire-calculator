@@ -5,7 +5,6 @@ export default function Settings({
   authLoading,
   household,
   householdMembers,
-  householdPanelRef,
   activePlan,
   personalPlanId,
   copied,
@@ -71,7 +70,7 @@ export default function Settings({
                 {activePlan === "household" ? "🏠 Household plan (shared)" : "👤 My personal plan"}
               </div>
               <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 2 }}>
-                {saveStatus === "saving" ? "Saving…" : saveStatus === "error" ? "Save error" : "Changes auto-saved"}
+                {saveStatus === "saving" ? "Saving…" : saveStatus === "error" ? "Save failed" : "Saved"}
               </div>
             </div>
             {user && household && personalPlanId && activePlan && (
@@ -96,7 +95,7 @@ export default function Settings({
               </p>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button onClick={() => createHousehold(user.id, s)} className="btn btn--primary btn--sm">
-                  {copied ? "✓ Invite link copied!" : "＋ Create household"}
+                  {copied ? "✓ Invite link copied!" : "+ Create household"}
                 </button>
               </div>
               <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--line)" }}>

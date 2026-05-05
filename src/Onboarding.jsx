@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { PersonBlock, PersonGroup } from "./SharedComponents";
+import { DollarInput, PctInput, VestDatePicker, Field, BtnPair, ModeToggle, CompRow } from "./ObInputs";
 
 // ---------- province data ----------
 const PROVINCES = [
@@ -33,15 +35,6 @@ function estimateBlendedTax(combinedIncome) {
 }
 
 // ---------- FIRE vision logic ----------
-// Lifestyle slider: continuous 0–100 → annual retirement spend
-// Exponential-ish curve: $30k at 0, ~$200k at 100
-function lifestyleSliderToSpend(val) {
-  // val: 0–100
-  // Maps smoothly: 0→$30k, 25→$55k, 50→$90k, 75→$135k, 100→$200k
-  const min = 30000, max = 200000;
-  const t = val / 100;
-  return Math.round((min + (max - min) * Math.pow(t, 1.5)) / 1000) * 1000;
-}
 
 function lifestyleLabel(spend) {
   if (spend < 50000) return "Lean & simple";
@@ -82,122 +75,6 @@ function classifyFire(retirementAge, lifestyleSpend, workLevel) {
   if (tradAge && lean)                  return { label: "Coast FIRE",           emoji: "🌊", desc: "You've done the heavy lifting — coast to a comfortable traditional retirement." };
   if (tradAge && fat)                   return { label: "Traditional Retirement",emoji: "🏡", desc: "A full, abundant retirement at the right time for you." };
   return                                       { label: "Traditional Retirement",emoji: "🏡", desc: "A well-funded retirement at a traditional age." };
-}
-
-// Field: row=true → label left, input right (matches Plan Editor inp-row)
-//        row=false (default) → label above, input below (for selects, text, btn pairs)
-function Field({ label, children, hint, row = false }) {
-  if (row) {
-    return (
-      <div className="inp-row" style={{ padding: "6px 0" }}>
-        <span style={{ color: "var(--ink-2)", fontSize: "var(--step--1)" }}>
-          {label}
-          {hint && <span style={{ color: "var(--ink-4)", fontSize: "var(--step--2)" }}> · {hint}</span>}
-        </span>
-        {children}
-      </div>
-    );
-  }
-  return (
-    <div className="ob-field">
-      {label && <label className="label-xs">{label}</label>}
-      {children}
-      {hint && <p className="ob-hint">{hint}</p>}
-    </div>
-  );
-}
-
-// Person block matching Plan Editor's coloured-header pill
-function PersonBlock({ name, variant = "you", children }) {
-  return (
-    <div className={`pe-person pe-person--${variant}`} style={{ marginBottom: 12 }}>
-      <div className="pe-person__header">
-        <span className="pe-person__dot" />
-        {name}
-      </div>
-      <div className="pe-person__fields">
-        {children}
-      </div>
-    </div>
-  );
-}
-
-// Section divider — matches Plan Editor AccSection header weight
-function SectionLabel({ children }) {
-  return <div className="ob-section-label">{children}</div>;
-}
-
-function formatWithCommas(n) {
-  if (!isFinite(n) || n === "" || n == null) return "";
-  return Math.round(n).toLocaleString("en-CA");
-}
-
-// Matches pe-field-wrap + pe-field-adorn exactly as in PlanEditor
-function DollarInput({ value, onChange, placeholder = "0" }) {
-  const [focused, setFocused] = useState(false);
-  const [raw, setRaw] = useState(value ? String(value) : "");
-  useEffect(() => {
-    if (!focused) setRaw(value ? String(value) : "");
-  }, [value, focused]);
-  const display = focused ? raw : (value ? formatWithCommas(value) : "");
-  return (
-    <div className="pe-field-wrap">
-      <span className="pe-field-adorn pe-field-adorn--left">$</span>
-      <input
-        type="text"
-        inputMode="numeric"
-        className="pe-field-input"
-        placeholder={placeholder}
-        value={display}
-        onFocus={() => { setFocused(true); setRaw(value ? String(value) : ""); }}
-        onChange={(e) => {
-          const cleaned = e.target.value.replace(/[^0-9.]/g, "");
-          setRaw(cleaned);
-          const n = parseFloat(cleaned);
-          if (!isNaN(n)) onChange(n);
-          else if (cleaned === "") onChange(0);
-        }}
-        onBlur={() => {
-          setFocused(false);
-          const n = parseFloat(raw);
-          setRaw(isNaN(n) ? "" : String(n));
-        }}
-      />
-    </div>
-  );
-}
-
-function PctInput({ value, onChange, placeholder = "0" }) {
-  const [focused, setFocused] = useState(false);
-  const [raw, setRaw] = useState(() => value ? parseFloat((value * 100).toFixed(2)).toString() : "");
-  useEffect(() => {
-    if (!focused) setRaw(value ? parseFloat((value * 100).toFixed(2)).toString() : "");
-  }, [value, focused]);
-  return (
-    <div className="pe-field-wrap">
-      <input
-        type="text"
-        inputMode="decimal"
-        className="pe-field-input"
-        placeholder={placeholder}
-        value={focused ? raw : (value ? parseFloat((value * 100).toFixed(2)).toString() : "")}
-        onFocus={() => { setFocused(true); setRaw(value ? parseFloat((value * 100).toFixed(2)).toString() : ""); }}
-        onChange={(e) => {
-          const cleaned = e.target.value.replace(/[^0-9.]/g, "");
-          setRaw(cleaned);
-          const n = parseFloat(cleaned);
-          if (!isNaN(n)) onChange(n / 100);
-          else if (cleaned === "") onChange(0);
-        }}
-        onBlur={() => {
-          setFocused(false);
-          const n = parseFloat(raw);
-          setRaw(isNaN(n) ? "" : parseFloat(n.toFixed(2)).toString());
-        }}
-      />
-      <span className="pe-field-adorn pe-field-adorn--right">%</span>
-    </div>
-  );
 }
 
 // Card shell
@@ -288,68 +165,62 @@ function CardAboutYou({ data, onChange, onNext, onSkip, onBack }) {
   const name = data.yourName?.trim();
   const canExit = !!name;
   return (
-    <Card step={1} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
-      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
-        {name ? `Nice to meet you, ${name}.` : "Let's start with you."}
+    <Card step={1} totalSteps={8} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+      <h2 className="ob-heading">
+        {name ? `Nice to meet you, ${name}. 👋` : "Let's start with you. 👋"}
       </h2>
-      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 28 }}>Three basics to anchor the plan.</p>
-      <Field label="Your name">
-        <input className="input" type="text" placeholder="e.g. Alex"
-          value={data.yourName || ""}
-          onChange={(e) => onChange("yourName", e.target.value)} />
-      </Field>
-      <Field label={name ? `How old are you, ${name}?` : "Your current age"} row>
-        <div className="pe-field-wrap">
-          <input className="pe-field-input" type="number" placeholder="35"
-            min={18} max={80}
-            value={data.currentAge || ""}
-            onChange={(e) => onChange("currentAge", parseInt(e.target.value) || 0)} />
-        </div>
-      </Field>
-      <Field label="Province" hint="We'll use this for tax brackets, health premiums, and provincial credits.">
-        <select className="input" value={data.province || "ON"}
-          onChange={(e) => onChange("province", e.target.value)}>
-          {PROVINCES.map((p) => (
-            <option key={p.code} value={p.code}>{p.name}</option>
-          ))}
-        </select>
-      </Field>
+      <p className="ob-sub" style={{ marginBottom: 28 }}>Three basics to anchor the plan.</p>
+      <div className="pe-row-group">
+        <Field label="Name" row>
+          <div className="pe-field-wrap">
+            <input className="pe-field-input" type="text" placeholder="e.g. Alex"
+              value={data.yourName || ""}
+              onChange={(e) => onChange("yourName", e.target.value)} />
+          </div>
+        </Field>
+        <Field label="Current age" row>
+          <div className="pe-field-wrap">
+            <input className="pe-field-input" type="text" inputMode="numeric" placeholder="35"
+              value={data.currentAge || ""}
+              onFocus={(e) => { if (!data.currentAge) e.target.value = ""; e.target.select(); }}
+              onChange={(e) => { const n = parseInt(e.target.value); onChange("currentAge", isNaN(n) ? 0 : n); }} />
+          </div>
+        </Field>
+        <Field label="Province" row>
+          <div className="pe-field-wrap">
+            <select className="pe-field-input" style={{ textAlign: "right", cursor: "pointer" }}
+              value={data.province || "ON"}
+              onChange={(e) => onChange("province", e.target.value)}>
+              {PROVINCES.map((p) => (
+                <option key={p.code} value={p.code}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+        </Field>
+      </div>
       <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 10 }}>Continue</button>
     </Card>
   );
 }
 
-// ---------- Shared: two-up button pair ----------
-function BtnPair({ options, value, onChange }) {
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-      {options.map(({ label, sub, val }) => (
-        <button key={label} onClick={() => onChange(val)}
-          className={`option-tile ${value === val ? "is-active" : ""}`}>
-          <div style={{ fontWeight: 500, fontSize: 14 }}>{label}</div>
-          {sub && <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>{sub}</div>}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 // ---------- Card 2: Household ----------
 function CardHousehold({ data, onChange, onNext, onSkip, onBack }) {
-  const name = data.yourName?.trim() || "you";
-  const canExit = !!(data.yourName?.trim());
+  const rawName = data.yourName?.trim();
+  const name = rawName || "you";
+  const yourPossessive = rawName ? `${rawName}'s` : "your";
+  const canExit = !!rawName;
   const partnered = data.partnered === true;
   const hasKids = data.hasKids === true;
   const spouseName = data.spouseName?.trim();
   const partnerFillsOwn = data.partnerFillsOwn === true;
 
   return (
-    <Card step={2} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
-      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
-        Who are we planning for?
+    <Card step={2} totalSteps={8} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+      <h2 className="ob-heading">
+        Who are we planning for? 🏡
       </h2>
-      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
-        {partnered ? "We'll fit the plan around both of you." : `We'll tailor it to ${name}'s full picture.`}
+      <p className="ob-sub">
+        {partnered ? "We'll fit the plan around both of you." : `We'll tailor it to ${yourPossessive} full picture.`}
       </p>
 
       <Field label="Relationship">
@@ -364,38 +235,29 @@ function CardHousehold({ data, onChange, onNext, onSkip, onBack }) {
       </Field>
 
       {partnered && (
-        <>
-          <Field label="Your partner's name">
-            <input className="input" type="text" placeholder="e.g. Jamie"
-              value={data.spouseName || ""}
-              onChange={(e) => onChange("spouseName", e.target.value)} />
-          </Field>
-          <Field label={`${spouseName ? spouseName + "'s" : "Their"} current age`} row>
+        <div className="pe-row-group" style={{ marginBottom: 16 }}>
+          <Field label="Partner's name" row>
             <div className="pe-field-wrap">
-              <input className="pe-field-input" type="number" placeholder="33"
-                min={18} max={80}
+              <input className="pe-field-input" type="text" placeholder="e.g. Jamie"
+                value={data.spouseName || ""}
+                onChange={(e) => onChange("spouseName", e.target.value)} />
+            </div>
+          </Field>
+          <Field label="Partner's age" row>
+            <div className="pe-field-wrap">
+              <input className="pe-field-input" type="text" inputMode="numeric" placeholder="33"
                 value={data.spouseCurrentAge || ""}
-                onChange={(e) => onChange("spouseCurrentAge", parseInt(e.target.value) || 0)} />
+                onFocus={(e) => { if (!data.spouseCurrentAge) e.target.value = ""; e.target.select(); }}
+                onChange={(e) => { const n = parseInt(e.target.value); onChange("spouseCurrentAge", isNaN(n) ? 0 : n); }} />
             </div>
           </Field>
-          <Field label={`Will ${spouseName || "your partner"} fill in their own details?`}>
-            <p className="ob-hint" style={{ marginBottom: 8 }}>Their income, savings, and pension — you can fill it in for them, or send them a link to do it themselves after you sign in.</p>
-            <BtnPair
-              value={data.partnerFillsOwn}
-              onChange={(v) => onChange("partnerFillsOwn", v)}
-              options={[
-                { label: "I'll fill it in", val: false },
-                { label: "They'll do it", val: true },
-              ]}
-            />
-          </Field>
-          {partnerFillsOwn && (
-            <div className="ob-notice">
-              <strong>Got it.</strong> Once you sign in, you'll get a link to share with{" "}
-              {spouseName || "your partner"} — they can join your household and add their details.
+          <Field label="They'll fill in their own details" hint="send them a link after sign-in" row>
+            <div className="seg">
+              <button onClick={() => onChange("partnerFillsOwn", false)} className={!partnerFillsOwn ? "is-active" : ""}>No</button>
+              <button onClick={() => onChange("partnerFillsOwn", true)} className={partnerFillsOwn ? "is-active" : ""}>Yes</button>
             </div>
-          )}
-        </>
+          </Field>
+        </div>
       )}
 
       <Field label="Kids at home (or on the way)">
@@ -414,29 +276,82 @@ function CardHousehold({ data, onChange, onNext, onSkip, onBack }) {
   );
 }
 
-// ---------- Card 3: FIRE Vision ----------
+// ---------- Card 8 (last): FIRE Vision ----------
+// Lifestyle spend is suggested from income & spending data collected in prior cards.
+// Returns suggested annual retirement spend in dollars, derived from onboarding inputs.
+function suggestLifestyleSpend(data) {
+  const partnered = data.partnered === true;
+  const hasKids   = data.hasKids === true;
+
+  // Monthly non-housing spend buckets entered in CardSpending
+  const monthlySpend =
+    (data.transport    || 0) +
+    (data.groceries    || 0) +
+    (data.dining       || 0) +
+    (data.travel       || 0) +
+    (data.personalCare || 0) +
+    (hasKids ? (data.childcare || 0) : 0) +
+    (data.other        || 0);
+
+  // Monthly housing costs
+  const housing = data.ownsHome
+    ? (data.mortgage || 0) + (data.propertyTax || 0) + (data.homeInsurance || 0) + (data.maintenance || 0) + (data.utilities || 0)
+    : (data.rent || 0) + (data.utilities || 0) + (data.homeInsurance || 0);
+
+  const totalMonthly = monthlySpend + housing;
+
+  if (totalMonthly > 0) {
+    return Math.round((totalMonthly * 12) / 1000) * 1000;
+  }
+
+  // Fallback: estimate from net income if no spend entered yet
+  const combined = (data.yourBase || 0) + (partnered ? (data.spouseBase || 0) : 0);
+  if (combined > 0) {
+    const taxRate = estimateBlendedTax(combined);
+    const netAnnual = combined * (1 - taxRate);
+    return Math.round((netAnnual * 0.6) / 1000) * 1000;
+  }
+
+  return 90000; // absolute fallback
+}
+
 function CardVision({ data, onChange, onNext, onSkip, onBack }) {
   const name = data.yourName?.trim() || "you";
   const spouseName = data.spouseName?.trim();
   const partnered = data.partnered === true;
   const canExit = !!(data.yourName?.trim());
 
-  const retAge      = data.visionRetirementAge ?? 55;
-  const lifestyleVal = data.visionLifestyleVal  ?? 50;
-  const workLevel   = data.visionWorkLevel      ?? 1;
+  const retAge    = data.visionRetirementAge ?? 55;
+  const workLevel = data.visionWorkLevel ?? 1;
 
-  const spend = lifestyleSliderToSpend(lifestyleVal);
-  const fire  = classifyFire(retAge, spend, workLevel);
+  // Lifestyle: computed from spending/income inputs as the midpoint; slider range is ±50%.
+  // userTouchedSlider tracks whether the user has moved it — if not, the midpoint stays live.
+  const userTouchedSlider = React.useRef(data.visionLifestyleVal != null);
+  const suggestedSpend = suggestLifestyleSpend(data);
+  const sliderMin = Math.round(suggestedSpend * 0.5 / 1000) * 1000;
+  const sliderMax = Math.round(suggestedSpend * 1.5 / 1000) * 1000;
+  const spend = userTouchedSlider.current
+    ? Math.max(sliderMin, Math.min(sliderMax, data.visionLifestyleVal ?? suggestedSpend))
+    : suggestedSpend;
+
+  // Keep state in sync so onboardingToState sees the latest
+  useEffect(() => {
+    if (!userTouchedSlider.current) {
+      onChange("visionLifestyleVal", suggestedSpend);
+    }
+  });
+
+  const fire = classifyFire(retAge, spend, workLevel);
 
   const planFor = partnered && spouseName ? `${name} & ${spouseName}` : partnered ? `${name} & your partner` : name;
 
   return (
-    <Card step={3} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+    <Card step={8} totalSteps={8} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
       <div className="chip chip--accent" style={{ marginBottom: 16 }}>Planning for {planFor}</div>
-      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
-        What does the horizon look like?
+      <h2 className="ob-heading">
+        What does the horizon look like? 🔥
       </h2>
-      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>Move the sliders until it feels right.</p>
+      <p className="ob-sub">Fine-tune your vision — we've pre-filled from your numbers.</p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
         {/* Retirement age */}
@@ -454,12 +369,25 @@ function CardVision({ data, onChange, onNext, onSkip, onBack }) {
 
         {/* Lifestyle */}
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-            <span className="label-xs">Lifestyle</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+            <span className="label-xs">Lifestyle in retirement</span>
             <span className="mono" style={{ fontSize: 14, color: "var(--ink-2)" }}>{fmtSpend(spend)}/yr</span>
           </div>
-          <input className="slider" type="range" min={0} max={100} step={1}
-            value={lifestyleVal} onChange={(e) => onChange("visionLifestyleVal", parseInt(e.target.value))} />
+          <p style={{ fontSize: 11, color: "var(--ink-3)", marginBottom: 8, marginTop: 0 }}>
+            Based on your current spending — adjust if retirement looks different.
+          </p>
+          <input className="slider" type="range"
+            min={sliderMin} max={sliderMax} step={1000}
+            value={spend}
+            onChange={(e) => {
+              userTouchedSlider.current = true;
+              onChange("visionLifestyleVal", parseInt(e.target.value));
+            }} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--ink-3)", marginTop: 6 }}>
+            <span>{fmtSpend(sliderMin)}</span>
+            <span>{fmtSpend(suggestedSpend)} today</span>
+            <span>{fmtSpend(sliderMax)}</span>
+          </div>
           <div style={{ marginTop: 10, fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 24, color: "var(--accent-deep)", letterSpacing: "-0.02em" }}>
             {lifestyleLabel(spend)}
           </div>
@@ -490,172 +418,72 @@ function CardVision({ data, onChange, onNext, onSkip, onBack }) {
         </div>
       </div>
 
-      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>This feels right →</button>
+      <button onClick={onNext} className="btn btn--accent" style={{ width: "100%", marginTop: 20 }}>Build my plan →</button>
     </Card>
   );
 }
 
-// ---------- Card 4: Income ----------
-function ModeToggle({ mode, onChange }) {
-  return (
-    <div className="mode-toggle">
-      {["%", "$"].map((m) => (
-        <button key={m} onClick={() => onChange(m)} className={mode === m ? "is-active" : ""}>{m}</button>
-      ))}
-    </div>
-  );
-}
-
-const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-
-function VestDatePicker({ value, onChange }) {
-  // value stored as "YYYY-MM" string, e.g. "2026-06"
-  const parts = value ? value.split("-") : ["", ""];
-  const year = parts[0] || "";
-  const month = parts[1] || "";
-
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 15 }, (_, i) => String(currentYear + i));
-
-  function update(newYear, newMonth) {
-    if (newYear && newMonth) onChange(`${newYear}-${newMonth}`);
-    else onChange(`${newYear || ""}-${newMonth || ""}`);
-  }
-
-  return (
-    <div style={{ display: "flex", gap: 8 }}>
-      <select
-        className="input"
-        value={month}
-        onChange={(e) => update(year, e.target.value)}
-        style={{ flex: 1 }}
-      >
-        <option value="">Month</option>
-        {MONTHS.map((m, i) => (
-          <option key={m} value={String(i + 1).padStart(2, "0")}>{m}</option>
-        ))}
-      </select>
-      <select
-        className="input"
-        value={year}
-        onChange={(e) => update(e.target.value, month)}
-        style={{ flex: 1 }}
-      >
-        <option value="">Year</option>
-        {years.map((y) => (
-          <option key={y} value={y}>{y}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function CompRow({ label, hint, hasKey, modeKey, pctKey, dollarKey, data, onChange, vestDateKey, vestDateLabel }) {
-  const has      = data[hasKey]    === true;
-  const mode     = data[modeKey]   || "%";
-  const pctVal   = data[pctKey]    || 0;
-  const dollarVal = data[dollarKey] || 0;
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <p className="label-xs" style={{ marginBottom: 8 }}>{label}</p>
-      <BtnPair value={has} onChange={(v) => onChange(hasKey, v)}
-        options={[{ label: "Yes", val: true }, { label: "No", val: false }]} />
-      {has && (
-        <div style={{ marginTop: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-            <label className="label-xs">{hint}</label>
-            <ModeToggle mode={mode} onChange={(m) => onChange(modeKey, m)} />
-          </div>
-          {mode === "%" ? (
-            <PctInput value={pctVal} onChange={(v) => onChange(pctKey, v)} placeholder="e.g. 15" />
-          ) : (
-            <DollarInput value={dollarVal} onChange={(v) => onChange(dollarKey, v)} placeholder="e.g. 25,000" />
-          )}
-          {vestDateKey && (
-            <Field label={vestDateLabel || "Vesting date / cliff"} hint="Optional — helps model timing">
-              <VestDatePicker
-                value={data[vestDateKey] || ""}
-                onChange={(v) => onChange(vestDateKey, v)}
-              />
-            </Field>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PersonIncome({ prefix, personName, data, onChange }) {
+function PersonIncome({ prefix, data, onChange }) {
   return (
     <div>
-      <Field label="Annual base salary" row>
+      <Field label="Base pay" hint="annual salary" row>
         <DollarInput value={data[`${prefix}Base`]} onChange={(v) => onChange(`${prefix}Base`, v)} />
       </Field>
-      <CompRow label={`Does ${personName} get a performance bonus?`} hint="Typical annual bonus"
-        hasKey={`${prefix}HasBonus`} modeKey={`${prefix}BonusMode`}
-        pctKey={`${prefix}BonusPct`} dollarKey={`${prefix}BonusDollar`}
-        data={data} onChange={onChange} />
-      <CompRow label="Any stock options or equity grants?" hint="Annual equity value vesting"
-        hasKey={`${prefix}HasEquity`} modeKey={`${prefix}EquityMode`}
-        pctKey={`${prefix}EquityPct`} dollarKey={`${prefix}EquityDollar`}
-        data={data} onChange={onChange}
-        vestDateKey={`${prefix}EquityVestDate`} vestDateLabel="Vesting date / cliff" />
-      <CompRow label="What about RSUs?" hint="Annual RSU value vesting"
-        hasKey={`${prefix}HasRsu`} modeKey={`${prefix}RsuMode`}
-        pctKey={`${prefix}RsuPct`} dollarKey={`${prefix}RsuAnnual`}
-        data={data} onChange={onChange}
-        vestDateKey={`${prefix}RsuVestDate`} vestDateLabel="Next vesting date / cliff" />
-      <CompRow label="Commission or variable pay?" hint="Typical annual commission"
-        hasKey={`${prefix}HasCommission`} modeKey={`${prefix}CommissionMode`}
-        pctKey={`${prefix}CommissionPct`} dollarKey={`${prefix}CommissionDollar`}
-        data={data} onChange={onChange} />
-      <CompRow label="Profit sharing or DPSP?" hint="Annual profit sharing amount"
-        hasKey={`${prefix}HasProfitShare`} modeKey={`${prefix}ProfitShareMode`}
-        pctKey={`${prefix}ProfitSharePct`} dollarKey={`${prefix}ProfitShareDollar`}
-        data={data} onChange={onChange} />
+      <Field label="Bonus" hint="annual average" row>
+        <DollarInput value={data[`${prefix}BonusDollar`]} onChange={(v) => onChange(`${prefix}BonusDollar`, v)} placeholder="0" />
+      </Field>
     </div>
   );
 }
 
 function CardIncome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }) {
-  const name = data.yourName?.trim() || "You";
+  const rawName = data.yourName?.trim();
+  const name = rawName || "You";
   const spouseName = data.spouseName?.trim() || "Spouse";
-  const canExit = !!(data.yourName?.trim());
+  const canExit = !!rawName;
   const partnered = data.partnered === true;
   const showSpouse = partnered && !hideSpouse;
-  const combined = (data.yourBase || 0) + (showSpouse ? (data.spouseBase || 0) : 0);
-  const estimatedRate = estimateBlendedTax(combined);
+  const combined =
+    (data.yourBase || 0) + (data.yourBonusDollar || 0) +
+    (showSpouse ? (data.spouseBase || 0) + (data.spouseBonusDollar || 0) : 0);
+
+  // Possessive: "Alex's" or "Your" (never "You's")
+  const yourPossessive = rawName ? `${rawName}'s` : "Your";
+
+  const spouseFirst = data.spouseName?.trim();
+  const heading = showSpouse
+    ? (rawName && spouseFirst
+        ? `${rawName} & ${spouseFirst}'s income`      // Martin & Jessica's income
+        : rawName
+          ? `${rawName} & your partner's income`      // Martin & your partner's income
+          : spouseFirst
+            ? `Your & ${spouseFirst}'s income`        // Your & Jessica's income
+            : "Your household income")                 // Your household income
+    : `${yourPossessive} income`;                      // Martin's income / Your income
 
   return (
-    <Card step={4} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
-      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
-        {showSpouse ? `${name} & ${spouseName}'s income` : `${name}'s income`}
+    <Card step={3} totalSteps={8} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+      <h2 className="ob-heading">
+        {heading} 💼
       </h2>
-      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>Start with base salary — we'll layer in the rest.</p>
+      <p className="ob-sub">Start with base salary — we'll layer in the rest.</p>
 
-      <PersonBlock name={name} variant="you">
-        <PersonIncome prefix="your" personName="you" data={data} onChange={onChange} />
-      </PersonBlock>
-
-      {showSpouse && (
-        <PersonBlock name={spouseName} variant="spouse">
-          <PersonIncome prefix="spouse" personName={spouseName} data={data} onChange={onChange} />
+      <PersonGroup
+        totalLabel={showSpouse ? "Total Household Income" : "Total Income"}
+        totalValue={`$${combined.toLocaleString()}`}
+      >
+        <PersonBlock name={name} variant="you">
+          <PersonIncome prefix="your" data={data} onChange={onChange} />
         </PersonBlock>
-      )}
+        {showSpouse && (
+          <PersonBlock name={spouseName} variant="spouse">
+            <PersonIncome prefix="spouse" data={data} onChange={onChange} />
+          </PersonBlock>
+        )}
+      </PersonGroup>
       {partnered && hideSpouse && (
         <div className="ob-notice" style={{ marginTop: 12 }}>
           {spouseName}'s income will be added when they join via the invite link.
-        </div>
-      )}
-      {combined > 0 && (
-        <div className="ob-summary">
-          <div className="ob-summary-row">
-            <span className="label-xs">Est. blended tax rate</span>
-            <span className="mono" style={{ fontSize: 14 }}>~{Math.round(estimatedRate * 100)}%</span>
-          </div>
         </div>
       )}
       <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Continue</button>
@@ -663,35 +491,25 @@ function CardIncome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false
   );
 }
 
-function PersonContributions({ monthlyRrspKey, monthlyTfsaKey, monthlyNrKey, annualRrspKey, annualTfsaKey, annualNrKey, data, onChange }) {
+function PersonContributions({ monthlyRrspKey, monthlyTfsaKey, monthlyNrKey, data, onChange }) {
+  const rows = [
+    { key: monthlyRrspKey, label: "RRSP",    sub: "tax-deferred" },
+    { key: monthlyTfsaKey, label: "TFSA",    sub: "tax-free" },
+    { key: monthlyNrKey,   label: "Non-reg", sub: "taxable" },
+  ];
   return (
-    <div>
-      <SectionLabel>Monthly contributions</SectionLabel>
-      <Field label="RRSP" row>
-        <DollarInput value={data[monthlyRrspKey]} onChange={(v) => onChange(monthlyRrspKey, v)} placeholder="0" />
-      </Field>
-      <Field label="TFSA" row>
-        <DollarInput value={data[monthlyTfsaKey]} onChange={(v) => onChange(monthlyTfsaKey, v)} placeholder="0" />
-      </Field>
-      <Field label="Non-registered" row>
-        <DollarInput value={data[monthlyNrKey]} onChange={(v) => onChange(monthlyNrKey, v)} placeholder="0" />
-      </Field>
-      <SectionLabel>Annual lump-sum top-ups</SectionLabel>
-      <p className="ob-hint" style={{ marginBottom: 8 }}>Enter any you already plan to make — the model will suggest more based on available cash.</p>
-      <Field label="RRSP" row>
-        <DollarInput value={data[annualRrspKey]} onChange={(v) => onChange(annualRrspKey, v)} placeholder="0" />
-      </Field>
-      <Field label="TFSA" row>
-        <DollarInput value={data[annualTfsaKey]} onChange={(v) => onChange(annualTfsaKey, v)} placeholder="0" />
-      </Field>
-      <Field label="Non-registered" row>
-        <DollarInput value={data[annualNrKey]} onChange={(v) => onChange(annualNrKey, v)} placeholder="0" />
-      </Field>
-    </div>
+    <>
+      {rows.map((r) => (
+        <div key={r.key} className="inp-row">
+          <span>{r.label} <span className="pe-row-sub">{r.sub}</span></span>
+          <DollarInput value={data[r.key]} onChange={(v) => onChange(r.key, v)} placeholder="0" />
+        </div>
+      ))}
+    </>
   );
 }
 
-// ---------- Card 5: Retirement contributions ----------
+// ---------- Card 4: Retirement contributions ----------
 function CardContributions({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }) {
   const name = data.yourName?.trim() || "You";
   const spouseName = data.spouseName?.trim() || "Spouse";
@@ -701,41 +519,41 @@ function CardContributions({ data, onChange, onNext, onSkip, onBack, hideSpouse 
   const hasKids = data.hasKids === true;
 
   return (
-    <Card step={5} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
-      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
-        Retirement saving
+    <Card step={4} totalSteps={8} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+      <h2 className="ob-heading">
+        Monthly savings 📈
       </h2>
-      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
+      <p className="ob-sub">
         {showSpouse
-          ? `How much are ${name} and ${spouseName} putting toward retirement — monthly and as lump sums?`
-          : "How much are you putting toward retirement — monthly and as annual lump sums?"}
+          ? "How much are you both putting away each month?"
+          : "How much are you putting away each month?"}
       </p>
 
-      <PersonBlock name={name} variant="you">
-        <PersonContributions
-          monthlyRrspKey="startingMonthly" monthlyTfsaKey="yourTfsaMonthly" monthlyNrKey="yourNrMonthly"
-          annualRrspKey="rrspTopUp" annualTfsaKey="tfsaTopUp" annualNrKey="nrTopUp"
-          data={data} onChange={onChange}
-        />
-      </PersonBlock>
-
-      {showSpouse && (
-        <PersonBlock name={spouseName} variant="spouse">
-          <PersonContributions
-            monthlyRrspKey="spouseMonthly" monthlyTfsaKey="spouseTfsaMonthly" monthlyNrKey="spouseNrMonthly"
-            annualRrspKey="spouseRrspTopUp" annualTfsaKey="spouseTfsaTopUp" annualNrKey="spouseNrTopUp"
-            data={data} onChange={onChange}
-          />
-        </PersonBlock>
-      )}
-
-      {hasKids && (
-        <PersonBlock name="Children" variant="shared">
-          <Field label="Annual RESP contributions" hint="Per year, across all children" row>
-            <DollarInput value={data.resp} onChange={(v) => onChange("resp", v)} placeholder="0" />
-          </Field>
-        </PersonBlock>
-      )}
+      {(() => {
+        const total = (data.startingMonthly||0)+(data.yourTfsaMonthly||0)+(data.yourNrMonthly||0)
+          +(showSpouse ? (data.spouseMonthly||0)+(data.spouseTfsaMonthly||0)+(data.spouseNrMonthly||0) : 0);
+        return (
+          <PersonGroup
+            totalLabel="Total Monthly Savings"
+            totalValue={total > 0 ? `$${total.toLocaleString()}` : "$0"}
+          >
+            <PersonBlock name={name} variant="you">
+              <PersonContributions
+                monthlyRrspKey="startingMonthly" monthlyTfsaKey="yourTfsaMonthly" monthlyNrKey="yourNrMonthly"
+                data={data} onChange={onChange}
+              />
+            </PersonBlock>
+            {showSpouse && (
+              <PersonBlock name={spouseName} variant="spouse">
+                <PersonContributions
+                  monthlyRrspKey="spouseMonthly" monthlyTfsaKey="spouseTfsaMonthly" monthlyNrKey="spouseNrMonthly"
+                  data={data} onChange={onChange}
+                />
+              </PersonBlock>
+            )}
+          </PersonGroup>
+        );
+      })()}
       {partnered && hideSpouse && (
         <div className="ob-notice" style={{ marginTop: 12 }}>
           {spouseName}'s contributions will be added when they join via the invite link.
@@ -746,50 +564,51 @@ function CardContributions({ data, onChange, onNext, onSkip, onBack, hideSpouse 
   );
 }
 
-// ---------- Card 6: Existing balances ----------
+// ---------- Card 5: Existing balances ----------
 function CardSavings({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }) {
-  const name = data.yourName?.trim() || "You";
+  const rawName = data.yourName?.trim();
+  const name = rawName || "You";
   const spouseName = data.spouseName?.trim() || "Spouse";
   const canExit = !!(data.yourName?.trim());
   const partnered = data.partnered === true;
   const showSpouse = partnered && !hideSpouse;
 
   return (
-    <Card step={6} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
-      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
-        What's already saved?
+    <Card step={5} totalSteps={8} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+      <h2 className="ob-heading">
+        What's already saved? 🏦
       </h2>
-      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
+      <p className="ob-sub">
         {showSpouse
-          ? `Current balances across ${name} and ${spouseName}'s accounts. A round number is fine — you can refine later.`
-          : `Current balances across your accounts. A round number is fine — you can refine later.`}
+          ? (rawName && data.spouseName?.trim()
+              ? `Current balances across ${rawName} and ${data.spouseName.trim()}'s accounts. A round number is fine.`
+              : "Current balances across both your accounts. A round number is fine.")
+          : "Current balances across your accounts. A round number is fine."}
       </p>
 
-      <PersonBlock name={name} variant="you">
-        <Field label="RRSP" row>
-          <DollarInput value={data.yourRrspStart} onChange={(v) => onChange("yourRrspStart", v)} />
-        </Field>
-        <Field label="TFSA" row>
-          <DollarInput value={data.yourTfsaStart} onChange={(v) => onChange("yourTfsaStart", v)} />
-        </Field>
-        <Field label="Non-registered" row>
-          <DollarInput value={data.yourNrStart} onChange={(v) => onChange("yourNrStart", v)} placeholder="0" />
-        </Field>
-      </PersonBlock>
-
-      {showSpouse && (
-        <PersonBlock name={spouseName} variant="spouse">
-          <Field label="RRSP" row>
-            <DollarInput value={data.spouseRrspStart} onChange={(v) => onChange("spouseRrspStart", v)} />
-          </Field>
-          <Field label="TFSA" row>
-            <DollarInput value={data.spouseTfsaStart} onChange={(v) => onChange("spouseTfsaStart", v)} />
-          </Field>
-          <Field label="Non-registered" row>
-            <DollarInput value={data.spouseNrStart} onChange={(v) => onChange("spouseNrStart", v)} placeholder="0" />
-          </Field>
-        </PersonBlock>
-      )}
+      {(() => {
+        const total = (data.yourRrspStart||0)+(data.yourTfsaStart||0)+(data.yourNrStart||0)
+          +(showSpouse ? (data.spouseRrspStart||0)+(data.spouseTfsaStart||0)+(data.spouseNrStart||0) : 0);
+        return (
+          <PersonGroup
+            totalLabel="Total Nest Egg"
+            totalValue={`$${total.toLocaleString()}`}
+          >
+            <PersonBlock name={name} variant="you">
+              <div className="inp-row"><span>RRSP <span className="pe-row-sub">tax-deferred</span></span><DollarInput value={data.yourRrspStart} onChange={(v) => onChange("yourRrspStart", v)} placeholder="0" /></div>
+              <div className="inp-row"><span>TFSA <span className="pe-row-sub">tax-free</span></span><DollarInput value={data.yourTfsaStart} onChange={(v) => onChange("yourTfsaStart", v)} placeholder="0" /></div>
+              <div className="inp-row"><span>Non-reg <span className="pe-row-sub">taxable</span></span><DollarInput value={data.yourNrStart} onChange={(v) => onChange("yourNrStart", v)} placeholder="0" /></div>
+            </PersonBlock>
+            {showSpouse && (
+              <PersonBlock name={spouseName} variant="spouse">
+                <div className="inp-row"><span>RRSP <span className="pe-row-sub">tax-deferred</span></span><DollarInput value={data.spouseRrspStart} onChange={(v) => onChange("spouseRrspStart", v)} placeholder="0" /></div>
+                <div className="inp-row"><span>TFSA <span className="pe-row-sub">tax-free</span></span><DollarInput value={data.spouseTfsaStart} onChange={(v) => onChange("spouseTfsaStart", v)} placeholder="0" /></div>
+                <div className="inp-row"><span>Non-reg <span className="pe-row-sub">taxable</span></span><DollarInput value={data.spouseNrStart} onChange={(v) => onChange("spouseNrStart", v)} placeholder="0" /></div>
+              </PersonBlock>
+            )}
+          </PersonGroup>
+        );
+      })()}
       {partnered && hideSpouse && (
         <div className="ob-notice" style={{ marginTop: 12 }}>
           {spouseName}'s savings will be added when they join via the invite link.
@@ -800,81 +619,10 @@ function CardSavings({ data, onChange, onNext, onSkip, onBack, hideSpouse = fals
   );
 }
 
-// ---------- Card 7: Pension ----------
-function CardPension({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }) {
-  const name = data.yourName?.trim() || "You";
-  const spouseName = data.spouseName?.trim() || "Spouse";
-  const canExit = !!(data.yourName?.trim());
-  const partnered = data.partnered === true;
-  const showSpouse = partnered && !hideSpouse;
-  const yourHasPension   = data.yourHasPension   === true;
-  const spouseHasPension = data.spouseHasPension === true;
-
-  return (
-    <Card step={7} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
-      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
-        Any defined-benefit pensions?
-      </h2>
-      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
-        A DB pension pays a guaranteed monthly amount in retirement — government, teachers, or union plans.
-      </p>
-
-      <PersonBlock name={name} variant="you">
-        <Field label="Defined-benefit pension?">
-          <BtnPair value={data.yourHasPension} onChange={(v) => onChange("yourHasPension", v)}
-            options={[{ label: "Yes", val: true }, { label: "No", val: false }]} />
-        </Field>
-        {yourHasPension && (
-          <>
-            <Field label="Monthly pension at retirement" row>
-              <DollarInput value={data.pensionMonthly} onChange={(v) => onChange("pensionMonthly", v)} placeholder="0" />
-            </Field>
-            <Field label="Pension start age" hint="60–65" row>
-              <div className="pe-field-wrap">
-                <input className="pe-field-input" type="number" placeholder="65" min={50} max={75}
-                  value={data.pensionStartAge || ""}
-                  onChange={(e) => onChange("pensionStartAge", parseInt(e.target.value) || 0)} />
-              </div>
-            </Field>
-          </>
-        )}
-      </PersonBlock>
-
-      {showSpouse && (
-        <PersonBlock name={spouseName} variant="spouse">
-          <Field label="Defined-benefit pension?">
-            <BtnPair value={data.spouseHasPension} onChange={(v) => onChange("spouseHasPension", v)}
-              options={[{ label: "Yes", val: true }, { label: "No", val: false }]} />
-          </Field>
-          {spouseHasPension && (
-            <>
-              <Field label="Monthly pension at retirement" row>
-                <DollarInput value={data.spousePensionMonthly} onChange={(v) => onChange("spousePensionMonthly", v)} placeholder="0" />
-              </Field>
-              <Field label="Pension start age" hint="60–65" row>
-                <div className="pe-field-wrap">
-                  <input className="pe-field-input" type="number" placeholder="65" min={50} max={75}
-                    value={data.spousePensionStartAge || ""}
-                    onChange={(e) => onChange("spousePensionStartAge", parseInt(e.target.value) || 0)} />
-                </div>
-              </Field>
-            </>
-          )}
-        </PersonBlock>
-      )}
-      {partnered && hideSpouse && (
-        <div className="ob-notice" style={{ marginTop: 12 }}>
-          {spouseName}'s pension will be added when they join via the invite link.
-        </div>
-      )}
-      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Continue</button>
-    </Card>
-  );
-}
-
-// ---------- Card 8: Housing ----------
+// ---------- Card 6: Housing ----------
 function CardHome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }) {
-  const name = data.yourName?.trim() || "You";
+  const rawName = data.yourName?.trim();
+  const name = rawName || "You";
   const spouseName = data.spouseName?.trim() || "Spouse";
   const canExit = !!(data.yourName?.trim());
   const partnered = data.partnered === true;
@@ -883,13 +631,15 @@ function CardHome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }
   const rents    = data.ownsHome === false;
 
   return (
-    <Card step={8} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
-      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
-        Housing
+    <Card step={6} totalSteps={8} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+      <h2 className="ob-heading">
+        Housing 🏠
       </h2>
-      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
+      <p className="ob-sub">
         {showSpouse
-          ? `${name} and ${spouseName}'s housing picture — mortgage, rent, and running costs.`
+          ? (rawName && data.spouseName?.trim()
+              ? `${rawName} and ${data.spouseName.trim()}'s housing costs — mortgage, rent, and running costs.`
+              : "Your household housing costs — mortgage, rent, and running costs.")
           : "Your housing picture — mortgage, rent, and running costs."}
       </p>
 
@@ -903,33 +653,37 @@ function CardHome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }
 
       {ownsHome && (
         <>
-          <Field label="Mortgage balance remaining" row>
-            <DollarInput value={data.mortgagePrincipal} onChange={(v) => onChange("mortgagePrincipal", v)} />
-          </Field>
-          <Field label="Monthly payment" row>
-            <DollarInput value={data.mortgage} onChange={(v) => onChange("mortgage", v)} />
-          </Field>
-          <Field label="Interest rate" hint="e.g. 3.85%" row>
-            <PctInput value={data.mortgageRate} onChange={(v) => onChange("mortgageRate", v)} />
-          </Field>
-          <SectionLabel>Monthly housing costs</SectionLabel>
-          <Field label="Property tax" row>
-            <DollarInput value={data.propertyTax} onChange={(v) => onChange("propertyTax", v)} placeholder="0" />
-          </Field>
-          <Field label="Home insurance" row>
-            <DollarInput value={data.homeInsurance} onChange={(v) => onChange("homeInsurance", v)} placeholder="0" />
-          </Field>
-          <Field label="Maintenance & repairs" hint="~1% of home value/yr" row>
-            <DollarInput value={data.maintenance} onChange={(v) => onChange("maintenance", v)} placeholder="0" />
-          </Field>
-          <Field label="Utilities" row>
-            <DollarInput value={data.utilities} onChange={(v) => onChange("utilities", v)} placeholder="0" />
-          </Field>
+          <div className="pe-row-group" style={{ marginBottom: 16 }}>
+            <Field label="Mortgage balance remaining" row>
+              <DollarInput value={data.mortgagePrincipal} onChange={(v) => onChange("mortgagePrincipal", v)} />
+            </Field>
+            <Field label="Monthly payment" row>
+              <DollarInput value={data.mortgage} onChange={(v) => onChange("mortgage", v)} />
+            </Field>
+            <Field label="Interest rate" hint="annual rate" row>
+              <PctInput value={data.mortgageRate} onChange={(v) => onChange("mortgageRate", v)} />
+            </Field>
+          </div>
+          <p className="label-xs" style={{ marginBottom: 8 }}>Monthly housing costs</p>
+          <div className="pe-row-group">
+            <Field label="Property tax" row>
+              <DollarInput value={data.propertyTax} onChange={(v) => onChange("propertyTax", v)} placeholder="0" />
+            </Field>
+            <Field label="Home insurance" row>
+              <DollarInput value={data.homeInsurance} onChange={(v) => onChange("homeInsurance", v)} placeholder="0" />
+            </Field>
+            <Field label="Maintenance & repairs" hint="~1% of home value per year" row>
+              <DollarInput value={data.maintenance} onChange={(v) => onChange("maintenance", v)} placeholder="0" />
+            </Field>
+            <Field label="Utilities" row>
+              <DollarInput value={data.utilities} onChange={(v) => onChange("utilities", v)} placeholder="0" />
+            </Field>
+          </div>
         </>
       )}
 
       {rents && (
-        <>
+        <div className="pe-row-group">
           <Field label="Monthly rent" row>
             <DollarInput value={data.rent} onChange={(v) => onChange("rent", v)} placeholder="0" />
           </Field>
@@ -939,7 +693,7 @@ function CardHome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }
           <Field label="Tenant insurance" row>
             <DollarInput value={data.homeInsurance} onChange={(v) => onChange("homeInsurance", v)} placeholder="0" />
           </Field>
-        </>
+        </div>
       )}
 
       <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Continue</button>
@@ -947,239 +701,86 @@ function CardHome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }
   );
 }
 
-// ---------- Card 9: Spending ----------
+// ---------- Card 7: Spending ----------
+// Canadian average monthly household spending benchmarks (Statistics Canada, rounded to $50)
+// Source: Survey of Household Spending — adapted per-person for solo, scaled for couples.
+// Kids add ~$1,000/mo to childcare when present.
+function spendingDefaults(partnered, hasKids) {
+  const scale = partnered ? 1.5 : 1.0; // couples spend ~50% more, not 2×
+  return {
+    transport:    Math.round(650  * scale / 50) * 50,   // ~$650 solo, $975 couple
+    groceries:    Math.round(600  * scale / 50) * 50,   // ~$600 solo, $900 couple
+    dining:       Math.round(450  * scale / 50) * 50,   // ~$450 solo, $675 couple
+    travel:       Math.round(300  * scale / 50) * 50,   // ~$300 solo, $450 couple (~$3.6k–$5.4k/yr)
+    personalCare: Math.round(200  * scale / 50) * 50,   // ~$200 solo, $300 couple
+    childcare:    hasKids ? 1000 : 0,                   // ~$1,000/mo with kids
+    other:        Math.round(400  * scale / 50) * 50,   // ~$400 solo, $600 couple
+  };
+}
+
 function CardSpending({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }) {
-  const name = data.yourName?.trim() || "You";
+  const rawName = data.yourName?.trim();
+  const name = rawName || "You";
   const spouseName = data.spouseName?.trim() || "Spouse";
   const partnered = data.partnered === true;
   const showSpouse = partnered && !hideSpouse;
   const hasKids = data.hasKids === true;
 
-  // Car toggle — hidden by default, shown if any car field already has a value
-  const CAR_KEYS = ["carPayment","carGas","carInsurance","carParking","carMaintenance","carRegistration"];
-  const [showCars, setShowCars] = useState(() => CAR_KEYS.some(k => data[k] > 0));
-
-  function toggleCars(on) {
-    setShowCars(on);
-    if (!on) {
-      // Clear car values when hiding
-      CAR_KEYS.forEach(k => onChange(k, 0));
-    }
-  }
-
-  // Pre-fill from retirement vision spend if fields are all empty
-  const lifestyleVal = data.visionLifestyleVal ?? 50;
-  const retirementAnnual = lifestyleSliderToSpend(lifestyleVal);
-
-  // Budget allocation:
-  // Monthly essentials + lifestyle = 60% of annual retirement target (housing ~25% + cars ~15% excluded)
-  // Annual commitments = 20% of annual retirement target
-  // Total pre-fill ≈ 80% of target, leaving room for housing already captured
-  const MONTHLY_POOL = retirementAnnual * 0.60; // distributed across monthly rows
-  const ANNUAL_POOL  = retirementAnnual * 0.20; // distributed across annual rows
-
-  // Monthly split weights (must sum to 1.0 — these share MONTHLY_POOL, not childcare-adjusted)
-  const MONTHLY_WEIGHTS = {
-    groceries:    0.26,
-    utilities:    0.08,
-    transport:    0.10,
-    personalCare: 0.07,
-    childcare:    hasKids ? 0.10 : 0,
-    dining:       0.17,
-    clothing:     0.08,
-    subscriptions:0.06,
-    entertainment:0.10,
-    carGas:       0.08,
-  };
-  const ANNUAL_WEIGHTS = {
-    travel:      0.60,
-    resp:        hasKids ? 0.15 : 0,
-    oneTimeMisc: 0.25,
-  };
-
-  const monthlyKeys = Object.keys(MONTHLY_WEIGHTS).filter(k => MONTHLY_WEIGHTS[k] > 0);
-  const annualKeys  = Object.keys(ANNUAL_WEIGHTS).filter(k => ANNUAL_WEIGHTS[k] > 0);
-  const allEmpty = [...monthlyKeys, ...annualKeys].every(k => !data[k]);
-
-  const mWeightTotal = Object.values(MONTHLY_WEIGHTS).reduce((a, b) => a + b, 0);
-  const aWeightTotal = Object.values(ANNUAL_WEIGHTS).reduce((a, b) => a + b, 0);
+  const defaults = spendingDefaults(partnered, hasKids);
+  const monthlyKeys = Object.keys(defaults).filter(k => defaults[k] > 0);
+  const allEmpty = monthlyKeys.every(k => !data[k]);
 
   useEffect(() => {
     if (!allEmpty) return;
     monthlyKeys.forEach(k => {
-      const v = Math.round((MONTHLY_WEIGHTS[k] / mWeightTotal) * MONTHLY_POOL / 12 / 50) * 50;
-      if (v > 0) onChange(k, v);
-    });
-    annualKeys.forEach(k => {
-      const v = Math.round((ANNUAL_WEIGHTS[k] / aWeightTotal) * ANNUAL_POOL / 100) * 100;
-      if (v > 0) onChange(k, v);
+      if (defaults[k] > 0) onChange(k, defaults[k]);
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const essentialRows = [
-    { key: "groceries",    label: "Groceries" },
-    { key: "utilities",    label: "Utilities (hydro, gas, water)" },
-    { key: "transport",    label: "Transport & transit" },
-    { key: "personalCare", label: "Personal care & health" },
-    { key: "childcare",    label: "Childcare & activities", kidsOnly: true },
-  ].filter(c => !c.kidsOnly || hasKids);
-
-  const lifestyleRows = [
-    { key: "dining",        label: "Dining & takeout" },
-    { key: "clothing",      label: "Clothing & shopping" },
-    { key: "subscriptions", label: "Subscriptions & tech" },
-    { key: "entertainment", label: "Entertainment & hobbies" },
+  const monthlyRows = [
+    { key: "transport",    label: "Transport",    sub: "cars, gas, transit" },
+    { key: "groceries",    label: "Groceries",    sub: "food in" },
+    { key: "dining",       label: "Dining & fun", sub: "eating out, delivery, entertainment" },
+    { key: "travel",       label: "Travel",       sub: "flights, hotels, trips" },
+    { key: "personalCare", label: "Health",       sub: "insurance, gym, chiro" },
+    ...(hasKids ? [{ key: "childcare", label: "Childcare", sub: "daycare, activities" }] : []),
+    { key: "other",        label: "Other",        sub: "subscriptions, gifts" },
   ];
 
-  const carMonthlyRows = [
-    { key: "carPayment",   label: "Car payment / lease" },
-    { key: "carGas",       label: "Gas & charging" },
-    { key: "carInsurance", label: "Car insurance" },
-    { key: "carParking",   label: "Parking & tolls" },
-  ];
-
-  const annualRows = [
-    { key: "travel",      label: "Travel & holidays" },
-    { key: "resp",        label: "RESP contributions", kidsOnly: true },
-    { key: "oneTimeMisc", label: "Other annual expenses", hint: "Gifts, insurance premiums, etc." },
-  ].filter(c => !c.kidsOnly || hasKids);
-
-  const carAnnualRows = [
-    { key: "carMaintenance",  label: "Car maintenance & repairs" },
-    { key: "carRegistration", label: "Car registration & licensing" },
-  ];
-
-  const baseMonthlyRows = [...essentialRows, ...lifestyleRows];
-  const allMonthlyRows  = showCars ? [...baseMonthlyRows, ...carMonthlyRows] : baseMonthlyRows;
-  const totalMonthly = allMonthlyRows.reduce((s, c) => s + (data[c.key] || 0), 0);
-  const allAnnualRows = showCars ? [...annualRows, ...carAnnualRows] : annualRows;
-  const totalAnnual  = allAnnualRows.reduce((s, c) => s + (data[c.key] || 0), 0);
-  const grandTotal   = totalMonthly * 12 + totalAnnual;
+  const totalMonthly = monthlyRows.reduce((s, c) => s + (data[c.key] || 0), 0);
 
   return (
-    <Card step={9} totalSteps={9} onSkip={onSkip} canExit={false} onExit={onSkip} onBack={onBack}>
-      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
-        {showSpouse ? `How do ${name} & ${spouseName} spend today?` : `How does ${name} spend today?`}
+    <Card step={7} totalSteps={8} onSkip={onSkip} canExit={false} onExit={onSkip} onBack={onBack}>
+      <h2 className="ob-heading">
+        {showSpouse
+          ? (rawName && data.spouseName?.trim()
+              ? `How do ${rawName} & ${data.spouseName.trim()} spend today? 🛒`
+              : "How does your household spend today? 🛒")
+          : rawName ? `How does ${rawName} spend today? 🛒` : "How do you spend today? 🛒"}
       </h2>
       <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 8 }}>
-        Monthly figures in today's dollars — housing excluded (already captured).
+        Monthly, in today's dollars — housing excluded.
       </p>
-      {!allEmpty && (
-        <div style={{ fontSize: 12, color: "var(--accent-ink)", background: "var(--accent-soft)", borderRadius: 8, padding: "8px 12px", marginBottom: 16 }}>
-          Pre-filled from your {fmtSpend(retirementAnnual)}/yr retirement target — adjust to match today's spending.
-        </div>
-      )}
-
-      <SectionLabel>Essentials — monthly</SectionLabel>
-      {essentialRows.map(c => (
-        <Field key={c.key} label={c.label} row>
-          <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
-        </Field>
-      ))}
-
-      <SectionLabel>Lifestyle — monthly</SectionLabel>
-      {lifestyleRows.map(c => (
-        <Field key={c.key} label={c.label} row>
-          <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
-        </Field>
-      ))}
-
-      {/* Cars — opt-in toggle */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0 0", borderTop: "1px solid var(--line)", marginTop: 4 }}>
-        <span style={{ fontSize: "var(--step--2)", letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 600, color: "var(--ink-3)" }}>Cars — monthly</span>
-        <button
-          onClick={() => toggleCars(!showCars)}
-          style={{
-            fontSize: 12, fontWeight: 500, color: showCars ? "var(--accent-deep)" : "var(--ink-3)",
-            background: showCars ? "var(--accent-soft)" : "var(--paper-2)",
-            border: "1px solid " + (showCars ? "oklch(80% 0.07 150)" : "var(--line)"),
-            borderRadius: 20, padding: "3px 12px", cursor: "pointer", transition: "all 0.15s",
-          }}
-        >
-          {showCars ? "Remove" : "+ Add"}
-        </button>
+      <div style={{ fontSize: 12, color: "var(--accent-ink)", background: "var(--accent-soft)", borderRadius: 8, padding: "8px 12px", marginBottom: 12 }}>
+        Pre-filled with Canadian averages — adjust to match your reality.
       </div>
-      {showCars && (
-        <div style={{ paddingTop: 8 }}>
-          {carMonthlyRows.map(c => (
-            <Field key={c.key} label={c.label} row>
-              <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
-            </Field>
-          ))}
-        </div>
-      )}
 
-      {totalMonthly > 0 && (
-        <div className="ob-summary">
-          <div className="ob-summary-row">
-            <span className="label-xs">Monthly total (ex. housing)</span>
-            <span className="mono" style={{ fontSize: 14 }}>${totalMonthly.toLocaleString()}/mo</span>
+      <div className="pe-row-group">
+        {monthlyRows.map(c => (
+          <div key={c.key} className="inp-row">
+            <span>{c.label} <span className="pe-row-sub">{c.sub}</span></span>
+            <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
           </div>
-        </div>
-      )}
-
-      <SectionLabel>Annual commitments</SectionLabel>
-      {annualRows.map(c => (
-        <Field key={c.key} label={c.label} hint={c.hint} row>
-          <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
-        </Field>
-      ))}
-      {showCars && carAnnualRows.map(c => (
-        <Field key={c.key} label={c.label} row>
-          <DollarInput value={data[c.key]} onChange={v => onChange(c.key, v)} placeholder="0" />
-        </Field>
-      ))}
-
-      {grandTotal > 0 && (
-        <div className="ob-summary">
-          <div className="ob-summary-row">
-            <span className="label-xs">Est. annual total (ex. housing)</span>
-            <span className="mono" style={{ fontSize: 14 }}>${Math.round(grandTotal).toLocaleString()}/yr</span>
+        ))}
+        {totalMonthly > 0 && (
+          <div className="pe-row-group__total">
+            <span>Total Monthly Spending</span>
+            <span className="mono">${totalMonthly.toLocaleString()}</span>
           </div>
-          <div className="ob-summary-row" style={{ marginTop: 4 }}>
-            <span className="label-xs" style={{ color: "var(--ink-4)" }}>Retirement target</span>
-            <span className="mono" style={{ fontSize: 12, color: "var(--ink-3)" }}>{fmtSpend(retirementAnnual)}/yr</span>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      <button onClick={onNext} className="btn btn--accent" style={{ width: "100%", marginTop: 20 }}>Build my plan →</button>
-    </Card>
-  );
-}
-
-// ---------- Card 10: CPP / Retirement income ----------
-function CardRetirement({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }) {
-  const name = data.yourName?.trim() || "You";
-  const spouseName = data.spouseName?.trim() || "Spouse";
-  const canExit = !!(data.yourName?.trim());
-  const partnered = data.partnered === true;
-  const showSpouse = partnered && !hideSpouse;
-
-  return (
-    <Card step={10} totalSteps={10} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
-      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 28, letterSpacing: "-0.02em", marginBottom: 6 }}>
-        Almost there!
-      </h2>
-      <p style={{ color: "var(--ink-3)", fontSize: 14, marginBottom: 24 }}>
-        {showSpouse
-          ? `Last thing — ${name} and ${spouseName}'s CPP estimates. We've pre-filled the Canadian average.`
-          : `Last thing — ${name}'s CPP estimate. We've pre-filled the Canadian average.`}
-      </p>
-      <Field label={`${name}'s CPP (annual)`} hint="My Service Canada estimate" row>
-        <DollarInput value={data.cppAmountToday ?? 9300} onChange={(v) => onChange("cppAmountToday", v)} placeholder="9300" />
-      </Field>
-      {showSpouse && (
-        <Field label={`${spouseName}'s CPP (annual)`} row>
-          <DollarInput value={data.spouseCppAmountToday ?? 9300} onChange={(v) => onChange("spouseCppAmountToday", v)} placeholder="9300" />
-        </Field>
-      )}
-      {partnered && !showSpouse && (
-        <div className="ob-notice" style={{ marginTop: 12 }}>
-          {spouseName}'s CPP will be added when they join via the invite link.
-        </div>
-      )}
-      <button onClick={onNext} className="btn btn--accent btn--lg" style={{ width: "100%", marginTop: 20 }}>Build my plan →</button>
+      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Continue</button>
     </Card>
   );
 }
@@ -1192,82 +793,40 @@ export function onboardingToState(d, baseDefaults) {
   const combined = (d.yourBase || 0) + (partnered ? (d.spouseBase || 0) : 0);
   const taxRate = estimateBlendedTax(combined);
 
-  // Retirement vision
-  const lifestyleVal = d.visionLifestyleVal ?? 50;
-  const retirementSpendTarget = lifestyleSliderToSpend(lifestyleVal);
+  // Retirement vision — use synced suggestion if user never touched the slider
+  const lifestyleVal = d.visionLifestyleVal ?? suggestLifestyleSpend(d);
   const workLevel = d.visionWorkLevel ?? 1;
   const retirementWorkIncome = WORK_INCOME[workLevel - 1];
-  const retirementTravel = retirementSpendTarget > 0
-    ? Math.max(d.travel || 0, retirementSpendTarget * 0.15)
-    : (d.travel || 0);
-  const retirementHealthcare = 3000;
-
-  // Helper: resolve a comp field that can be entered as % or $, returning a % of base
-  function resolveCompPct(base, hasFlag, mode, pctVal, dollarVal) {
-    if (!hasFlag) return 0;
-    if (mode === "$") return base > 0 ? (dollarVal || 0) / base : 0;
-    return pctVal || 0;
-  }
-  // Helper: resolve to absolute $ amount
-  function resolveCompDollar(base, hasFlag, mode, pctVal, dollarVal) {
-    if (!hasFlag) return 0;
-    if (mode === "$") return dollarVal || 0;
-    return base * (pctVal || 0);
-  }
 
   const yourBase   = d.yourBase   || 0;
   const spouseBase = partnered ? (d.spouseBase || 0) : 0;
 
-  // Equity: stock options/grants + RSUs combined into a single % of base
-  const yourEquityPct = resolveCompPct(yourBase, d.yourHasEquity, d.yourEquityMode, d.yourEquityPct, d.yourEquityDollar)
-    + resolveCompPct(yourBase, d.yourHasRsu, d.yourRsuMode, d.yourRsuPct, d.yourRsuAnnual);
-  const spouseEquityPct = partnered
-    ? resolveCompPct(spouseBase, d.spouseHasEquity, d.spouseEquityMode, d.spouseEquityPct, d.spouseEquityDollar)
-      + resolveCompPct(spouseBase, d.spouseHasRsu, d.spouseRsuMode, d.spouseRsuPct, d.spouseRsuAnnual)
-    : 0;
-
-  // Pension
-  const pensionMonthly       = d.yourHasPension    ? (d.pensionMonthly       || 0) : 0;
-  const spousePensionMonthly = partnered && d.spouseHasPension ? (d.spousePensionMonthly || 0) : 0;
-  const pensionStartAge      = d.pensionStartAge      || baseDefaults.pensionStartAge || 65;
-
-  // Monthly contributions: RRSP + TFSA + non-reg combined into startingMonthly for backward compat
-  // The calculator uses startingMonthly as the primary monthly savings figure
+  // Monthly contributions: RRSP + TFSA + non-reg per person
   const startingMonthly = (d.startingMonthly || 0)
     + (d.yourTfsaMonthly || 0)
     + (d.yourNrMonthly   || 0);
 
-  // Spending — housing-specific costs stored separately; spending card captures the rest
+  // Spending — 7 monthly buckets; "other" maps to clothing+subscriptions
   const spendFields = {
-    groceries:     d.groceries     || 0,
-    transport:     d.transport     || 0,
-    dining:        d.dining        || 0,
-    clothing:      d.clothing      || 0,
-    subscriptions: d.subscriptions || 0,
-    personalCare:  d.personalCare  || 0,
-    childcare:     d.childcare     || 0,
-    entertainment: d.entertainment || 0,
-    // Housing costs captured from CardHome
-    propertyTax:   d.propertyTax   || 0,
-    maintenance:   d.maintenance   || 0,
-    utilities:     d.utilities     || 0,
-    // Cars — monthly
-    carPayment:    d.carPayment    || 0,
-    carGas:        d.carGas        || 0,
-    carInsurance:  d.carInsurance  || 0,
-    carParking:    d.carParking    || 0,
-    // Cars — annual
-    carMaintenance:  d.carMaintenance  || 0,
-    carRegistration: d.carRegistration || 0,
+    transport:     d.transport    || 0,
+    groceries:     d.groceries    || 0,
+    dining:        d.dining       || 0,
+    travel:        d.travel       || 0,
+    personalCare:  d.personalCare || 0,
+    childcare:     d.childcare    || 0,
+    clothing:      Math.round((d.other || 0) * 0.4),
+    subscriptions: Math.round((d.other || 0) * 0.6),
+    entertainment: 0,
+    propertyTax:   d.propertyTax  || 0,
+    maintenance:   d.maintenance  || 0,
+    utilities:     d.utilities    || 0,
+    carPayment: 0, carGas: 0, carInsurance: 0, carParking: 0,
+    carMaintenance: 0, carRegistration: 0,
   };
 
-  // Annual lump-sum additions into oneTimeMisc / separate fields
-  const annualTopUps = (d.rrspTopUp || 0) + (d.tfsaTopUp || 0) + (d.nrTopUp || 0)
-    + (partnered ? (d.spouseRrspTopUp || 0) + (d.spouseTfsaTopUp || 0) + (d.spouseNrTopUp || 0) : 0);
-
-  const cppAmountToday = d.cppAmountToday > 0 ? d.cppAmountToday : 9300;
-  const spouseCpp      = partnered ? (d.spouseCppAmountToday > 0 ? d.spouseCppAmountToday : 9300) : 0;
-  const combinedCpp    = cppAmountToday + spouseCpp;
+  // CPP defaults — use Canadian average per person
+  const cppPerPerson = 9300;
+  const combinedCpp  = cppPerPerson + (partnered ? cppPerPerson : 0);
 
   return {
     ...baseDefaults,
@@ -1279,55 +838,45 @@ export function onboardingToState(d, baseDefaults) {
     // Income
     yourBase,
     spouseBase,
-    yourBonusPct:     resolveCompPct(yourBase, d.yourHasBonus, d.yourBonusMode, d.yourBonusPct, d.yourBonusDollar),
-    spouseBonusPct:   partnered ? resolveCompPct(spouseBase, d.spouseHasBonus, d.spouseBonusMode, d.spouseBonusPct, d.spouseBonusDollar) : 0,
-    yourEquityPct,
-    spouseEquityPct,
-    // Commission and profit sharing folded into bonus for calculator compat (additive)
-    yourCommissionPct:   resolveCompPct(yourBase, d.yourHasCommission, d.yourCommissionMode, d.yourCommissionPct, d.yourCommissionDollar),
-    yourProfitSharePct:  resolveCompPct(yourBase, d.yourHasProfitShare, d.yourProfitShareMode, d.yourProfitSharePct, d.yourProfitShareDollar),
-    spouseCommissionPct: partnered ? resolveCompPct(spouseBase, d.spouseHasCommission, d.spouseCommissionMode, d.spouseCommissionPct, d.spouseCommissionDollar) : 0,
-    spouseProfitSharePct: partnered ? resolveCompPct(spouseBase, d.spouseHasProfitShare, d.spouseProfitShareMode, d.spouseProfitSharePct, d.spouseProfitShareDollar) : 0,
+    yourBonusPct:   yourBase > 0 ? (d.yourBonusDollar || 0) / yourBase : 0,
+    spouseBonusPct: partnered && spouseBase > 0 ? (d.spouseBonusDollar || 0) / spouseBase : 0,
+    yourEquityPct:  0,
+    spouseEquityPct: 0,
     taxRate,
     // Contributions
     startingMonthly,
-    // Pension
-    pensionMonthly,
-    spousePensionMonthly,
-    pensionStartAge,
+    yourTfsaMonthly:    d.yourTfsaMonthly    || 0,
+    yourNrMonthly:      d.yourNrMonthly      || 0,
+    spouseMonthly:      partnered ? (d.spouseMonthly      || 0) : 0,
+    spouseTfsaMonthly:  partnered ? (d.spouseTfsaMonthly  || 0) : 0,
+    spouseNrMonthly:    partnered ? (d.spouseNrMonthly    || 0) : 0,
     // Existing balances
-    yourRrspStart:    d.yourRrspStart   || 0,
-    spouseRrspStart:  partnered ? (d.spouseRrspStart || 0) : 0,
-    yourTfsaStart:    d.yourTfsaStart   || 0,
-    spouseTfsaStart:  partnered ? (d.spouseTfsaStart || 0) : 0,
-    yourNrStart:      d.yourNrStart     || 0,
-    spouseNrStart:    partnered ? (d.spouseNrStart || 0) : 0,
+    yourRrspStart:   d.yourRrspStart  || 0,
+    spouseRrspStart: partnered ? (d.spouseRrspStart || 0) : 0,
+    yourTfsaStart:   d.yourTfsaStart  || 0,
+    spouseTfsaStart: partnered ? (d.spouseTfsaStart || 0) : 0,
+    yourNrStart:     d.yourNrStart    || 0,
+    spouseNrStart:   partnered ? (d.spouseNrStart   || 0) : 0,
     // Housing
     mortgage:          d.ownsHome ? (d.mortgage          || 0) : 0,
-    mortgagePrincipal: d.ownsHome ? (d.mortgagePrincipal || 0) : 0,
-    mortgageRate:      d.ownsHome ? (d.mortgageRate       || 0) : 0,
+    mortgagePrincipal: d.ownsHome ? (d.mortgagePrincipal  || 0) : 0,
+    mortgageRate:      d.ownsHome ? (d.mortgageRate        || 0) : 0,
     rent:              !d.ownsHome ? (d.rent || 0) : 0,
     homeInsurance:     d.homeInsurance || 0,
     // Spending
     ...spendFields,
-    travel:            d.travel || 0,
-    resp:              d.resp   || 0,
-    otherAnnual:       (d.otherAnnual || 0) + annualTopUps,
-    oneTimeMisc:       d.oneTimeMisc || baseDefaults.oneTimeMisc || 0,
-    // Retirement
-    retirementTravel,
-    retirementHealthcare,
-    cppAmountToday:   combinedCpp,
-    cppStartAge:      baseDefaults.cppStartAge || 65,
-    oasAmountToday:   baseDefaults.oasAmountToday || 8500,
-    oasStartAge:      65,
+    // Retirement income defaults
+    cppAmountToday: combinedCpp,
+    cppStartAge:    baseDefaults.cppStartAge  || 65,
+    oasAmountToday: baseDefaults.oasAmountToday || 8500,
+    oasStartAge:    65,
     // Vision
     visionRetirementAge: d.visionRetirementAge ?? 55,
     visionLifestyleVal:  lifestyleVal,
     visionWorkLevel:     workLevel,
     retirementWorkIncome,
     partnered,
-    hasKids:          d.hasKids === true,
+    hasKids:  d.hasKids === true,
     province,
     onboardingComplete: true,
   };
@@ -1342,7 +891,7 @@ export default function Onboarding({ onComplete, onSignIn, publicDefaults }) {
     hasKids: null,
     ownsHome: null,
     visionRetirementAge: 55,
-    visionLifestyleVal: 50,
+    visionLifestyleVal: null,
     visionWorkLevel: 1,
     cppAmountToday: 9300,
     spouseCppAmountToday: 9300,
@@ -1360,12 +909,11 @@ export default function Onboarding({ onComplete, onSignIn, publicDefaults }) {
   if (step === 0)  return <CardWelcome       onNext={next} onSignIn={onSignIn} />;
   if (step === 1)  return <CardAboutYou      data={data} onChange={update} onNext={next} onSkip={skip} onBack={null} />;
   if (step === 2)  return <CardHousehold     data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} />;
-  if (step === 3)  return <CardVision        data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} />;
-  if (step === 4)  return <CardIncome        data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
-  if (step === 5)  return <CardContributions data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
-  if (step === 6)  return <CardSavings       data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
-  if (step === 7)  return <CardPension       data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
-  if (step === 8)  return <CardHome          data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
-  if (step === 9)  return <CardSpending      data={data} onChange={update} onNext={skip} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
+  if (step === 3)  return <CardIncome        data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
+  if (step === 4)  return <CardContributions data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
+  if (step === 5)  return <CardSavings       data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
+  if (step === 6)  return <CardHome          data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
+  if (step === 7)  return <CardSpending      data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
+  if (step === 8)  return <CardVision        data={data} onChange={update} onNext={skip} onSkip={skip} onBack={back} />;
   return null;
 }

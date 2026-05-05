@@ -624,15 +624,16 @@ input, select, textarea {
 
 .dash-hero {
   display: grid;
-  grid-template-columns: 1.6fr 1fr;
+  grid-template-columns: 1.1fr 1fr;
   gap: 16px;
+  align-items: stretch;
 }
 
 .dash-hero__moment {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: var(--r-4);
-  padding: 32px 36px;
+  padding: 24px 28px;
   position: relative;
   overflow: hidden;
 }
@@ -641,6 +642,10 @@ input, select, textarea {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.dash-hero__aside .hero-stat {
+  flex: 1;
 }
 
 .mini-stat {
@@ -686,6 +691,7 @@ input, select, textarea {
 .dash-scenario-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
+  align-items: stretch;
   gap: 10px;
   margin-top: 16px;
 }
@@ -697,6 +703,8 @@ input, select, textarea {
   background: var(--paper);
   cursor: pointer;
   transition: all var(--dur-1) var(--ease);
+  display: flex;
+  flex-direction: column;
 }
 
 .scen-card:hover {
@@ -782,8 +790,22 @@ input, select, textarea {
   justify-content: space-between;
   gap: 8px;
   font-size: var(--step--1);
-  padding: 3px 0;
+  padding: 7px 0;
   color: var(--ink-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.inp-row:last-child {
+  border-bottom: none;
+}
+
+/* Inside a pe-person__fields block, rows already have a border context */
+.pe-person__fields .inp-row {
+  border-bottom: 1px solid var(--line);
+}
+
+.pe-person__fields .inp-row:last-child {
+  border-bottom: none;
 }
 
 .inp-row input[type="text"],
@@ -1045,7 +1067,62 @@ input, select, textarea {
 /* Scroll offset so sticky header doesn't overlap sections */
 .pe-accordion {
   border-top: 1px solid var(--line);
-  scroll-margin-top: 57px;
+  scroll-margin-top: 16px;
+}
+
+.pe-accordion:first-child {
+  border-top: none;
+}
+
+/* Accordion head button */
+.pe-accordion__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 14px 0;
+  cursor: pointer;
+  border-bottom: none;
+}
+
+.pe-accordion__head.is-closed {
+  border-bottom: 1px solid var(--line);
+}
+
+.pe-accordion__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pe-accordion__icon {
+  font-size: var(--step-0);
+  line-height: 1;
+}
+
+.pe-accordion__head span:last-child {
+  font-size: var(--step-0);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.pe-accordion__chevron {
+  color: var(--ink-3);
+  flex-shrink: 0;
+  transition: transform var(--dur-2) var(--ease);
+  transform: rotate(0deg);
+}
+
+.pe-accordion__chevron.is-open {
+  transform: rotate(180deg);
+}
+
+/* Section body with consistent bottom padding + divider */
+.pe-fields--section {
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
 }
 
 /* ── Person blocks ── */
@@ -1077,7 +1154,7 @@ input, select, textarea {
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 4px 14px 12px;
+  padding: 0;
   background: var(--paper);
   border-top: 1px solid var(--line);
 }
@@ -1133,4 +1210,369 @@ input, select, textarea {
 }
 .pe-person--shared {
   border-color: var(--line);
+}
+
+/* ── PersonGroup — outer card wrapping one or more PersonBlocks + total footer ── */
+.pe-person-group {
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  overflow: hidden;
+  margin: 4px 0;
+}
+
+/* PersonBlocks inside a group share the outer border — no own border */
+.pe-person-group > .pe-person {
+  border: none;
+  border-radius: 0;
+  border-bottom: 1px solid var(--line);
+  margin: 0;
+}
+
+.pe-person-group > .pe-person:last-of-type {
+  border-bottom: none;
+}
+
+/* When a total follows, the last person gets its bottom border back */
+.pe-person-group:has(.pe-person-group__total) > .pe-person:last-of-type {
+  border-bottom: 1px solid var(--line);
+}
+
+.pe-person-group__total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 9px 14px;
+  background: var(--paper-2);
+}
+
+.pe-person-group__total-label {
+  font-size: var(--step--2);
+  font-weight: 600;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pe-person-group__total-value {
+  font-size: var(--step-0);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* ── Row group card — same card chrome as pe-person but no coloured header ── */
+/* Used for Spending housing/monthly groups, totals attached at bottom */
+.pe-row-group {
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  overflow: hidden;
+  margin: 4px 0;
+  background: var(--paper);
+}
+
+.pe-row-group .inp-row {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  margin: 0;
+}
+
+.pe-row-group .inp-row:last-child {
+  border-bottom: none;
+}
+
+/* Total row attached inside a pe-row-group — heavier weight, paper-2 bg */
+.pe-row-group__total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 9px 14px;
+  background: var(--paper-2);
+  border-top: 1px solid var(--line);
+  font-size: var(--step--2);
+  font-weight: 600;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pe-row-group__total .mono {
+  font-size: var(--step-0);
+  font-weight: 700;
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Also override pe-person__fields to use same attached-total treatment */
+.pe-person__fields .inp-row {
+  padding: 9px 14px;
+  margin: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.pe-person__fields .inp-row:last-child {
+  border-bottom: none;
+}
+
+/* ── Plan Editor utility classes ── */
+
+/* Sub-label inside expense rows: "cars, gas, transit" */
+.pe-row-sub {
+  font-size: var(--step--2);
+  color: var(--ink-3);
+  margin-left: 0;
+}
+.pe-row-sub::before {
+  content: " · ";
+}
+
+/* Inline dot-prefixed hint inside inp-row labels: " · annual salary" */
+.inp-hint {
+  font-size: var(--step--2);
+  color: var(--ink-3);
+  margin-left: 4px;
+}
+
+/* Hint / description text under a section label */
+.pe-hint {
+  font-size: var(--step--2);
+  color: var(--ink-3);
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+/* Summary divider row: label left, mono value right */
+.pe-summary {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pe-summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--step--1);
+  color: var(--ink-2);
+}
+
+.pe-summary-row--total {
+  font-weight: 600;
+  color: var(--ink);
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+/* "Total nest egg" / "Total monthly savings" — attaches to bottom of preceding card */
+.pe-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 9px 14px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-top: none;
+  border-radius: 0 0 var(--r-3) var(--r-3);
+  margin-top: -1px; /* overlap the card's bottom border */
+  margin-bottom: 4px;
+}
+
+.pe-total-row__label {
+  font-size: var(--step--2);
+  font-weight: 600;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pe-total-row__value {
+  font-family: var(--font-mono);
+  font-size: var(--step-0);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* ToC nav buttons */
+.pe-toc-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: var(--step--1);
+  font-weight: 400;
+  color: var(--ink-2);
+  background: none;
+  border: none;
+  border-left: 2px solid transparent;
+  padding: 6px 10px;
+  border-radius: 0 var(--r-2) var(--r-2) 0;
+  cursor: pointer;
+  margin-bottom: 1px;
+  transition: all var(--dur-1) var(--ease);
+}
+
+.pe-toc-btn:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.pe-toc-btn.is-active {
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--paper-2);
+  border-left-color: var(--accent-deep);
+}
+
+/* Retirement override callout */
+.pe-override-callout {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-2);
+  font-size: var(--step--2);
+  color: var(--accent-ink);
+  line-height: 1.5;
+}
+
+/* Save error color token */
+.pe-save-error {
+  color: oklch(42% 0.12 25);
+}
+
+/* Accordion section label (e.g. "Housing", "Monthly") */
+.pe-section-label {
+  padding: 8px 0 4px;
+}
+
+/* InfoBox inner text */
+.info-box p,
+.info-box > div {
+  font-size: var(--step--2);
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+
+/* ── Dashboard hero aside cards (Trailhead V2 style) ── */
+.hero-stat {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.hero-stat__label {
+  font-size: var(--step--2);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.hero-stat__value {
+  font-family: var(--font-mono);
+  font-size: var(--step-3);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  margin-top: 8px;
+  line-height: 1.1;
+}
+
+.hero-stat__sub {
+  font-size: var(--step--2);
+  color: var(--ink-3);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* ===== UTILITY CLASSES — replaces repeated inline styles ===== */
+
+/* Typography */
+.text-meta   { font-size: var(--step--2); color: var(--ink-3); }
+.text-body   { font-size: var(--step--1); color: var(--ink-2); }
+.text-pos    { color: var(--moss-ink); }
+.text-neg    { color: var(--slate-ink); }
+.text-accent { color: var(--accent-ink); }
+
+/* Onboarding card heading — used on every ob-card h2 */
+.ob-heading {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+
+/* Onboarding sub-heading paragraph */
+.ob-sub {
+  color: var(--ink-3);
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+/* Slider label row (label-xs left, mono value right) */
+.slider-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+/* Accent callout box — used in live controls sidebar */
+.callout-accent {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: var(--step--2);
+  color: var(--accent-ink);
+  line-height: 1.5;
+}
+
+/* Info card — neutral tinted panel (fire reveal, housing section label, etc.) */
+.info-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--paper-2);
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+
+/* ── Collapse animation ── */
+.collapse-wrap {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 280ms cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 220ms ease;
+  opacity: 1;
+}
+.collapse-wrap.is-collapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+.collapse-inner {
+  overflow: hidden;
+}
+
+/* Colour-dot swatch — small coloured block used in legends */
+.dot-swatch {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* Legend row — icon + label + value inline */
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--step--2);
+  color: var(--ink-2);
 }
