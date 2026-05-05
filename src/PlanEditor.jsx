@@ -220,7 +220,7 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus, onNa
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
 
         {/* ToC sidebar — never scrolls, always visible */}
-        <div style={{
+        <div className="pe-toc-sidebar" style={{
           width: 172,
           flexShrink: 0,
           padding: "24px 12px 24px 20px",

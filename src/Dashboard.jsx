@@ -131,6 +131,9 @@ export default function Dashboard({
   const [ageSliderTouched, setAgeSliderTouched] = useState(false);
   const [liveActive, setLiveActive] = useState(false);
 
+  // Mobile sidebar drawer
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   // Quick preset toggles
   const [activePresets, setActivePresets] = useState(new Set());
 
@@ -411,16 +414,18 @@ export default function Dashboard({
         </div>
       </div>
 
-    <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+    <div style={{ display: "flex", flex: 1, minHeight: 0, position: "relative" }}>
+
+      {/* ── Mobile sidebar backdrop ── */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          className="dash-sidebar-backdrop"
+        />
+      )}
 
       {/* ── Left: Live Controls sidebar ── */}
-      <div style={{
-        width: 276, flexShrink: 0,
-        borderRight: "1px solid var(--line)",
-        overflowY: "auto",
-        padding: "24px 20px 40px",
-        background: "var(--paper)",
-      }}>
+      <div className={`dash-sidebar${sidebarOpen ? " is-open" : ""}`}>
         {/* Header */}
         <div style={{ marginBottom: 20 }}>
           <div className="label-xs" style={{ letterSpacing: "0.1em", marginBottom: 4 }}>LIVE CONTROLS</div>
@@ -513,7 +518,7 @@ export default function Dashboard({
       </div>
 
       {/* ── Right: Main dashboard content ── */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "24px 24px 60px" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "24px 24px 80px" }}>
 
 
       {/* ── Panel 1: FI Hero ── */}
@@ -773,6 +778,26 @@ export default function Dashboard({
       )}
 
       </div>
+
+      {/* ── Mobile FAB: open Live Controls ── */}
+      <button
+        className="dash-sidebar-fab"
+        onClick={() => setSidebarOpen(o => !o)}
+        aria-label="Live controls"
+      >
+        {sidebarOpen ? (
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M4 4L14 14M14 4L4 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+        ) : (
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <rect x="2" y="5" width="14" height="1.5" rx="0.75" fill="currentColor"/>
+            <rect x="2" y="8.25" width="9" height="1.5" rx="0.75" fill="currentColor"/>
+            <rect x="2" y="11.5" width="11" height="1.5" rx="0.75" fill="currentColor"/>
+          </svg>
+        )}
+        <span>{sidebarOpen ? "Close" : "Adjust"}</span>
+      </button>
     </div>
     </div>
   );
