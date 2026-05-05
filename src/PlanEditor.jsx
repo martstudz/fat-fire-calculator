@@ -159,7 +159,7 @@ function SaveIndicator({ saveStatus }) {
 
 // ── Main PlanEditor ───────────────────────────────────────────────────────────
 
-export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
+export default function PlanEditor({ s, update, solved, inputs, saveStatus, onNavigate }) {
   const hidden = useContext(PrivacyContext);
   const fmtMoney = (n) => fmt$(n, hidden);
 
@@ -178,14 +178,13 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
   const sections = [
     { id: "household", label: "Household" },
     { id: "income", label: "Income & Tax" },
-    { id: "spending", label: "Spending" },
     { id: "savings", label: "Savings & Portfolio" },
+    { id: "spending", label: "Spending" },
     { id: "assumptions", label: "Assumptions" },
   ];
 
   const scrollRef = useRef(null);
 
-  // Track which section is currently in view — observe within our own scroll container
   const [activeSection, setActiveSection] = useState("household");
   useEffect(() => {
     const root = scrollRef.current;
@@ -217,7 +216,6 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
 
   return (
     <div className="pe-frame" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      {/* Body: ToC (static) + content (scrolls). minHeight:0 lets flex children shrink. */}
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
 
         {/* ToC sidebar — never scrolls, always visible */}
@@ -228,7 +226,6 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
           borderRight: "1px solid var(--line)",
           overflowY: "auto",
         }}>
-          <div style={{ fontSize: "var(--step--2)", fontWeight: 600, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Sections</div>
           {sections.map(sec => {
             const isActive = activeSection === sec.id;
             return (
@@ -322,6 +319,46 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
               <PctInput label="Blended tax rate" value={s.taxRate} onChange={update("taxRate")} />
               <PctInput label="Income growth (real)" value={s.incomeGrowth} onChange={update("incomeGrowth")} />
             </PersonBlock>
+          </AccSection>
+
+          {/* ── Savings & Portfolio ── */}
+          <AccSection id="savings" title="Savings & Portfolio" icon="📈">
+
+            {/* Account balances */}
+            <div className="label-xs pe-section-label">Account balances</div>
+            <PersonGroup
+              totalLabel="Total Nest Egg"
+              totalValue={fmtMoney((s.yourRrspStart||0)+(s.yourTfsaStart||0)+(s.yourNrStart||0)+(s.partnered !== false ? (s.spouseRrspStart||0)+(s.spouseTfsaStart||0)+(s.spouseNrStart||0) : 0))}
+            >
+              <PersonBlock name={s.yourName || "You"} variant="you">
+                <NumInput label={<>RRSP <span className="pe-row-sub">tax-deferred</span></>} value={s.yourRrspStart || 0} onChange={update("yourRrspStart")} prefix="$" />
+                <NumInput label={<>TFSA <span className="pe-row-sub">tax-free</span></>} value={s.yourTfsaStart || 0} onChange={update("yourTfsaStart")} prefix="$" />
+                <NumInput label={<>Non-reg <span className="pe-row-sub">taxable</span></>} value={s.yourNrStart || 0} onChange={update("yourNrStart")} prefix="$" />
+              </PersonBlock>
+              <PersonBlock name={s.spouseName || "Spouse"} variant="spouse" open={s.partnered !== false}>
+                <NumInput label={<>RRSP <span className="pe-row-sub">tax-deferred</span></>} value={s.spouseRrspStart || 0} onChange={update("spouseRrspStart")} prefix="$" />
+                <NumInput label={<>TFSA <span className="pe-row-sub">tax-free</span></>} value={s.spouseTfsaStart || 0} onChange={update("spouseTfsaStart")} prefix="$" />
+                <NumInput label={<>Non-reg <span className="pe-row-sub">taxable</span></>} value={s.spouseNrStart || 0} onChange={update("spouseNrStart")} prefix="$" />
+              </PersonBlock>
+            </PersonGroup>
+
+            {/* Monthly savings */}
+            <div className="label-xs pe-section-label" style={{ paddingTop: 16 }}>Monthly savings</div>
+            <PersonGroup
+              totalLabel="Total Monthly Savings"
+              totalValue={fmtMoney(totalMonthlyContrib)}
+            >
+              <PersonBlock name={s.yourName || "You"} variant="you">
+                <NumInput label={<>RRSP <span className="pe-row-sub">tax-deferred</span></>} value={s.startingMonthly || 0} onChange={update("startingMonthly")} prefix="$" />
+                <NumInput label={<>TFSA <span className="pe-row-sub">tax-free</span></>} value={s.yourTfsaMonthly || 0} onChange={update("yourTfsaMonthly")} prefix="$" />
+                <NumInput label={<>Non-reg <span className="pe-row-sub">taxable</span></>} value={s.yourNrMonthly || 0} onChange={update("yourNrMonthly")} prefix="$" />
+              </PersonBlock>
+              <PersonBlock name={s.spouseName || "Spouse"} variant="spouse" open={s.partnered !== false}>
+                <NumInput label={<>RRSP <span className="pe-row-sub">tax-deferred</span></>} value={s.spouseMonthly || 0} onChange={update("spouseMonthly")} prefix="$" />
+                <NumInput label={<>TFSA <span className="pe-row-sub">tax-free</span></>} value={s.spouseTfsaMonthly || 0} onChange={update("spouseTfsaMonthly")} prefix="$" />
+                <NumInput label={<>Non-reg <span className="pe-row-sub">taxable</span></>} value={s.spouseNrMonthly || 0} onChange={update("spouseNrMonthly")} prefix="$" />
+              </PersonBlock>
+            </PersonGroup>
           </AccSection>
 
           {/* ── Spending ── */}
@@ -445,52 +482,12 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
             </div>
           </AccSection>
 
-          {/* ── Savings & Portfolio ── */}
-          <AccSection id="savings" title="Savings & Portfolio" icon="📈">
-
-            {/* Account balances */}
-            <div className="label-xs pe-section-label">Account balances</div>
-            <PersonGroup
-              totalLabel="Total Nest Egg"
-              totalValue={fmtMoney((s.yourRrspStart||0)+(s.yourTfsaStart||0)+(s.yourNrStart||0)+(s.partnered !== false ? (s.spouseRrspStart||0)+(s.spouseTfsaStart||0)+(s.spouseNrStart||0) : 0))}
-            >
-              <PersonBlock name={s.yourName || "You"} variant="you">
-                <NumInput label={<>RRSP <span className="pe-row-sub">tax-deferred</span></>} value={s.yourRrspStart || 0} onChange={update("yourRrspStart")} prefix="$" />
-                <NumInput label={<>TFSA <span className="pe-row-sub">tax-free</span></>} value={s.yourTfsaStart || 0} onChange={update("yourTfsaStart")} prefix="$" />
-                <NumInput label={<>Non-reg <span className="pe-row-sub">taxable</span></>} value={s.yourNrStart || 0} onChange={update("yourNrStart")} prefix="$" />
-              </PersonBlock>
-              <PersonBlock name={s.spouseName || "Spouse"} variant="spouse" open={s.partnered !== false}>
-                <NumInput label={<>RRSP <span className="pe-row-sub">tax-deferred</span></>} value={s.spouseRrspStart || 0} onChange={update("spouseRrspStart")} prefix="$" />
-                <NumInput label={<>TFSA <span className="pe-row-sub">tax-free</span></>} value={s.spouseTfsaStart || 0} onChange={update("spouseTfsaStart")} prefix="$" />
-                <NumInput label={<>Non-reg <span className="pe-row-sub">taxable</span></>} value={s.spouseNrStart || 0} onChange={update("spouseNrStart")} prefix="$" />
-              </PersonBlock>
-            </PersonGroup>
-
-            {/* Monthly savings */}
-            <div className="label-xs pe-section-label" style={{ paddingTop: 16 }}>Monthly savings</div>
-            <PersonGroup
-              totalLabel="Total Monthly Savings"
-              totalValue={fmtMoney(totalMonthlyContrib)}
-            >
-              <PersonBlock name={s.yourName || "You"} variant="you">
-                <NumInput label={<>RRSP <span className="pe-row-sub">tax-deferred</span></>} value={s.startingMonthly || 0} onChange={update("startingMonthly")} prefix="$" />
-                <NumInput label={<>TFSA <span className="pe-row-sub">tax-free</span></>} value={s.yourTfsaMonthly || 0} onChange={update("yourTfsaMonthly")} prefix="$" />
-                <NumInput label={<>Non-reg <span className="pe-row-sub">taxable</span></>} value={s.yourNrMonthly || 0} onChange={update("yourNrMonthly")} prefix="$" />
-              </PersonBlock>
-              <PersonBlock name={s.spouseName || "Spouse"} variant="spouse" open={s.partnered !== false}>
-                <NumInput label={<>RRSP <span className="pe-row-sub">tax-deferred</span></>} value={s.spouseMonthly || 0} onChange={update("spouseMonthly")} prefix="$" />
-                <NumInput label={<>TFSA <span className="pe-row-sub">tax-free</span></>} value={s.spouseTfsaMonthly || 0} onChange={update("spouseTfsaMonthly")} prefix="$" />
-                <NumInput label={<>Non-reg <span className="pe-row-sub">taxable</span></>} value={s.spouseNrMonthly || 0} onChange={update("spouseNrMonthly")} prefix="$" />
-              </PersonBlock>
-            </PersonGroup>
-
-            <PersonBlock name="Savings growth" variant="shared">
-              <PctInput label="Monthly contrib growth" value={s.contribGrowth} onChange={update("contribGrowth")} hint="annual rate" />
-            </PersonBlock>
-          </AccSection>
-
           {/* ── Assumptions ── */}
           <AccSection id="assumptions" title="Assumptions" icon="⚙️">
+            <PersonBlock name="Growth" variant="shared">
+              <PctInput label="Monthly contrib growth" value={s.contribGrowth} onChange={update("contribGrowth")} hint="annual rate" />
+            </PersonBlock>
+
             <PersonBlock name="Market" variant="shared">
               <PctInput label="Market return (nominal)" value={s.investmentReturn} onChange={update("investmentReturn")} hint="long-run nominal return" />
               <PctInput label="Inflation" value={s.inflation} onChange={update("inflation")} hint="Bank of Canada target" />
@@ -510,6 +507,7 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
 
         </div>
         </div>
+
       </div>
     </div>
   );

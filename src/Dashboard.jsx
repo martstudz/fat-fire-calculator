@@ -124,7 +124,8 @@ export default function Dashboard({
     : baseAnnualSpend;
 
   // Slider state — defaults mirror real plan values
-  const [sliderMonthly, setSliderMonthly] = useState(() => Math.min(6000, Math.max(0, baseTotalMonthly)));
+  const sliderMonthlyMax = Math.max(6000, Math.round(baseTotalMonthly * 2 / 500) * 500);
+  const [sliderMonthly, setSliderMonthly] = useState(() => Math.min(sliderMonthlyMax, Math.max(0, baseTotalMonthly)));
   const [sliderSpend, setSliderSpend] = useState(() => Math.min(180000, Math.max(24000, Math.round(baseRetirementSpend / 1000) * 1000)));
   const [sliderAge, setSliderAge] = useState(() => solved.age ? Math.min(70, Math.max(40, solved.age)) : 55);
   const [ageSliderTouched, setAgeSliderTouched] = useState(false);
@@ -141,7 +142,7 @@ export default function Dashboard({
   // Sync sliders back to plan when nothing is overridden and plan changes
   React.useEffect(() => {
     if (!liveActive) {
-      setSliderMonthly(Math.min(6000, Math.max(0, baseTotalMonthly)));
+      setSliderMonthly(Math.min(sliderMonthlyMax, Math.max(0, baseTotalMonthly)));
       setSliderSpend(Math.min(180000, Math.max(24000, Math.round(baseRetirementSpend / 1000) * 1000)));
       if (solved.age) { setSliderAge(Math.min(70, Math.max(40, solved.age))); setAgeSliderTouched(false); }
     }
@@ -160,7 +161,7 @@ export default function Dashboard({
 
       // Nudge the relevant slider so it visually reflects the preset
       if (key === "saveMore") {
-        setSliderMonthly(m => Math.min(6000, m + (adding ? PRESET_MONTHLY_DELTA : -PRESET_MONTHLY_DELTA)));
+        setSliderMonthly(m => Math.min(sliderMonthlyMax, m + (adding ? PRESET_MONTHLY_DELTA : -PRESET_MONTHLY_DELTA)));
         setLiveActive(true);
       }
       if (key === "spendLess") {
@@ -184,7 +185,7 @@ export default function Dashboard({
     setLiveActive(false);
     setAgeSliderTouched(false);
     setActivePresets(new Set());
-    setSliderMonthly(Math.min(6000, Math.max(0, baseTotalMonthly)));
+    setSliderMonthly(Math.min(sliderMonthlyMax, Math.max(0, baseTotalMonthly)));
     setSliderSpend(Math.min(180000, Math.max(24000, Math.round(baseRetirementSpend / 1000) * 1000)));
     if (solved.age) setSliderAge(Math.min(70, Math.max(40, solved.age)));
   }
@@ -302,11 +303,35 @@ export default function Dashboard({
     ? (scenarios.find(sc => sc.label === selectedScenarioLabel)?.age ?? retireAge)
     : retireAge;
   const portfolioAtRetirement = retRow ? retRow.endTotal / retRow.infFactor : null;
-  const yearsToRetirement = retireAge ? retireAge - s.currentAge : null;
+  const yearsToRetirement = retireAge ? Math.max(0, retireAge - s.currentAge) : null;
   const mortgagePayoff = activeSolved.mortgagePayoffAge;
 
   const startPortfolio = (s.yourRrspStart||0) + (s.yourTfsaStart||0) + (s.yourNrStart||0)
     + (s.partnered !== false ? (s.spouseRrspStart||0) + (s.spouseTfsaStart||0) + (s.spouseNrStart||0) : 0);
+
+  // FIRE type label — derived from retirement age + lifestyle spend
+  const fireLabel = (() => {
+    if (!retireAge) return { label: "FIRE", emoji: "🔥" };
+    const spend = retirementAnnual || 0;
+    const workLevel = s.visionWorkLevel ?? 1;
+    const earlyAge = retireAge <= 52;
+    const midAge   = retireAge >= 53 && retireAge <= 59;
+    const tradAge  = retireAge >= 60;
+    const lean = spend < 75000;
+    const fat  = spend >= 110000;
+    const hasWork = workLevel >= 2;
+    if (workLevel === 3)           return { label: "Semi-FIRE",            emoji: "🌗" };
+    if (earlyAge && hasWork)       return { label: "Barista FIRE",          emoji: "☕" };
+    if (earlyAge && lean)          return { label: "Lean FIRE",             emoji: "🌿" };
+    if (earlyAge && fat)           return { label: "Fat FIRE",              emoji: "🔥" };
+    if (earlyAge)                  return { label: "FIRE",                  emoji: "✨" };
+    if (midAge && hasWork)         return { label: "Barista FIRE",          emoji: "☕" };
+    if (midAge && lean)            return { label: "Lean FIRE",             emoji: "🌿" };
+    if (midAge)                    return { label: "FIRE",                  emoji: "✨" };
+    if (tradAge && lean)           return { label: "Coast FIRE",            emoji: "🌊" };
+    if (tradAge && fat)            return { label: "Traditional Retirement", emoji: "🏡" };
+    return                                { label: "Traditional Retirement", emoji: "🏡" };
+  })();
 
   const retRrsp = retRow ? retRow.rrspBal / retRow.infFactor : 0;
   const retTfsa = retRow ? retRow.tfsaBal / retRow.infFactor : 0;
@@ -406,12 +431,17 @@ export default function Dashboard({
         <LiveSlider
           label="Monthly savings"
           value={sliderMonthly}
-          min={0} max={6000} step={100}
+          min={0} max={sliderMonthlyMax} step={100}
           format={v => `$${v.toLocaleString("en-CA")}`}
           tone="green"
           sub="Across all accounts"
           onChange={v => { setSliderMonthly(v); setLiveActive(true); }}
         />
+        {liveActive && sliderMonthly !== baseTotalMonthly && (
+          <div style={{ fontSize: "var(--step--2)", color: sliderMonthly > baseTotalMonthly ? "var(--moss-ink)" : "var(--slate-ink)", marginTop: -12, marginBottom: 16, textAlign: "right" }}>
+            {sliderMonthly > baseTotalMonthly ? "+" : "−"}${Math.abs(sliderMonthly - baseTotalMonthly).toLocaleString("en-CA")}/mo vs plan
+          </div>
+        )}
 
         {/* Slider: Retirement spending */}
         <LiveSlider
@@ -423,6 +453,11 @@ export default function Dashboard({
           sub="Annual, today's dollars after tax"
           onChange={v => { setSliderSpend(v); setLiveActive(true); }}
         />
+        {liveActive && sliderSpend !== Math.round(baseRetirementSpend / 1000) * 1000 && (
+          <div style={{ fontSize: "var(--step--2)", color: sliderSpend > baseRetirementSpend ? "var(--slate-ink)" : "var(--moss-ink)", marginTop: -12, marginBottom: 16, textAlign: "right" }}>
+            {sliderSpend > baseRetirementSpend ? "+" : "−"}${Math.round(Math.abs(sliderSpend - baseRetirementSpend) / 1000)}k/yr vs plan
+          </div>
+        )}
 
         {/* Slider: Retirement age */}
         <div style={{ marginBottom: 4 }}>
@@ -435,6 +470,11 @@ export default function Dashboard({
             sub="When you stop working"
             onChange={v => { setSliderAge(v); setAgeSliderTouched(true); setLiveActive(true); }}
           />
+          {ageSliderTouched && sliderAge !== (solved.age ? Math.min(70, Math.max(40, solved.age)) : 55) && (
+            <div style={{ fontSize: "var(--step--2)", color: sliderAge < (solved.age || 55) ? "var(--moss-ink)" : "var(--slate-ink)", marginTop: -12, marginBottom: 4, textAlign: "right" }}>
+              {sliderAge < (solved.age || 55) ? "−" : "+"}{Math.abs(sliderAge - (solved.age || 55))} yr{Math.abs(sliderAge - (solved.age || 55)) === 1 ? "" : "s"} vs plan
+            </div>
+          )}
         </div>
 
         {/* Divider */}
@@ -490,7 +530,7 @@ export default function Dashboard({
                   year{yearsToRetirement === 1 ? "" : "s"} from today.
                   <div style={{ color: "var(--ink-3)", fontSize: "var(--step--1)", marginTop: 4 }}>
                     {s.yourName || "You"} age {retireAge}
-                    {s.partnered !== false && ` · ${s.spouseName || "Spouse"} age ${retireAge + (s.spouseCurrentAge - s.currentAge)}`}
+                    {s.partnered !== false && s.spouseCurrentAge > 0 && ` · ${s.spouseName || "Spouse"} age ${retireAge + (s.spouseCurrentAge - s.currentAge)}`}
                   </div>
                 </div>
               </div>
@@ -503,13 +543,13 @@ export default function Dashboard({
               )}
               {/* Narrative sentence */}
               <div style={{ marginTop: 16, fontSize: "var(--step--1)", color: "var(--ink-2)", lineHeight: 1.6, maxWidth: 420 }}>
-                {s.yourName || "You"}'s path crosses independence at {retireAge}.
-                {portfolioAtRetirement !== null && ` At today's savings pace, you reach ${fmtk(portfolioAtRetirement)} and can hold ${fmtk(retirementAnnual)}/year in retirement through age ${s.deathAge}.`}
+                {s.yourName ? `${s.yourName}'s` : "Your"} path crosses independence at {retireAge}.
+                {portfolioAtRetirement !== null && ` At today's savings pace, you reach ${fmtk(portfolioAtRetirement)} and can spend ${fmtk(retirementAnnual)}/year in retirement through age ${s.deathAge}.`}
               </div>
               <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <span className="chip chip--sun">Fat FIRE</span>
+                <span className="chip chip--sun">{fireLabel.emoji} {fireLabel.label}</span>
                 {s.partnered !== false && <span className="chip">Partnered</span>}
-                <span className="chip">RRSP-first drawdown</span>
+
               </div>
             </>
           ) : (
@@ -576,72 +616,7 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* ── Panel 2b: Annual excess cash ── */}
-      <div className="dash-panel" style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
-          <div>
-            <div className="label-xs">Annual excess cash</div>
-            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 3 }}>
-              Take-home minus spending and planned contributions — this year
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <span className="mono" style={{
-              fontSize: "var(--step-3)",
-              fontWeight: 700,
-              color: householdExcess >= 0 ? "var(--moss-ink)" : "var(--slate-ink)",
-            }}>
-              {fmt(householdExcess)}
-            </span>
-            <span className="text-meta">/yr household</span>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", gap: 0, borderTop: "1px solid var(--line)" }}>
-          {/* Your column */}
-          <div style={{ flex: 1, paddingTop: 14, paddingRight: 24 }}>
-            <div className="label-xs" style={{ marginBottom: 10 }}>{s.yourName || "You"}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <CashRow label="Take-home" value={yourNetIncome} fmt={fmt} />
-              <CashRow label="Spending (share)" value={-yourAnnualExpenses} fmt={fmt} />
-              <CashRow label="Savings contributions" value={-yourAnnualSavings} fmt={fmt} />
-              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 6, marginTop: 2, display: "flex", justifyContent: "space-between", fontWeight: 600 }}>
-                <span style={{ fontSize: "var(--step--1)", color: "var(--ink)" }}>Excess</span>
-                <span className="mono" style={{
-                  fontSize: "var(--step-1)",
-                  fontWeight: 700,
-                  color: yourExcess >= 0 ? "var(--moss-ink)" : "var(--slate-ink)",
-                }}>{fmt(yourExcess)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Spouse column — only shown if partnered */}
-          {partnered && (
-            <>
-              <div style={{ width: 1, background: "var(--line)", margin: "14px 0 0" }} />
-              <div style={{ flex: 1, paddingTop: 14, paddingLeft: 24 }}>
-                <div className="label-xs" style={{ marginBottom: 10 }}>{s.spouseName || "Spouse"}</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <CashRow label="Take-home" value={spouseNetIncome} fmt={fmt} />
-                  <CashRow label="Spending (share)" value={-spouseAnnualExpenses} fmt={fmt} />
-                  <CashRow label="Savings contributions" value={-spouseAnnualSavings} fmt={fmt} />
-                  <div style={{ borderTop: "1px solid var(--line)", paddingTop: 6, marginTop: 2, display: "flex", justifyContent: "space-between", fontWeight: 600 }}>
-                    <span style={{ fontSize: "var(--step--1)", color: "var(--ink)" }}>Excess</span>
-                    <span className="mono" style={{
-                      fontSize: "var(--step-1)",
-                      fontWeight: 700,
-                      color: spouseExcess >= 0 ? "var(--moss-ink)" : "var(--slate-ink)",
-                    }}>{fmt(spouseExcess)}</span>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* ── Panel 3: Scenario pressure test ── */}
+      {/* ── Panel 2: Scenario pressure test ── */}
       {scenarios && (
         <Panel style={{ marginBottom: 16 }}>
           <PanelHead label="Pressure test" title="What if markets disappoint?" />
@@ -660,7 +635,7 @@ export default function Dashboard({
                   onClick={() => setSelectedScenarioLabel(sc.label === "Base" ? null : sc.label)}
                 >
                   <div className="label-xs">{sc.label}</div>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", margin: "4px 0 0" }}>{(sc.return * 100).toFixed(1)}% ret · {(sc.inflation * 100).toFixed(1)}% inf</div>
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", margin: "4px 0 0" }}>{(sc.return * 100).toFixed(1)}% returns · {(sc.inflation * 100).toFixed(1)}% inflation</div>
                   <div style={{ flex: 1 }} />
                   {sc.age !== null ? (
                     <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
@@ -726,10 +701,75 @@ export default function Dashboard({
               <AccountMixDonut rrsp={retRrsp} tfsa={retTfsa} nr={retNr} hidden={hidden} />
             </div>
             <div style={{ marginTop: 16, fontSize: "var(--step--2)", color: "var(--ink-3)" }}>
-              Snapshot at age {retireAge}. RRSP-first drawdown depletes registered accounts first.
+              Snapshot at age {retireAge}.
             </div>
           </Panel>
         )}
+      </div>
+
+      {/* ── Panel 4: Annual excess cash ── */}
+      <div className="dash-panel" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+          <div>
+            <div className="label-xs">Annual excess cash</div>
+            <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 3 }}>
+              Take-home minus spending and planned contributions — this year
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <span className="mono" style={{
+              fontSize: "var(--step-3)",
+              fontWeight: 700,
+              color: householdExcess >= 0 ? "var(--moss-ink)" : "var(--slate-ink)",
+            }}>
+              {fmt(householdExcess)}
+            </span>
+            <span className="text-meta">/yr household</span>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 0, borderTop: "1px solid var(--line)" }}>
+          {/* Your column */}
+          <div style={{ flex: 1, paddingTop: 14, paddingRight: 24 }}>
+            <div className="label-xs" style={{ marginBottom: 10 }}>{s.yourName || "You"}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <CashRow label="Take-home" value={yourNetIncome} fmt={fmt} />
+              <CashRow label="Spending (share)" value={-yourAnnualExpenses} fmt={fmt} />
+              <CashRow label="Savings contributions" value={-yourAnnualSavings} fmt={fmt} />
+              <div style={{ borderTop: "1px solid var(--line)", paddingTop: 6, marginTop: 2, display: "flex", justifyContent: "space-between", fontWeight: 600 }}>
+                <span style={{ fontSize: "var(--step--1)", color: "var(--ink)" }}>Excess</span>
+                <span className="mono" style={{
+                  fontSize: "var(--step-1)",
+                  fontWeight: 700,
+                  color: yourExcess >= 0 ? "var(--moss-ink)" : "var(--slate-ink)",
+                }}>{fmt(yourExcess)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Spouse column — only shown if partnered */}
+          {partnered && (
+            <>
+              <div style={{ width: 1, background: "var(--line)", margin: "14px 0 0" }} />
+              <div style={{ flex: 1, paddingTop: 14, paddingLeft: 24 }}>
+                <div className="label-xs" style={{ marginBottom: 10 }}>{s.spouseName || "Spouse"}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <CashRow label="Take-home" value={spouseNetIncome} fmt={fmt} />
+                  <CashRow label="Spending (share)" value={-spouseAnnualExpenses} fmt={fmt} />
+                  <CashRow label="Savings contributions" value={-spouseAnnualSavings} fmt={fmt} />
+                  <div style={{ borderTop: "1px solid var(--line)", paddingTop: 6, marginTop: 2, display: "flex", justifyContent: "space-between", fontWeight: 600 }}>
+                    <span style={{ fontSize: "var(--step--1)", color: "var(--ink)" }}>Excess</span>
+                    <span className="mono" style={{
+                      fontSize: "var(--step-1)",
+                      fontWeight: 700,
+                      color: spouseExcess >= 0 ? "var(--moss-ink)" : "var(--slate-ink)",
+                    }}>{fmt(spouseExcess)}</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       </div>

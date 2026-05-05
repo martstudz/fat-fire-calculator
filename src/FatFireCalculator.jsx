@@ -479,6 +479,15 @@ export default function FatFireCalculator() {
     const saved = localStorage.getItem("trailhead_page");
     return ["dashboard", "editor", "settings"].includes(saved) ? saved : "dashboard";
   });
+  const [pageKey, setPageKey] = useState(0);
+  const [pageAnimClass, setPageAnimClass] = useState("page-enter");
+
+  function navigateTo(newPage) {
+    setPage(newPage);
+    setPageKey(k => k + 1);
+    setPageAnimClass("page-enter");
+    localStorage.setItem("trailhead_page", newPage);
+  }
 
   // ── Check URL for ?join=CODE on load ──────────────────────────────────────
   const pendingJoinCode = useMemo(() => {
@@ -804,6 +813,8 @@ export default function FatFireCalculator() {
     localStorage.setItem(ONBOARDING_KEY, "1");
     setShowOnboarding(false);
     setPage("dashboard");
+    setPageKey(k => k + 1);
+    setPageAnimClass("page-reveal");
     localStorage.setItem("trailhead_page", "dashboard");
   }
 
@@ -1048,7 +1059,7 @@ export default function FatFireCalculator() {
             ].map(tab => (
               <button
                 key={tab.id}
-                onClick={() => { setPage(tab.id); localStorage.setItem("trailhead_page", tab.id); }}
+                onClick={() => navigateTo(tab.id)}
                 style={{
                   padding: "5px 14px",
                   fontSize: "var(--step--1)",
@@ -1114,17 +1125,18 @@ export default function FatFireCalculator() {
       {/* ── Page content ── */}
       {/* Editor gets its own scroll context so the ToC sidebar can be sticky */}
       {page === "editor" && (
-        <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div key={pageKey} className={pageAnimClass} style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
           <PlanEditor
             s={s}
             update={update}
             solved={solved}
             inputs={inputs}
             saveStatus={saveStatus}
+            onNavigate={(p) => navigateTo(p)}
           />
         </div>
       )}
-      <div style={{ flex: 1, overflowY: "auto", display: page === "editor" ? "none" : "block" }}>
+      <div key={page !== "editor" ? pageKey : undefined} className={page !== "editor" ? pageAnimClass : undefined} style={{ flex: 1, overflowY: "auto", display: page === "editor" ? "none" : "block" }}>
         {page === "dashboard" && (
           <Dashboard
             s={s}

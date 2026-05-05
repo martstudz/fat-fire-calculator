@@ -78,10 +78,10 @@ function classifyFire(retirementAge, lifestyleSpend, workLevel) {
 }
 
 // Card shell
-function Card({ children, step, totalSteps, onSkip, canExit, onExit, onBack }) {
+function Card({ children, step, totalSteps, onSkip, canExit, onExit, onBack, animClass = "" }) {
   const pct = Math.round((step / totalSteps) * 100);
   return (
-    <div className="ob-scene">
+    <div className={`ob-scene${animClass ? " " + animClass : ""}`}>
       <div className="ob-card" style={{ maxWidth: 480 }}>
         <div className="ob-card__topnav">
           <TrailheadMark size={22} />
@@ -129,9 +129,9 @@ function TrailheadMark({ size = 28 }) {
   );
 }
 
-function CardWelcome({ onNext, onSignIn }) {
+function CardWelcome({ onNext, onSignIn, animClass = "" }) {
   return (
-    <div className="ob-scene">
+    <div className={`ob-scene${animClass ? " " + animClass : ""}`}>
       <div className="ob-card">
         <div className="ob-card__body" style={{ textAlign: "center", padding: "48px 48px 56px" }}>
           <div style={{ marginBottom: 32 }}>
@@ -161,11 +161,11 @@ function CardWelcome({ onNext, onSignIn }) {
 }
 
 // ---------- Card 1: About you ----------
-function CardAboutYou({ data, onChange, onNext, onSkip, onBack }) {
+function CardAboutYou({ data, onChange, onNext, onSkip, onBack, animClass = "" }) {
   const name = data.yourName?.trim();
   const canExit = !!name;
   return (
-    <Card step={1} totalSteps={8} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+    <Card step={1} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack} animClass={animClass}>
       <h2 className="ob-heading">
         {name ? `Nice to meet you, ${name}. 👋` : "Let's start with you. 👋"}
       </h2>
@@ -186,25 +186,34 @@ function CardAboutYou({ data, onChange, onNext, onSkip, onBack }) {
               onChange={(e) => { const n = parseInt(e.target.value); onChange("currentAge", isNaN(n) ? 0 : n); }} />
           </div>
         </Field>
-        <Field label="Province" row>
-          <div className="pe-field-wrap">
-            <select className="pe-field-input" style={{ textAlign: "right", cursor: "pointer" }}
-              value={data.province || "ON"}
-              onChange={(e) => onChange("province", e.target.value)}>
-              {PROVINCES.map((p) => (
-                <option key={p.code} value={p.code}>{p.name}</option>
-              ))}
-            </select>
+        <div className="inp-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+            <div>
+              <span style={{ fontSize: "var(--step--1)", color: "var(--ink-2)" }}>Province</span>
+              <span className="text-meta" style={{ display: "block", marginTop: 2 }}>· affects tax brackets & life expectancy</span>
+            </div>
+            <div className="pe-field-wrap" style={{ position: "relative" }}>
+              <select className="pe-field-input" style={{ textAlign: "right", cursor: "pointer", paddingRight: 24, appearance: "none", WebkitAppearance: "none" }}
+                value={data.province || "ON"}
+                onChange={(e) => onChange("province", e.target.value)}>
+                {PROVINCES.map((p) => (
+                  <option key={p.code} value={p.code}>{p.name}</option>
+                ))}
+              </select>
+              <svg style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "var(--ink-3)" }} width="10" height="6" viewBox="0 0 10 6" fill="none">
+                <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
           </div>
-        </Field>
+        </div>
       </div>
-      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 10 }}>Continue</button>
+      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 10 }}>Next →</button>
     </Card>
   );
 }
 
 // ---------- Card 2: Household ----------
-function CardHousehold({ data, onChange, onNext, onSkip, onBack }) {
+function CardHousehold({ data, onChange, onNext, onSkip, onBack, animClass = "" }) {
   const rawName = data.yourName?.trim();
   const name = rawName || "you";
   const yourPossessive = rawName ? `${rawName}'s` : "your";
@@ -215,7 +224,7 @@ function CardHousehold({ data, onChange, onNext, onSkip, onBack }) {
   const partnerFillsOwn = data.partnerFillsOwn === true;
 
   return (
-    <Card step={2} totalSteps={8} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+    <Card step={2} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack} animClass={animClass}>
       <h2 className="ob-heading">
         Who are we planning for? 🏡
       </h2>
@@ -251,12 +260,6 @@ function CardHousehold({ data, onChange, onNext, onSkip, onBack }) {
                 onChange={(e) => { const n = parseInt(e.target.value); onChange("spouseCurrentAge", isNaN(n) ? 0 : n); }} />
             </div>
           </Field>
-          <Field label="They'll fill in their own details" hint="send them a link after sign-in" row>
-            <div className="seg">
-              <button onClick={() => onChange("partnerFillsOwn", false)} className={!partnerFillsOwn ? "is-active" : ""}>No</button>
-              <button onClick={() => onChange("partnerFillsOwn", true)} className={partnerFillsOwn ? "is-active" : ""}>Yes</button>
-            </div>
-          </Field>
         </div>
       )}
 
@@ -271,7 +274,21 @@ function CardHousehold({ data, onChange, onNext, onSkip, onBack }) {
         />
       </Field>
 
-      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 8 }}>Continue</button>
+      {partnered && (
+        <div className="pe-row-group">
+          <Field label="They'll fill in their own details" row>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+              <div className="seg">
+                <button onClick={() => onChange("partnerFillsOwn", false)} className={!partnerFillsOwn ? "is-active" : ""}>No</button>
+                <button onClick={() => onChange("partnerFillsOwn", true)} className={partnerFillsOwn ? "is-active" : ""}>Yes</button>
+              </div>
+              <span className="text-meta" style={{ textAlign: "right", marginRight: 0 }}>If your partner will enter their own income and savings details, you can invite them after signing in.</span>
+            </div>
+          </Field>
+        </div>
+      )}
+
+      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 8 }}>Next →</button>
     </Card>
   );
 }
@@ -315,7 +332,7 @@ function suggestLifestyleSpend(data) {
   return 90000; // absolute fallback
 }
 
-function CardVision({ data, onChange, onNext, onSkip, onBack }) {
+function CardVision({ data, onChange, onNext, onSkip, onBack, animClass = "" }) {
   const name = data.yourName?.trim() || "you";
   const spouseName = data.spouseName?.trim();
   const partnered = data.partnered === true;
@@ -346,7 +363,7 @@ function CardVision({ data, onChange, onNext, onSkip, onBack }) {
   const planFor = partnered && spouseName ? `${name} & ${spouseName}` : partnered ? `${name} & your partner` : name;
 
   return (
-    <Card step={8} totalSteps={8} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+    <Card step={8} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack} animClass={animClass}>
       <div className="chip chip--accent" style={{ marginBottom: 16 }}>Planning for {planFor}</div>
       <h2 className="ob-heading">
         What does the horizon look like? 🔥
@@ -418,7 +435,8 @@ function CardVision({ data, onChange, onNext, onSkip, onBack }) {
         </div>
       </div>
 
-      <button onClick={onNext} className="btn btn--accent" style={{ width: "100%", marginTop: 20 }}>Build my plan →</button>
+      <div style={{ borderTop: "1px solid var(--line)", margin: "24px 0 0" }} />
+      <button onClick={onNext} className="btn btn--accent" style={{ width: "100%", marginTop: 16 }}>Build my plan →</button>
     </Card>
   );
 }
@@ -436,7 +454,7 @@ function PersonIncome({ prefix, data, onChange }) {
   );
 }
 
-function CardIncome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }) {
+function CardIncome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false, animClass = "" }) {
   const rawName = data.yourName?.trim();
   const name = rawName || "You";
   const spouseName = data.spouseName?.trim() || "Spouse";
@@ -462,7 +480,7 @@ function CardIncome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false
     : `${yourPossessive} income`;                      // Martin's income / Your income
 
   return (
-    <Card step={3} totalSteps={8} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+    <Card step={3} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack} animClass={animClass}>
       <h2 className="ob-heading">
         {heading} 💼
       </h2>
@@ -486,7 +504,7 @@ function CardIncome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false
           {spouseName}'s income will be added when they join via the invite link.
         </div>
       )}
-      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Continue</button>
+      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Next →</button>
     </Card>
   );
 }
@@ -510,7 +528,7 @@ function PersonContributions({ monthlyRrspKey, monthlyTfsaKey, monthlyNrKey, dat
 }
 
 // ---------- Card 4: Retirement contributions ----------
-function CardContributions({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }) {
+function CardContributions({ data, onChange, onNext, onSkip, onBack, hideSpouse = false, animClass = "" }) {
   const name = data.yourName?.trim() || "You";
   const spouseName = data.spouseName?.trim() || "Spouse";
   const canExit = !!(data.yourName?.trim());
@@ -519,7 +537,7 @@ function CardContributions({ data, onChange, onNext, onSkip, onBack, hideSpouse 
   const hasKids = data.hasKids === true;
 
   return (
-    <Card step={4} totalSteps={8} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+    <Card step={4} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack} animClass={animClass}>
       <h2 className="ob-heading">
         Monthly savings 📈
       </h2>
@@ -559,13 +577,13 @@ function CardContributions({ data, onChange, onNext, onSkip, onBack, hideSpouse 
           {spouseName}'s contributions will be added when they join via the invite link.
         </div>
       )}
-      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Continue</button>
+      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Next →</button>
     </Card>
   );
 }
 
 // ---------- Card 5: Existing balances ----------
-function CardSavings({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }) {
+function CardSavings({ data, onChange, onNext, onSkip, onBack, hideSpouse = false, animClass = "" }) {
   const rawName = data.yourName?.trim();
   const name = rawName || "You";
   const spouseName = data.spouseName?.trim() || "Spouse";
@@ -574,7 +592,7 @@ function CardSavings({ data, onChange, onNext, onSkip, onBack, hideSpouse = fals
   const showSpouse = partnered && !hideSpouse;
 
   return (
-    <Card step={5} totalSteps={8} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+    <Card step={5} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack} animClass={animClass}>
       <h2 className="ob-heading">
         What's already saved? 🏦
       </h2>
@@ -614,13 +632,13 @@ function CardSavings({ data, onChange, onNext, onSkip, onBack, hideSpouse = fals
           {spouseName}'s savings will be added when they join via the invite link.
         </div>
       )}
-      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Continue</button>
+      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Next →</button>
     </Card>
   );
 }
 
 // ---------- Card 6: Housing ----------
-function CardHome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }) {
+function CardHome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false, animClass = "" }) {
   const rawName = data.yourName?.trim();
   const name = rawName || "You";
   const spouseName = data.spouseName?.trim() || "Spouse";
@@ -631,7 +649,7 @@ function CardHome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }
   const rents    = data.ownsHome === false;
 
   return (
-    <Card step={6} totalSteps={8} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack}>
+    <Card step={6} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack} animClass={animClass}>
       <h2 className="ob-heading">
         Housing 🏠
       </h2>
@@ -696,7 +714,7 @@ function CardHome({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }
         </div>
       )}
 
-      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Continue</button>
+      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Next →</button>
     </Card>
   );
 }
@@ -718,7 +736,7 @@ function spendingDefaults(partnered, hasKids) {
   };
 }
 
-function CardSpending({ data, onChange, onNext, onSkip, onBack, hideSpouse = false }) {
+function CardSpending({ data, onChange, onNext, onSkip, onBack, hideSpouse = false, animClass = "" }) {
   const rawName = data.yourName?.trim();
   const name = rawName || "You";
   const spouseName = data.spouseName?.trim() || "Spouse";
@@ -750,7 +768,7 @@ function CardSpending({ data, onChange, onNext, onSkip, onBack, hideSpouse = fal
   const totalMonthly = monthlyRows.reduce((s, c) => s + (data[c.key] || 0), 0);
 
   return (
-    <Card step={7} totalSteps={8} onSkip={onSkip} canExit={false} onExit={onSkip} onBack={onBack}>
+    <Card step={7} totalSteps={9} onSkip={onSkip} canExit={false} onExit={onSkip} onBack={onBack} animClass={animClass}>
       <h2 className="ob-heading">
         {showSpouse
           ? (rawName && data.spouseName?.trim()
@@ -780,7 +798,7 @@ function CardSpending({ data, onChange, onNext, onSkip, onBack, hideSpouse = fal
         )}
       </div>
 
-      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Continue</button>
+      <button onClick={onNext} className="btn btn--primary" style={{ width: "100%", marginTop: 20 }}>Next →</button>
     </Card>
   );
 }
@@ -801,10 +819,13 @@ export function onboardingToState(d, baseDefaults) {
   const yourBase   = d.yourBase   || 0;
   const spouseBase = partnered ? (d.spouseBase || 0) : 0;
 
-  // Monthly contributions: RRSP + TFSA + non-reg per person
+  // Monthly contributions: RRSP + TFSA + non-reg, both persons
   const startingMonthly = (d.startingMonthly || 0)
     + (d.yourTfsaMonthly || 0)
-    + (d.yourNrMonthly   || 0);
+    + (d.yourNrMonthly   || 0)
+    + (partnered ? (d.spouseMonthly     || 0) : 0)
+    + (partnered ? (d.spouseTfsaMonthly || 0) : 0)
+    + (partnered ? (d.spouseNrMonthly   || 0) : 0);
 
   // Spending — 7 monthly buckets; "other" maps to clothing+subscriptions
   const spendFields = {
@@ -885,6 +906,8 @@ export function onboardingToState(d, baseDefaults) {
 // ---------- Orchestrator ----------
 export default function Onboarding({ onComplete, onSignIn, publicDefaults }) {
   const [step, setStep] = useState(0);
+  const [direction, setDirection] = useState("forward"); // "forward" | "back"
+  const [animKey, setAnimKey] = useState(0);
   const [data, setData] = useState({
     province: "ON",
     partnered: null,
@@ -898,22 +921,23 @@ export default function Onboarding({ onComplete, onSignIn, publicDefaults }) {
   });
 
   function update(key, value) { setData((prev) => ({ ...prev, [key]: value })); }
-  function next() { setStep((s) => s + 1); }
-  function back() { setStep((s) => Math.max(1, s - 1)); }
+  function next() { setDirection("forward"); setAnimKey(k => k + 1); setStep((s) => s + 1); }
+  function back() { setDirection("back"); setAnimKey(k => k + 1); setStep((s) => Math.max(1, s - 1)); }
   function skip() { onComplete(onboardingToState(data, publicDefaults)); }
 
-  // When partner fills their own details, pass a flag so income/savings cards
-  // know to hide spouse fields
   const partnerFillsOwn = data.partnerFillsOwn === true;
+  const animClass = direction === "back" ? "ob-card-enter-back" : "ob-card-enter-forward";
+  // animKey changes on every step change, forcing React to remount and re-trigger the animation
+  const ac = animClass;
 
-  if (step === 0)  return <CardWelcome       onNext={next} onSignIn={onSignIn} />;
-  if (step === 1)  return <CardAboutYou      data={data} onChange={update} onNext={next} onSkip={skip} onBack={null} />;
-  if (step === 2)  return <CardHousehold     data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} />;
-  if (step === 3)  return <CardIncome        data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
-  if (step === 4)  return <CardContributions data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
-  if (step === 5)  return <CardSavings       data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
-  if (step === 6)  return <CardHome          data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
-  if (step === 7)  return <CardSpending      data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
-  if (step === 8)  return <CardVision        data={data} onChange={update} onNext={skip} onSkip={skip} onBack={back} />;
+  if (step === 0)  return <CardWelcome       key={animKey} animClass={ac} onNext={next} onSignIn={onSignIn} />;
+  if (step === 1)  return <CardAboutYou      key={animKey} animClass={ac} data={data} onChange={update} onNext={next} onSkip={skip} onBack={null} />;
+  if (step === 2)  return <CardHousehold     key={animKey} animClass={ac} data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} />;
+  if (step === 3)  return <CardIncome        key={animKey} animClass={ac} data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
+  if (step === 4)  return <CardContributions key={animKey} animClass={ac} data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
+  if (step === 5)  return <CardSavings       key={animKey} animClass={ac} data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
+  if (step === 6)  return <CardHome          key={animKey} animClass={ac} data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
+  if (step === 7)  return <CardSpending      key={animKey} animClass={ac} data={data} onChange={update} onNext={next} onSkip={skip} onBack={back} hideSpouse={partnerFillsOwn} />;
+  if (step === 8)  return <CardVision        key={animKey} animClass={ac} data={data} onChange={update} onNext={skip} onSkip={skip} onBack={back} />;
   return null;
 }
