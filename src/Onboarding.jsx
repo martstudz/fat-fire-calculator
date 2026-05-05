@@ -167,7 +167,7 @@ function CardAboutYou({ data, onChange, onNext, onSkip, onBack, animClass = "" }
   return (
     <Card step={1} totalSteps={9} onSkip={onSkip} canExit={canExit} onExit={onSkip} onBack={onBack} animClass={animClass}>
       <h2 className="ob-heading">
-        {name ? `Nice to meet you, ${name}. 👋` : "Let's start with you. 👋"}
+        {name ? `Nice to meet you, ${name}. 👋` : "Let's start with you 👋"}
       </h2>
       <p className="ob-sub" style={{ marginBottom: 28 }}>Three basics to anchor the plan.</p>
       <div className="pe-row-group">
@@ -189,8 +189,7 @@ function CardAboutYou({ data, onChange, onNext, onSkip, onBack, animClass = "" }
         <div className="inp-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
             <div>
-              <span style={{ fontSize: "var(--step--1)", color: "var(--ink-2)" }}>Province</span>
-              <span className="text-meta" style={{ display: "block", marginTop: 2 }}>· affects tax brackets & life expectancy</span>
+              <span style={{ fontSize: "var(--step--1)", color: "var(--ink-2)" }}>Province <span className="text-meta">· affects tax brackets</span></span>
             </div>
             <div className="pe-field-wrap" style={{ position: "relative" }}>
               <select className="pe-field-input" style={{ textAlign: "right", cursor: "pointer", paddingRight: 24, appearance: "none", WebkitAppearance: "none" }}

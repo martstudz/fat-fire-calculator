@@ -517,7 +517,7 @@ export default function Dashboard({
 
 
       {/* ── Panel 1: FI Hero ── */}
-      <div className="dash-hero" style={{ marginBottom: 24 }}>
+      <div className="dash-hero" style={{ marginBottom: 16 }}>
         <div className="dash-hero__moment dot-bg">
           <div className="label-xs">Years until financial independence</div>
           {retireAge !== null ? (
@@ -615,59 +615,6 @@ export default function Dashboard({
           })()}
         </div>
       </div>
-
-      {/* ── Panel 2: Scenario pressure test ── */}
-      {scenarios && (
-        <Panel style={{ marginBottom: 16 }}>
-          <PanelHead label="Pressure test" title="What if markets disappoint?" />
-          <div className="dash-scenario-grid" style={{ marginTop: 16 }}>
-            {scenarios.map(sc => {
-              const ageDiff = baseScenario && baseScenario.age !== null && sc.age !== null ? sc.age - baseScenario.age : null;
-              const portDiff = baseScenario && baseScenario.portfolioAtRetirement !== null && sc.portfolioAtRetirement !== null
-                ? sc.portfolioAtRetirement - baseScenario.portfolioAtRetirement : null;
-              const isBase = sc.label === "Base";
-              const effectiveSelected = selectedScenarioLabel ?? "Base";
-              const isSelected = sc.label === effectiveSelected;
-              return (
-                <div
-                  key={sc.label}
-                  className={"scen-card" + (isSelected ? " is-active" : "")}
-                  onClick={() => setSelectedScenarioLabel(sc.label === "Base" ? null : sc.label)}
-                >
-                  <div className="label-xs">{sc.label}</div>
-                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", margin: "4px 0 0" }}>{(sc.return * 100).toFixed(1)}% returns · {(sc.inflation * 100).toFixed(1)}% inflation</div>
-                  <div style={{ flex: 1 }} />
-                  {sc.age !== null ? (
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                      <div className="mono" style={{ fontSize: "var(--step-3)", fontWeight: 500, color: isSelected ? "var(--accent)" : "var(--ink)" }}>{sc.age}</div>
-                      {!isBase && ageDiff !== null && (
-                        <div className="mono" style={{ fontSize: "var(--step--1)", color: ageDiff > 0 ? "var(--slate-ink)" : "var(--moss-ink)" }}>
-                          {ageDiff > 0 ? "+" : ""}{ageDiff}y
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: "var(--step-0)", fontWeight: 600, color: "var(--slate)" }}>—</div>
-                  )}
-                  {sc.portfolioAtRetirement !== null && (
-                    <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 4 }}>
-                      {fmt(sc.portfolioAtRetirement)}
-                      {!isBase && portDiff !== null && (
-                        <span style={{ marginLeft: 4, color: portDiff < 0 ? "var(--slate-ink)" : "var(--moss-ink)" }}>
-                          {portDiff > 0 ? "+" : ""}{fmt(portDiff)}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 12 }}>
-            All other inputs held constant. Differences relative to Base.
-          </div>
-        </Panel>
-      )}
 
       {/* ── Net worth chart + Account mix — side by side ── */}
       <div style={{ display: "grid", gridTemplateColumns: retRow ? "1.6fr 1fr" : "1fr", gap: 16, alignItems: "stretch", marginBottom: 16 }}>
@@ -771,6 +718,59 @@ export default function Dashboard({
           )}
         </div>
       </div>
+
+      {/* ── Scenario pressure test ── */}
+      {scenarios && (
+        <Panel style={{ marginBottom: 16 }}>
+          <PanelHead label="Pressure test" title="What if markets disappoint?" />
+          <div className="dash-scenario-grid" style={{ marginTop: 16 }}>
+            {scenarios.map(sc => {
+              const ageDiff = baseScenario && baseScenario.age !== null && sc.age !== null ? sc.age - baseScenario.age : null;
+              const portDiff = baseScenario && baseScenario.portfolioAtRetirement !== null && sc.portfolioAtRetirement !== null
+                ? sc.portfolioAtRetirement - baseScenario.portfolioAtRetirement : null;
+              const isBase = sc.label === "Base";
+              const effectiveSelected = selectedScenarioLabel ?? "Base";
+              const isSelected = sc.label === effectiveSelected;
+              return (
+                <div
+                  key={sc.label}
+                  className={"scen-card" + (isSelected ? " is-active" : "")}
+                  onClick={() => setSelectedScenarioLabel(sc.label === "Base" ? null : sc.label)}
+                >
+                  <div className="label-xs">{sc.label}</div>
+                  <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", margin: "4px 0 0" }}>{(sc.return * 100).toFixed(1)}% returns · {(sc.inflation * 100).toFixed(1)}% inflation</div>
+                  <div style={{ flex: 1 }} />
+                  {sc.age !== null ? (
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                      <div className="mono" style={{ fontSize: "var(--step-3)", fontWeight: 500, color: isSelected ? "var(--accent)" : "var(--ink)" }}>{sc.age}</div>
+                      {!isBase && ageDiff !== null && (
+                        <div className="mono" style={{ fontSize: "var(--step--1)", color: ageDiff > 0 ? "var(--slate-ink)" : "var(--moss-ink)" }}>
+                          {ageDiff > 0 ? "+" : ""}{ageDiff}y
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: "var(--step-0)", fontWeight: 600, color: "var(--slate)" }}>—</div>
+                  )}
+                  {sc.portfolioAtRetirement !== null && (
+                    <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 4 }}>
+                      {fmt(sc.portfolioAtRetirement)}
+                      {!isBase && portDiff !== null && (
+                        <span style={{ marginLeft: 4, color: portDiff < 0 ? "var(--slate-ink)" : "var(--moss-ink)" }}>
+                          {portDiff > 0 ? "+" : ""}{fmt(portDiff)}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: "var(--step--2)", color: "var(--ink-3)", marginTop: 12 }}>
+            All other inputs held constant. Differences relative to Base.
+          </div>
+        </Panel>
+      )}
 
       </div>
     </div>
