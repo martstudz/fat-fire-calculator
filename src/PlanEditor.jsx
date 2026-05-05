@@ -163,8 +163,9 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus, onNa
   const hidden = useContext(PrivacyContext);
   const fmtMoney = (n) => fmt$(n, hidden);
 
-  // Housing type: "mortgage" or "rent"
-  const housingType = s.housingType || (s.mortgage > 0 ? "mortgage" : "rent");
+  // Housing type — derived from ownsHome flag (set by onboarding and toggle below)
+  // Fall back to checking mortgage > 0 for plans created before this flag existed
+  const ownsHome = s.ownsHome != null ? s.ownsHome : s.mortgage > 0;
 
   // Derived values
   const yourBonusAmt = s.yourBase * s.yourBonusPct;
@@ -370,13 +371,13 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus, onNa
             {/* Housing rows in a card */}
             <div className="pe-row-group">
               <div className="inp-row">
-                <span>Housing type</span>
+                <span>Housing</span>
                 <div className="seg">
-                  <button onClick={() => update("housingType")("mortgage")} className={housingType === "mortgage" ? "is-active" : ""}>Mortgage</button>
-                  <button onClick={() => update("housingType")("rent")} className={housingType === "rent" ? "is-active" : ""}>Rent</button>
+                  <button onClick={() => update("ownsHome")(true)} className={ownsHome ? "is-active" : ""}>Own</button>
+                  <button onClick={() => update("ownsHome")(false)} className={!ownsHome ? "is-active" : ""}>Rent</button>
                 </div>
               </div>
-              <Collapse open={housingType === "mortgage"}>
+              <Collapse open={ownsHome}>
                 <div className="inp-row">
                   <span>Mortgage</span>
                   <FieldInput left="$"><CommaInput value={s.mortgage} onChange={update("mortgage")} /></FieldInput>
@@ -414,7 +415,7 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus, onNa
                   <FieldInput left="$"><CommaInput value={s.maintenance} onChange={update("maintenance")} /></FieldInput>
                 </div>
               </Collapse>
-              <Collapse open={housingType === "rent"}>
+              <Collapse open={!ownsHome}>
                 <div className="inp-row">
                   <span>Rent</span>
                   <FieldInput left="$"><CommaInput value={s.rent || 0} onChange={update("rent")} /></FieldInput>
@@ -424,7 +425,7 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus, onNa
                   <FieldInput left="$"><CommaInput value={s.homeInsurance || 0} onChange={update("homeInsurance")} /></FieldInput>
                 </div>
               </Collapse>
-              <div className="inp-row">
+              <div className="inp-row" style={{ borderTop: "1px solid var(--line)" }}>
                 <span>Utilities</span>
                 <FieldInput left="$"><CommaInput value={s.utilities} onChange={update("utilities")} /></FieldInput>
               </div>
