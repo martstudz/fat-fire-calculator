@@ -1140,7 +1140,16 @@ export default function FatFireCalculator() {
             displayRows={displayRows}
             update={update}
             totalMonthlyContrib={totalMonthlyContrib}
-            solveWithOverrides={(overrideInputs) => solveEarliestAge({ ...inputs, ...overrideInputs })}
+            solveWithOverrides={(overrideInputs, forceAge) => {
+              // overrideInputs.startingMonthly is already the full household total
+              // (Dashboard sums all per-person/per-account fields before passing).
+              const merged = { ...inputs, ...overrideInputs };
+              if (forceAge != null) {
+                const res = simulate(merged, forceAge);
+                return { age: forceAge, ...res };
+              }
+              return solveEarliestAge(merged);
+            }}
           />
         )}
         {page === "settings" && (

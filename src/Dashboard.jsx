@@ -127,6 +127,7 @@ export default function Dashboard({
   const [sliderMonthly, setSliderMonthly] = useState(() => Math.min(6000, Math.max(0, baseTotalMonthly)));
   const [sliderSpend, setSliderSpend] = useState(() => Math.min(180000, Math.max(24000, Math.round(baseRetirementSpend / 1000) * 1000)));
   const [sliderAge, setSliderAge] = useState(() => solved.age ? Math.min(70, Math.max(40, solved.age)) : 55);
+  const [ageSliderTouched, setAgeSliderTouched] = useState(false);
   const [liveActive, setLiveActive] = useState(false);
 
   // Quick preset toggles
@@ -142,7 +143,7 @@ export default function Dashboard({
     if (!liveActive) {
       setSliderMonthly(Math.min(6000, Math.max(0, baseTotalMonthly)));
       setSliderSpend(Math.min(180000, Math.max(24000, Math.round(baseRetirementSpend / 1000) * 1000)));
-      if (solved.age) setSliderAge(Math.min(70, Math.max(40, solved.age)));
+      if (solved.age) { setSliderAge(Math.min(70, Math.max(40, solved.age))); setAgeSliderTouched(false); }
     }
   }, [baseTotalMonthly, baseRetirementSpend, solved.age]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -171,6 +172,7 @@ export default function Dashboard({
       }
       if (key === "delayRetirement") {
         setSliderAge(a => Math.min(70, Math.max(40, a + (adding ? PRESET_AGE_DELTA : -PRESET_AGE_DELTA))));
+        setAgeSliderTouched(adding);
         setLiveActive(true);
       }
 
@@ -180,6 +182,7 @@ export default function Dashboard({
 
   function resetAll() {
     setLiveActive(false);
+    setAgeSliderTouched(false);
     setActivePresets(new Set());
     setSliderMonthly(Math.min(6000, Math.max(0, baseTotalMonthly)));
     setSliderSpend(Math.min(180000, Math.max(24000, Math.round(baseRetirementSpend / 1000) * 1000)));
@@ -193,17 +196,16 @@ export default function Dashboard({
     if (!previewActive) return inputs;
 
     // --- Slider: monthly savings ---
-    // Scale each contribution account proportionally so the ratios are preserved
-    const contribScale = baseTotalMonthly > 0 ? sliderMonthly / baseTotalMonthly : 0;
-    const scaledMonthly = {
-      startingMonthly:   Math.round((s.startingMonthly   || 0) * contribScale),
-      yourTfsaMonthly:   Math.round((s.yourTfsaMonthly   || 0) * contribScale),
-      yourNrMonthly:     Math.round((s.yourNrMonthly     || 0) * contribScale),
-      spouseMonthly:     Math.round((s.spouseMonthly     || 0) * contribScale),
-      spouseTfsaMonthly: Math.round((s.spouseTfsaMonthly || 0) * contribScale),
-      spouseNrMonthly:   Math.round((s.spouseNrMonthly   || 0) * contribScale),
-    };
-    const scaledStartingMonthly = Object.values(scaledMonthly).reduce((a, b) => a + b, 0);
+    // When base contributions exist, scale each field proportionally.
+    // When base is 0, put the full slider amount into RRSP as a sensible default.
+    let scaledStartingMonthly;
+    if (baseTotalMonthly > 0) {
+      const contribScale = sliderMonthly / baseTotalMonthly;
+      scaledStartingMonthly = Math.round(baseTotalMonthly * contribScale); // == sliderMonthly
+    } else {
+      scaledStartingMonthly = sliderMonthly;
+    }
+    const scaledMonthly = {}; // individual fields not needed — engine reads startingMonthly total
 
     // --- Slider: retirement spend ---
     const sliderRetirementSpend = sliderSpend; // annual, today's $
@@ -232,21 +234,16 @@ export default function Dashboard({
   const previewSolved = useMemo(() => {
     if (!previewActive || !solveWithOverrides) return solved;
     const overrides = {
+      // startingMonthly is already the full household total (all accounts, both persons)
       startingMonthly: previewInputs.startingMonthly,
       retirementSpendOverride: previewInputs.retirementSpendOverride,
-      ...Object.fromEntries(
-        ["yourTfsaMonthly","yourNrMonthly","spouseMonthly","spouseTfsaMonthly","spouseNrMonthly"]
-          .map(k => [k, previewInputs[k]])
-      ),
     };
-    let result = solveWithOverrides(overrides);
-    // Preset: delay retirement — enforce minimum age floor
-    if (activePresets.has("delayRetirement") && result.age !== null) {
-      const floor = Math.min(70, (solved.age || s.currentAge) + 10);
-      if (result.age < floor) result = { ...result, age: floor };
-    }
+    // When the age slider has been deliberately moved, force simulate at that
+    // specific age. Otherwise let the engine find the earliest sustainable age.
+    const forceAge = ageSliderTouched ? sliderAge : null;
+    const result = solveWithOverrides(overrides, forceAge);
     return result;
-  }, [previewActive, solveWithOverrides, previewInputs, activePresets, solved, s.currentAge]);
+  }, [previewActive, ageSliderTouched, sliderAge, solveWithOverrides, previewInputs, solved, s.currentAge]);
 
   // Preview display rows (today's $ projections for the chart)
   const previewDisplayRows = useMemo(() => {
@@ -362,15 +359,8 @@ export default function Dashboard({
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
 
       {/* ── Preview banner — spans full width above both columns ── */}
-      {previewActive && (
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          gap: 12, flexShrink: 0,
-          padding: "11px 20px",
-          background: "var(--sun-soft)",
-          borderBottom: "1px solid var(--sun)",
-          fontSize: "var(--step--2)",
-        }}>
+      <div className={`dash-preview-banner${previewActive ? " is-active" : ""}`}>
+        <div className="dash-preview-banner__inner">
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 14 }}>🔮</span>
             <span style={{ fontWeight: 600, color: "var(--sun-ink)" }}>Scenario preview</span>
@@ -394,7 +384,7 @@ export default function Dashboard({
             ↺ Reset
           </button>
         </div>
-      )}
+      </div>
 
     <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
 
@@ -443,7 +433,7 @@ export default function Dashboard({
             format={v => `age ${v}`}
             tone="dusk"
             sub="When you stop working"
-            onChange={v => { setSliderAge(v); setLiveActive(true); }}
+            onChange={v => { setSliderAge(v); setAgeSliderTouched(true); setLiveActive(true); }}
           />
         </div>
 

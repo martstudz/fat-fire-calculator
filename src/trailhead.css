@@ -622,6 +622,30 @@ input, select, textarea {
   gap: 16px;
 }
 
+/* ── Scenario preview banner ── */
+.dash-preview-banner {
+  overflow: hidden;
+  flex-shrink: 0;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 280ms cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 220ms ease;
+}
+.dash-preview-banner.is-active {
+  max-height: 80px;
+  opacity: 1;
+}
+.dash-preview-banner__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 20px;
+  background: var(--sun-soft);
+  border-bottom: 1px solid var(--sun);
+  font-size: var(--step--2);
+}
+
 .dash-hero {
   display: grid;
   grid-template-columns: 1.1fr 1fr;
@@ -1212,6 +1236,23 @@ input, select, textarea {
   border-color: var(--line);
 }
 
+/* Collapsed PersonBlock — hides content with animation while staying a direct child */
+.pe-person--collapsed {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  border-bottom-width: 0 !important;
+  transition: max-height 280ms cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 220ms ease,
+              border-bottom-width 280ms;
+}
+.pe-person:not(.pe-person--collapsed) {
+  max-height: 2000px;
+  opacity: 1;
+  transition: max-height 280ms cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 220ms ease;
+}
+
 /* ── PersonGroup — outer card wrapping one or more PersonBlocks + total footer ── */
 .pe-person-group {
   border: 1px solid var(--line);
@@ -1557,6 +1598,23 @@ input, select, textarea {
 }
 .collapse-inner {
   overflow: hidden;
+}
+
+/* Collapsible inp-row — stays a direct child so border selectors work */
+.collapse-row {
+  overflow: hidden;
+  max-height: 200px;
+  transition: max-height 280ms cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 220ms ease,
+              padding 280ms cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+}
+.collapse-row.is-collapsed {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-bottom-width: 0;
 }
 
 /* Colour-dot swatch — small coloured block used in legends */

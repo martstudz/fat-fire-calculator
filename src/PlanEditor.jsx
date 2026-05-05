@@ -136,11 +136,13 @@ function AccSection({ id, title, icon, defaultOpen = true, children }) {
           <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </button>
-      {open && (
-        <div className="pe-fields pe-fields--section">
-          {children}
+      <div className={`collapse-wrap${open ? "" : " is-collapsed"}`}>
+        <div className="collapse-inner">
+          <div className="pe-fields pe-fields--section">
+            {children}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -246,7 +248,7 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
         <div className="pe-stack" style={{ padding: "0 32px 60px", maxWidth: 680 }}>
 
           {/* ── Household ── */}
-          <AccSection id="household" title="Household" icon="👥">
+          <AccSection id="household" title="Household" icon="🏡">
             <PersonGroup>
               <PersonBlock name={s.yourName || "You"} variant="you">
                 <div className="inp-row">
@@ -264,23 +266,21 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
                 <NumInput label="Current age" value={s.currentAge} onChange={update("currentAge")} small />
               </PersonBlock>
 
-              <Collapse open={s.partnered !== false}>
-                <PersonBlock name={s.spouseName || "Spouse"} variant="spouse">
-                  <div className="inp-row">
-                    <span>Name</span>
-                    <div className="pe-field-wrap">
-                      <input
-                        type="text"
-                        value={s.spouseName || ""}
-                        placeholder="e.g. Jamie"
-                        onChange={(e) => update("spouseName")(e.target.value)}
-                        className="pe-field-input"
-                      />
-                    </div>
+              <PersonBlock name={s.spouseName || "Spouse"} variant="spouse" open={s.partnered !== false}>
+                <div className="inp-row">
+                  <span>Name</span>
+                  <div className="pe-field-wrap">
+                    <input
+                      type="text"
+                      value={s.spouseName || ""}
+                      placeholder="e.g. Jamie"
+                      onChange={(e) => update("spouseName")(e.target.value)}
+                      className="pe-field-input"
+                    />
                   </div>
-                  <NumInput label="Current age" value={s.spouseCurrentAge} onChange={update("spouseCurrentAge")} small />
-                </PersonBlock>
-              </Collapse>
+                </div>
+                <NumInput label="Current age" value={s.spouseCurrentAge} onChange={update("spouseCurrentAge")} small />
+              </PersonBlock>
             </PersonGroup>
 
             <PersonBlock name="Household" variant="shared">
@@ -312,12 +312,10 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
                 <NumInput label="Bonus" value={Math.round(s.yourBase * (s.yourBonusPct || 0))} onChange={(v) => update("yourBonusPct")(s.yourBase > 0 ? v / s.yourBase : 0)} prefix="$" step={1000} hint="annual average" />
               </PersonBlock>
 
-              <Collapse open={s.partnered !== false}>
-                <PersonBlock name={s.spouseName || "Spouse"} variant="spouse">
-                  <NumInput label="Base pay" value={s.spouseBase} onChange={update("spouseBase")} prefix="$" step={1000} hint="annual salary" />
-                  <NumInput label="Bonus" value={Math.round(s.spouseBase * (s.spouseBonusPct || 0))} onChange={(v) => update("spouseBonusPct")(s.spouseBase > 0 ? v / s.spouseBase : 0)} prefix="$" step={1000} hint="annual average" />
-                </PersonBlock>
-              </Collapse>
+              <PersonBlock name={s.spouseName || "Spouse"} variant="spouse" open={s.partnered !== false}>
+                <NumInput label="Base pay" value={s.spouseBase} onChange={update("spouseBase")} prefix="$" step={1000} hint="annual salary" />
+                <NumInput label="Bonus" value={Math.round(s.spouseBase * (s.spouseBonusPct || 0))} onChange={(v) => update("spouseBonusPct")(s.spouseBase > 0 ? v / s.spouseBase : 0)} prefix="$" step={1000} hint="annual average" />
+              </PersonBlock>
             </PersonGroup>
 
             <PersonBlock name="Tax & growth" variant="shared">
@@ -418,12 +416,10 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
                 <span>Health <span className="pe-row-sub">insurance, gym, chiro</span></span>
                 <FieldInput left="$"><CommaInput value={s.personalCare||0} onChange={update("personalCare")} /></FieldInput>
               </div>
-              <Collapse open={s.hasKids !== false}>
-                <div className="inp-row">
-                  <span>Childcare <span className="pe-row-sub">daycare, activities</span></span>
-                  <FieldInput left="$"><CommaInput value={s.childcare} onChange={update("childcare")} /></FieldInput>
-                </div>
-              </Collapse>
+              <div className={`inp-row collapse-row${s.hasKids !== false ? "" : " is-collapsed"}`}>
+                <span>Childcare <span className="pe-row-sub">daycare, activities</span></span>
+                <FieldInput left="$"><CommaInput value={s.childcare} onChange={update("childcare")} /></FieldInput>
+              </div>
               <div className="inp-row">
                 <span>Other <span className="pe-row-sub">subscriptions, gifts</span></span>
                 <FieldInput left="$"><CommaInput value={(s.clothing||0)+(s.subscriptions||0)} onChange={(v) => { update("clothing")(Math.round(v*0.4)); update("subscriptions")(Math.round(v*0.6)); }} /></FieldInput>
@@ -450,7 +446,7 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
           </AccSection>
 
           {/* ── Savings & Portfolio ── */}
-          <AccSection id="savings" title="Savings & Portfolio" icon="📊">
+          <AccSection id="savings" title="Savings & Portfolio" icon="📈">
 
             {/* Account balances */}
             <div className="label-xs pe-section-label">Account balances</div>
@@ -463,13 +459,11 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
                 <NumInput label={<>TFSA <span className="pe-row-sub">tax-free</span></>} value={s.yourTfsaStart || 0} onChange={update("yourTfsaStart")} prefix="$" />
                 <NumInput label={<>Non-reg <span className="pe-row-sub">taxable</span></>} value={s.yourNrStart || 0} onChange={update("yourNrStart")} prefix="$" />
               </PersonBlock>
-              <Collapse open={s.partnered !== false}>
-                <PersonBlock name={s.spouseName || "Spouse"} variant="spouse">
-                  <NumInput label={<>RRSP <span className="pe-row-sub">tax-deferred</span></>} value={s.spouseRrspStart || 0} onChange={update("spouseRrspStart")} prefix="$" />
-                  <NumInput label={<>TFSA <span className="pe-row-sub">tax-free</span></>} value={s.spouseTfsaStart || 0} onChange={update("spouseTfsaStart")} prefix="$" />
-                  <NumInput label={<>Non-reg <span className="pe-row-sub">taxable</span></>} value={s.spouseNrStart || 0} onChange={update("spouseNrStart")} prefix="$" />
-                </PersonBlock>
-              </Collapse>
+              <PersonBlock name={s.spouseName || "Spouse"} variant="spouse" open={s.partnered !== false}>
+                <NumInput label={<>RRSP <span className="pe-row-sub">tax-deferred</span></>} value={s.spouseRrspStart || 0} onChange={update("spouseRrspStart")} prefix="$" />
+                <NumInput label={<>TFSA <span className="pe-row-sub">tax-free</span></>} value={s.spouseTfsaStart || 0} onChange={update("spouseTfsaStart")} prefix="$" />
+                <NumInput label={<>Non-reg <span className="pe-row-sub">taxable</span></>} value={s.spouseNrStart || 0} onChange={update("spouseNrStart")} prefix="$" />
+              </PersonBlock>
             </PersonGroup>
 
             {/* Monthly savings */}
@@ -483,13 +477,11 @@ export default function PlanEditor({ s, update, solved, inputs, saveStatus }) {
                 <NumInput label={<>TFSA <span className="pe-row-sub">tax-free</span></>} value={s.yourTfsaMonthly || 0} onChange={update("yourTfsaMonthly")} prefix="$" />
                 <NumInput label={<>Non-reg <span className="pe-row-sub">taxable</span></>} value={s.yourNrMonthly || 0} onChange={update("yourNrMonthly")} prefix="$" />
               </PersonBlock>
-              <Collapse open={s.partnered !== false}>
-                <PersonBlock name={s.spouseName || "Spouse"} variant="spouse">
-                  <NumInput label={<>RRSP <span className="pe-row-sub">tax-deferred</span></>} value={s.spouseMonthly || 0} onChange={update("spouseMonthly")} prefix="$" />
-                  <NumInput label={<>TFSA <span className="pe-row-sub">tax-free</span></>} value={s.spouseTfsaMonthly || 0} onChange={update("spouseTfsaMonthly")} prefix="$" />
-                  <NumInput label={<>Non-reg <span className="pe-row-sub">taxable</span></>} value={s.spouseNrMonthly || 0} onChange={update("spouseNrMonthly")} prefix="$" />
-                </PersonBlock>
-              </Collapse>
+              <PersonBlock name={s.spouseName || "Spouse"} variant="spouse" open={s.partnered !== false}>
+                <NumInput label={<>RRSP <span className="pe-row-sub">tax-deferred</span></>} value={s.spouseMonthly || 0} onChange={update("spouseMonthly")} prefix="$" />
+                <NumInput label={<>TFSA <span className="pe-row-sub">tax-free</span></>} value={s.spouseTfsaMonthly || 0} onChange={update("spouseTfsaMonthly")} prefix="$" />
+                <NumInput label={<>Non-reg <span className="pe-row-sub">taxable</span></>} value={s.spouseNrMonthly || 0} onChange={update("spouseNrMonthly")} prefix="$" />
+              </PersonBlock>
             </PersonGroup>
 
             <PersonBlock name="Savings growth" variant="shared">

@@ -4,9 +4,11 @@ import React from "react";
 // Coloured-header pill wrapping fields for one person.
 // variant: "you" | "spouse" | "shared"
 // When inside a PersonGroup the outer border is stripped via CSS child selector.
-export function PersonBlock({ name, variant = "you", children }) {
+// open: when false, the block collapses with animation. Defaults to true.
+// This keeps PersonBlock a direct child of PersonGroup so CSS selectors work.
+export function PersonBlock({ name, variant = "you", open = true, children }) {
   return (
-    <div className={`pe-person pe-person--${variant}`}>
+    <div className={`pe-person pe-person--${variant}${open ? "" : " pe-person--collapsed"}`}>
       <div className="pe-person__header">
         <span className="pe-person__dot" />
         {name}
