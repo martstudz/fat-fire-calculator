@@ -917,6 +917,11 @@ export default function Onboarding({ onComplete, onSignIn, publicDefaults }) {
     visionWorkLevel: 1,
     cppAmountToday: 9300,
     spouseCppAmountToday: 9300,
+    // Intermediate fields used during onboarding and converted to pct at completion
+    yourBonusDollar: 0,
+    spouseBonusDollar: 0,
+    yourEquityDollar: 0,
+    spouseEquityDollar: 0,
   });
 
   function update(key, value) { setData((prev) => ({ ...prev, [key]: value })); }

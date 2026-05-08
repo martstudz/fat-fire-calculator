@@ -39,6 +39,47 @@ export function rrifMinimum(balance, age) {
   return balance * factor;
 }
 
+// ---------- input sanitisation ----------
+// Clamps all numeric inputs to safe ranges before they reach the simulation,
+// preventing NaN / Infinity from propagating silently through calculations.
+export function sanitiseInputs(p) {
+  const clamp = (v, lo, hi, fallback) => {
+    const n = Number(v);
+    if (!isFinite(n)) return fallback;
+    return Math.max(lo, Math.min(hi, n));
+  };
+  return {
+    ...p,
+    currentAge:            clamp(p.currentAge,            0,   120, 30),
+    spouseCurrentAge:      clamp(p.spouseCurrentAge,       0,   120, 0),
+    deathAge:              Math.max(clamp(p.deathAge, 0, 120, 90), (p.currentAge || 30) + 1),
+    investmentReturn:      clamp(p.investmentReturn,       -0.5, 0.5, 0.07),
+    inflation:             clamp(p.inflation,              0,    0.3, 0.03),
+    taxRate:               clamp(p.taxRate,                0,    0.99, 0.33),
+    incomeGrowth:          clamp(p.incomeGrowth,           -0.2, 0.5, 0.03),
+    yourBase:              clamp(p.yourBase,               0, 10_000_000, 0),
+    spouseBase:            clamp(p.spouseBase,             0, 10_000_000, 0),
+    yourBonusPct:          clamp(p.yourBonusPct,           0,    5, 0),
+    spouseBonusPct:        clamp(p.spouseBonusPct,         0,    5, 0),
+    yourEquityPct:         clamp(p.yourEquityPct,          0,    5, 0),
+    spouseEquityPct:       clamp(p.spouseEquityPct,        0,    5, 0),
+    startingMonthly:       clamp(p.startingMonthly,        0, 500_000, 0),
+    rrspStart:             clamp(p.rrspStart,              0, 1_000_000_000, 0),
+    tfsaStart:             clamp(p.tfsaStart,              0, 1_000_000_000, 0),
+    nrStart:               clamp(p.nrStart,                0, 1_000_000_000, 0),
+    mortgagePrincipal:     clamp(p.mortgagePrincipal,      0, 100_000_000, 0),
+    mortgageRate:          clamp(p.mortgageRate,           0,    0.5, 0),
+    mortgagePayment:       clamp(p.mortgagePayment,        0, 1_000_000, 0),
+    monthlyExpensesTotal:  clamp(p.monthlyExpensesTotal,   0, 1_000_000, 0),
+    retirementSpendOverride: clamp(p.retirementSpendOverride, 0, 10_000_000, 0),
+    terminalTargetToday:   clamp(p.terminalTargetToday,    0, 1_000_000_000, 0),
+    cppAmountToday:        clamp(p.cppAmountToday,         0,   20_000, 0),
+    cppStartAge:           clamp(p.cppStartAge,            60,      70, 65),
+    rrspTaxRate:           clamp(p.rrspTaxRate,            0,    0.99, 0.37),
+    nrCapGainsRate:        clamp(p.nrCapGainsRate,         0,    0.99, 0.21),
+  };
+}
+
 // ---------- core simulation ----------
 // Simulate a full life path from currentAge through deathAge, retiring at retirementAge.
 //
@@ -54,7 +95,8 @@ export function rrifMinimum(balance, age) {
 //   TFSA is always the last resort / shock absorber.
 //   Non-reg gains taxed at 50% inclusion × retirement marginal rate.
 //
-export function simulate(p, retirementAge) {
+export function simulate(rawP, retirementAge) {
+  const p = sanitiseInputs(rawP);
   const years = Math.max(0, p.deathAge - p.currentAge + 1);
   const totalAnnualSpendToday = p.monthlyExpensesTotal * 12;
   // Retirement spend can differ from working-life spend.
@@ -278,9 +320,9 @@ export function solveEarliestAge(inputs) {
 // ---------- Monte Carlo ----------
 // Box-Muller transform: two uniform random numbers → standard normal sample.
 function randNormal() {
-  let u, v;
-  do { u = Math.random(); } while (u === 0);
-  do { v = Math.random(); } while (v === 0);
+  // Box-Muller — guard against log(0) without a loop
+  const u = Math.random() || Number.MIN_VALUE;
+  const v = Math.random() || Number.MIN_VALUE;
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 

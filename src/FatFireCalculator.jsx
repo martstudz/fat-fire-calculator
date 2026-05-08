@@ -185,12 +185,15 @@ function buildInputs(s) {
         s.partnered !== false, s.province || "ON"
       );
 
+  // Clamp every expense field to ≥ 0 — prevents negative totals if localStorage
+  // is tampered with (e.g. { mortgage: -999999 } injected via DevTools).
+  const nn = (v) => Math.max(0, Number(v) || 0);
   const monthlyExpensesTotal =
-      (s.mortgage || 0) + (s.rent || 0) + (s.maintenance || 0) + (s.propertyTax || 0) +
-      (s.utilities || 0) + (s.homeInsurance || 0) +
-      (s.transport || 0) + (s.groceries || 0) + (s.dining || 0) + (s.clothing || 0) +
-      (s.travel || 0) + (s.entertainment || 0) + (s.childcare || 0) + (s.subscriptions || 0) + (s.personalCare || 0) +
-      (s.carPayment || 0) + (s.carGas || 0) + (s.carInsurance || 0) + (s.carParking || 0);
+      nn(s.mortgage) + nn(s.rent) + nn(s.maintenance) + nn(s.propertyTax) +
+      nn(s.utilities) + nn(s.homeInsurance) +
+      nn(s.transport) + nn(s.groceries) + nn(s.dining) + nn(s.clothing) +
+      nn(s.travel) + nn(s.entertainment) + nn(s.childcare) + nn(s.subscriptions) + nn(s.personalCare) +
+      nn(s.carPayment) + nn(s.carGas) + nn(s.carInsurance) + nn(s.carParking);
 
   // Retirement spend: default to current spend if not explicitly overridden
   const retirementSpendOverride = (s.retirementSpendOverride && s.retirementSpendOverride > 0)
@@ -401,13 +404,24 @@ function InfoBox({ children }) {
 const STORAGE_KEY = "fatfire_inputs_v2";
 const ONBOARDING_KEY = "fatfire_onboarding_done";
 
+// Keys that are allowed to be read back from localStorage — prevents prototype
+// pollution if the stored JSON is ever tampered with.
+const ALLOWED_STATE_KEYS = new Set(Object.keys(defaults));
+
 function loadSaved() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaults;
     const parsed = JSON.parse(raw);
-    // Merge with defaults so new fields always have a value
-    return { ...defaults, ...parsed };
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return defaults;
+    // Only accept known keys — drop anything unexpected
+    const safe = {};
+    for (const key of ALLOWED_STATE_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(parsed, key)) {
+        safe[key] = parsed[key];
+      }
+    }
+    return { ...defaults, ...safe };
   } catch {
     return defaults;
   }
@@ -490,10 +504,29 @@ export default function FatFireCalculator() {
   }
 
   // ── Check URL for ?join=CODE on load ──────────────────────────────────────
+  // Validate join codes to alphanumeric only, max 20 chars
+  const JOIN_CODE_RE = /^[A-Z0-9]{4,20}$/;
+  function sanitiseJoinCode(raw) {
+    if (!raw) return null;
+    const upper = String(raw).toUpperCase().replace(/[^A-Z0-9]/g, "");
+    return JOIN_CODE_RE.test(upper) ? upper : null;
+  }
+
   const pendingJoinCode = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get("join") || null;
+    const code = sanitiseJoinCode(params.get("join"));
+    // Remove the join code from the URL immediately so it can't be accidentally
+    // shared in screenshots or copy-pasted browser URLs.
+    if (code) {
+      const clean = new URL(window.location.href);
+      clean.searchParams.delete("join");
+      window.history.replaceState({}, "", clean.toString());
+    }
+    return code;
   }, []);
+
+  // Confirmation state for URL-triggered joins
+  const [showJoinConfirm, setShowJoinConfirm] = useState(false);
 
   // ── Auth: listen for session changes ──────────────────────────────────────
   useEffect(() => {
@@ -547,15 +580,8 @@ export default function FatFireCalculator() {
 
     // 2. Handle pending join code (only if not already in a household)
     if (!hasHousehold && pendingJoinCode) {
-      // Load personal plan first so we know if picker is needed after joining
-      const { data: existingPersonal } = await supabase
-        .from("personal_plans")
-        .select("id, inputs")
-        .eq("user_id", userId)
-        .single();
-      if (existingPersonal) setPersonalPlanId(existingPersonal.id);
-
-      await joinHouseholdByCode(userId, pendingJoinCode, existingPersonal);
+      // Show confirmation dialog — don't auto-join without user consent
+      setShowJoinConfirm(true);
       return;
     }
 
@@ -771,13 +797,27 @@ export default function FatFireCalculator() {
   async function handleJoinSubmit() {
     if (!user) { signInWithGoogle(); return; }
     setJoinError("");
+    const code = sanitiseJoinCode(joinInput.trim());
+    if (!code) { setJoinError("Invalid code — codes are 4–20 alphanumeric characters."); return; }
     const { data: existingPersonal } = await supabase
       .from("personal_plans")
       .select("id, inputs")
       .eq("user_id", user.id)
       .single();
     if (existingPersonal) setPersonalPlanId(existingPersonal.id);
-    await joinHouseholdByCode(user.id, joinInput.trim(), existingPersonal);
+    await joinHouseholdByCode(user.id, code, existingPersonal);
+  }
+
+  async function confirmUrlJoin() {
+    setShowJoinConfirm(false);
+    if (!user || !pendingJoinCode) return;
+    const { data: existingPersonal } = await supabase
+      .from("personal_plans")
+      .select("id, inputs")
+      .eq("user_id", user.id)
+      .single();
+    if (existingPersonal) setPersonalPlanId(existingPersonal.id);
+    await joinHouseholdByCode(user.id, pendingJoinCode, existingPersonal);
   }
 
   const shareUrl = household
@@ -826,10 +866,11 @@ export default function FatFireCalculator() {
   }
 
   async function signInWithGoogle() {
-    // Preserve join code through the OAuth redirect
+    // Always construct redirectTo from known origin+pathname — never use window.location.href
+    // directly, as that could include arbitrary query params from an attacker's link.
     const redirectTo = pendingJoinCode
       ? `${window.location.origin}${window.location.pathname}?join=${pendingJoinCode}`
-      : window.location.href;
+      : `${window.location.origin}${window.location.pathname}`;
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo },
@@ -970,7 +1011,7 @@ export default function FatFireCalculator() {
         <div className="modal-overlay">
           <div className="modal-card">
             <h2>Start over?</h2>
-            <p>This will clear all your inputs and take you back to the beginning. Any unsaved changes will be lost — this can't be undone.</p>
+            <p>This will clear your inputs locally and take you back to the beginning. If you're signed in, your cloud-saved plan is unaffected and can be restored by signing in again.</p>
             <button onClick={confirmReset} className="btn btn--primary" style={{ width: "100%", marginBottom: 10, background: "oklch(42% 0.14 25)", justifyContent: "center" }}>
               Yes, clear everything and start over
             </button>
@@ -989,7 +1030,7 @@ export default function FatFireCalculator() {
               <span className="modal-choice-btn__icon">💻</span>
               <div>
                 <div className="modal-choice-btn__title">Keep browser inputs</div>
-                <div className="modal-choice-btn__desc">Use what you just entered — this will overwrite your saved plan</div>
+                <div className="modal-choice-btn__desc">Use what you just entered — your cloud-saved plan will not be changed until you save</div>
               </div>
             </button>
             <button onClick={() => { setS({ ...publicDefaults, ...mergeConflict.cloudInputs }); localStorage.removeItem(STORAGE_KEY); setMergeConflict(null); }} className="modal-choice-btn">
@@ -1021,6 +1062,19 @@ export default function FatFireCalculator() {
                 <div className="modal-choice-btn__desc">Shared with {householdMembers.length > 1 ? `${householdMembers.length} members` : "your household"} — changes sync for everyone</div>
               </div>
             </button>
+          </div>
+        </div>
+      )}
+      {showJoinConfirm && (
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <h2>Join a household?</h2>
+            <p>You were invited to join a shared household plan via a link. Your financial data will sync with the household members.</p>
+            <p style={{ fontSize: "var(--step--1)", color: "var(--ink-3)" }}>Code: <strong>{pendingJoinCode}</strong></p>
+            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+              <button onClick={confirmUrlJoin} className="btn btn--primary">Accept &amp; join</button>
+              <button onClick={() => setShowJoinConfirm(false)} className="btn btn--outline">Decline</button>
+            </div>
           </div>
         </div>
       )}
